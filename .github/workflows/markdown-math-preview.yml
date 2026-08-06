@@ -38,6 +38,11 @@ jobs:
       - name: Reject Markdown that still needs normalization
         run: python .github/scripts/normalize_markdown_math.py .
 
+      - name: Diagnose GitHub inline math recognition
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python .github/scripts/diagnose_github_inline_math.py
+
       - name: Validate GitHub GFM math classification
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,7 +79,7 @@ jobs:
             exit 0
           fi
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898287+github-actions[bot]@users.noreply.github.com"
           git add -- \
             RankMixer/README.md \
             RankMixer/docs/01_literature_and_diagnosis.md \
