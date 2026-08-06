@@ -32,6 +32,21 @@ for source, target in inline_fixes.items():
     if source not in doc:
         raise RuntimeError(f"Expected inline expression was not found: {source}")
     doc = doc.replace(source, target)
+
+# GitHub's inline-dollar recognizer is conservative when delimiters touch CJK
+# punctuation. Delimit the affected expressions with spaces explicitly.
+doc = doc.replace(
+    "backbone、$T=H=16$、PFFN",
+    "backbone、 $T=H=16$ 、PFFN",
+)
+doc = doc.replace(
+    r"测试 $\alpha\in\{1,2\}$，不能",
+    r"测试 $\alpha\in\{1,2\}$ ，不能",
+)
+doc = doc.replace(
+    r"建议从 $\lambda_g\in\{0,10^{-5},10^{-4}\}$ 搜索",
+    r"建议从 $\lambda_g\in\{0,10^{-5},10^{-4}\}$ 搜索",
+)
 doc_path.write_text(doc, encoding="utf-8")
 
 readme_path = root / "RankMixer/README.md"
