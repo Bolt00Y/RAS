@@ -8,30 +8,30 @@ on:
       - "**/*.md"
       - ".github/scripts/**"
       - ".github/workflows/markdown-math-preview.yml"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".github/scripts/**"
+      - ".github/workflows/markdown-math-preview.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate-and-fix:
-    if: github.actor != 'github-actions[bot]'
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out RankMixer
+      - name: Check out the exact revision
         uses: actions/checkout@v4
         with:
-          ref: RankMixer
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Convert remaining inline equations
-        run: python .github/scripts/fix_remaining_inline_math.py
 
       - name: Reject Markdown that still needs normalization
         run: python .github/scripts/normalize_markdown_math.py .
@@ -62,16 +62,5 @@ jobs:
             "$validator_dir/validate_markdown_math.mjs"
           node "$validator_dir/validate_markdown_math.mjs" "$GITHUB_WORKSPACE"
 
-      - name: Commit corrected document
-        shell: bash
-        run: |
-          git diff --check
-          if git diff --quiet -- RankMixer/docs/02_modification_schemes.md; then
-            echo "No correction was needed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- RankMixer/docs/02_modification_schemes.md
-          git commit -m "Render remaining inline equations in GitHub Preview [skip ci]"
-          git push origin HEAD:RankMixer
+      - name: Check whitespace integrity
+        run: git diff --check
