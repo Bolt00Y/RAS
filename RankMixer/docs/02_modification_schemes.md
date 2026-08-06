@@ -13,13 +13,13 @@ X0 = [B, T, D]
 
 当前基线：
 
-\[
+$$
 \begin{aligned}
 S_l &= \mathrm{LN}(\mathrm{Mix}(X_{l-1}) + X_{l-1}),\\
 X_l &= \mathrm{LN}(\mathrm{PFFN}(S_l) + S_l),\\
 h &= \mathrm{MeanPool}(X_L).
 \end{aligned}
-\]
+$$
 
 所有方案都必须从该基线独立出发，不允许首轮一次组合多个新增模块。
 
@@ -59,9 +59,9 @@ perm = torch.randperm(1234, generator=fixed_generator)
 
 每组仍使用独立投影：
 
-\[
+$$
 x_i=W_i\operatorname{Concat}(e_j:j\in G_i)+b_i,\quad x_i\in\mathbb{R}^{768}.
-\]
+$$
 
 最终仍为：
 
@@ -114,14 +114,14 @@ X_local: [B, 15, 768]
 
 使用 local token 的一阶与二阶统计构造 global token：
 
-\[
+$$
 \begin{aligned}
 \mu &= \frac{1}{15}\sum_{i=1}^{15}x_i,\\
 r &= \sqrt{\frac{1}{15}\sum_{i=1}^{15}x_i^2+\epsilon},\\
 u &= [\mu;r]\in\mathbb{R}^{1536},\\
 g &= W_2\operatorname{SiLU}(W_1u)\in\mathbb{R}^{768}.
 \end{aligned}
-\]
+$$
 
 首版设置：
 
@@ -179,10 +179,10 @@ RM-R4: RM-R3 + selective multi-embedding
 
 对每层输出 `H ∈ R^[B,T,D]`，按样本计算：
 
-\[
+$$
 \operatorname{erank}(H_b)=\exp\left(-\sum_i p_i\log p_i\right),
 \quad p_i=\frac{\sigma_i}{\sum_j\sigma_j}.
-\]
+$$
 
 由于 `T=16`，每个样本只需对 `16×768` 矩阵做 SVD；训练时每隔固定步数抽样计算即可。
 
@@ -238,9 +238,9 @@ X1 = X + pSwiGLU_orig(RMSNorm(R))
 
 ## 2.3 Per-token SwiGLU
 
-\[
+$$
 \operatorname{pSwiGLU}(x)=W_{down}\left(\operatorname{SiLU}(W_{gate}x)\odot W_{up}x\right).
-\]
+$$
 
 每个 token 拥有独立的 `W_gate/W_up/W_down`。
 
@@ -314,9 +314,9 @@ L = 4, 6
 - 在中间层增加 auxiliary CVR head；
 - 总损失：
 
-\[
+$$
 \mathcal{L}=\mathcal{L}_{final}+\lambda_{aux}\mathcal{L}_{mid}.
-\]
+$$
 
 建议搜索：
 
@@ -406,9 +406,9 @@ Z_l: [48,48], l=1..4
 
 每个 block 有系数 `omega_i ∈ R^4`：
 
-\[
+$$
 W_{local}^{(i)}=\operatorname{Sinkhorn}\left(\sum_{l=1}^{4}\omega_l^{(i)}Z_l\right).
-\]
+$$
 
 ### Global mixing
 
@@ -424,9 +424,9 @@ W_global = Sinkhorn(A @ B): [256,256]
 
 ### 安全残差
 
-\[
+$$
 X_{adapt}=X+\gamma\cdot\operatorname{UniMixLite}(X).
-\]
+$$
 
 `gamma` 初始化为 0，或使用逐层可学习标量且初始值 `1e-3`，保证训练开始时严格接近基线。
 
@@ -501,13 +501,13 @@ z0: [B,512]
 
 设置 `m=512, r=64, N_cross=3`：
 
-\[
+$$
 \begin{aligned}
 a_l &= V_l^Tz_l,\quad a_l\in\mathbb{R}^{64},\\
 c_l &= U_l\phi(a_l)+b_l,\quad c_l\in\mathbb{R}^{512},\\
 z_{l+1} &= z_l+z_0\odot c_l.
 \end{aligned}
-\]
+$$
 
 其中 `U_l,V_l ∈ R^[512,64]`，`phi` 可先使用 identity 或 GELU，二者分别消融。
 
@@ -527,10 +527,10 @@ g_cross = W_o LayerNorm(z3): [B,768]
 
 使用安全 gated residual：
 
-\[
+$$
 \alpha=\sigma(w^T[h_{rm};g_{cross}]+b),\qquad
 h=h_{rm}+\alpha g_{cross}.
-\]
+$$
 
 首版可直接将 `W_o` zero-init，保证初始模型等价于基线。
 
@@ -549,9 +549,9 @@ Total ≈ 983,040 parameters
 
 只有在单一低秩 CrossNet 获益后，才增加 `E=4` experts：
 
-\[
+$$
 c_l=\sum_{e=1}^{E}g_e(z_l)U_{l,e}\phi(V_{l,e}^Tz_l).
-\]
+$$
 
 需要记录 expert 使用分布，防止 4 个 experts 退化为相同矩阵。
 
@@ -601,24 +601,24 @@ X: [B,16,768]
 
 构造全局上下文：
 
-\[
+$$
 \begin{aligned}
 \mu &= \operatorname{Mean}_{token}(X)\in\mathbb{R}^{768},\\
 r &= \operatorname{RMS}_{token}(X)\in\mathbb{R}^{768},\\
 c &= \operatorname{SiLU}(W_c[\mu;r])\in\mathbb{R}^{64}.
 \end{aligned}
-\]
+$$
 
 生成 token gate 和 channel gate：
 
-\[
+$$
 \begin{aligned}
 a &= 1+\rho\tanh(W_tc)\in\mathbb{R}^{16},\\
 b &= 1+\rho\tanh(W_dc)\in\mathbb{R}^{768},\\
 M &= a\otimes b\in\mathbb{R}^{16\times768},\\
 \hat X &= X\odot M.
 \end{aligned}
-\]
+$$
 
 推荐 `rho`：
 
@@ -653,10 +653,10 @@ Total ≈ 148,480 parameters
 
 在主干不变时单独研究：
 
-\[
+$$
 \alpha_i=\operatorname{softmax}(q^Tx_i),\qquad
 h=\sum_i\alpha_ix_i.
-\]
+$$
 
 它解决的是输出聚合问题，不应与输入 gate 在同一首轮实验中同时加入。
 
@@ -664,9 +664,9 @@ h=\sum_i\alpha_ix_i.
 
 使用轻量 identity regularization：
 
-\[
+$$
 \mathcal{L}_{gate}=\lambda_g\|M-1\|_2^2.
-\]
+$$
 
 建议从 `lambda_g ∈ {0, 1e-5, 1e-4}` 搜索。
 
@@ -776,9 +776,9 @@ router_t: R^768 -> R^3
 
 3 个 routed experts 中选择 top-1，再加 always-on shared expert。
 
-\[
+$$
 y_t=E_{shared,t}(x_t)+\alpha\,g_{j^*}(x_t)E_{j^*,t}(x_t).
-\]
+$$
 
 激活比例为 1:2 时，TokenMixer-Large 的经验建议 `alpha≈2`。必须同时测试 `alpha ∈ {1,2}`，不能直接假设论文最优值可迁移。
 
@@ -864,34 +864,34 @@ XL: [B,16,768]
 
 分别为 CTR 和 CVR 学习 pooling query：
 
-\[
+$$
 \begin{aligned}
 \alpha_{ctr} &= \operatorname{softmax}(X_Lq_{ctr}/\sqrt D),\\
 h_{ctr} &= \sum_i\alpha_{ctr,i}X_{L,i},\\
 \alpha_{cvr} &= \operatorname{softmax}(X_Lq_{cvr}/\sqrt D),\\
 h_{cvr} &= \sum_i\alpha_{cvr,i}X_{L,i}.
 \end{aligned}
-\]
+$$
 
 独立任务塔：
 
-\[
+$$
 p_{CTR}=\sigma(f_{ctr}(h_{ctr})),\qquad
 p_{CVR}=\sigma(f_{cvr}(h_{cvr})).
-\]
+$$
 
 遵循 ESMM：
 
-\[
+$$
 p_{CTCVR}=p_{CTR}\cdot p_{CVR}.
-\]
+$$
 
 损失：
 
-\[
+$$
 \mathcal{L}=\mathrm{BCE}(click,p_{CTR})+
 \lambda\,\mathrm{BCE}(click\times conversion,p_{CTCVR}).
-\]
+$$
 
 标准 ESMM 不需要给未点击样本构造伪 CVR label。
 
