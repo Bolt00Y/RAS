@@ -38,15 +38,15 @@ logit / probability
 
 输入投影参数量近似为：
 
-$$
+```math
 P_{tokenizer}=F\times D=20,978\times768=16,111,104.
-$$
+```
 
 每个 RankMixer block 的 PFFN 参数量近似为：
 
-$$
+```math
 P_{PFFN/block}\approx 2kTD^2.
-$$
+```
 
 如果 `k=4`，则：
 
@@ -255,9 +255,9 @@ FiBiNET 使用 SENET 动态学习不同 field 对当前样本的重要性，并�
 
 不建议直接复现 field-level FiBiNET。1234 个字段共有：
 
-$$
+```math
 \binom{1234}{2}=760,761
-$$
+```
 
 个字段对。若显式保留每个 pair 的 17 维交互，batch 2048 的中间张量不可接受。应把 FiBiNET 思路迁移到 `T=16` 的 token 层，或使用低秩 factorized gate。
 
@@ -332,9 +332,9 @@ https://arxiv.org/abs/1804.07931
 
 ESMM 在全曝光空间同时建模 CTR 和 CTCVR：
 
-$$
+```math
 p_{CTCVR}=p_{CTR}\cdot p_{CVR}.
-$$
+```
 
 这不是单纯的 backbone 变化，而是改变估计问题本身。如果数据具备曝光、点击和转化标签，目标层升级通常应与 backbone 改造并行研究。
 

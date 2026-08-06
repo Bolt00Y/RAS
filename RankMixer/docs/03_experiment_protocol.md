@@ -197,9 +197,9 @@ AUC 提升不能代替 LogLoss 和校准检查。
 
 至少报告：
 
-$$
+```math
 \text{CVR Bias}=\frac{\sum_i \hat p_i}{\sum_i y_i}.
-$$
+```
 
 并报告：
 
@@ -259,10 +259,10 @@ $$
 
 对单样本 token matrix `H_b ∈ R^[16,768]`：
 
-$$
+```math
 p_i=\frac{\sigma_i}{\sum_j\sigma_j},\qquad
 \operatorname{erank}(H_b)=\exp\left(-\sum_i p_i\log(p_i+\epsilon)\right).
-$$
+```
 
 建议在以下位置采样：
 
