@@ -52,9 +52,9 @@ p_i=\frac{\sigma_i}{\sum_{j=1}^{k}\sigma_j},\qquad
 
 ### 2.2 一个对当前模型非常重要的上限
 
-论文在层间动态分析中，对每个样本的 $T\times D$ token 矩阵计算 effective rank，因此它的理论上限是 $\min(T,D)$，而不是隐藏维度 $D$。
+论文在层间动态分析中，对每个样本的 $T\times D$ token 矩阵计算 effective rank，因此它的理论上限是 $\min(T,D)$ ，而不是隐藏维度 $D$ 。
 
-你的当前基线为 $T=16$、$D=768$，所以单样本层间 effective rank 的上限只有 16。论文 Figure 4 中的值接近 40-48，是因为论文系统包含 32 个 sparse tokens 以及 dense、sequence、cross、task 等非 sparse tokens，总 token 数明显大于 16。**论文的绝对数值不能直接和你的 16-token 模型横向比较。**
+你的当前基线为 $T=16$ 、 $D=768$ ，所以单样本层间 effective rank 的上限只有 16。论文 Figure 4 中的值接近 40-48，是因为论文系统包含 32 个 sparse tokens 以及 dense、sequence、cross、task 等非 sparse tokens，总 token 数明显大于 16。**论文的绝对数值不能直接和你的 16-token 模型横向比较。**
 
 建议同时报告归一化指标：
 
@@ -65,12 +65,12 @@ p_i=\frac{\sigma_i}{\sum_{j=1}^{k}\sigma_j},\qquad
 
 ### 2.3 Figure 3 与 Figure 4 的 rank 口径不要混用
 
-Figure 4 明确使用单样本 token 矩阵 $\mathbf{H}_b\in\mathbb{R}^{T\times D}$；Figure 3 则描述“每个 token 的 embedding matrix”，图中数值超过 100，显然不可能来自一个 token 维度为 1 的单样本矩阵。更合理的理解是：Figure 3 对固定 token 在 batch / 样本维度上形成的矩阵计算 effective rank，例如 $\mathbf{E}_t\in\mathbb{R}^{B\times D}$。
+Figure 4 明确使用单样本 token 矩阵 $\mathbf{H}_b\in\mathbb{R}^{T\times D}$ ；Figure 3 则描述“每个 token 的 embedding matrix”，图中数值超过 100，显然不可能来自一个 token 维度为 1 的单样本矩阵。更合理的理解是：Figure 3 对固定 token 在 batch / 样本维度上形成的矩阵计算 effective rank，例如 $\mathbf{E}_t\in\mathbb{R}^{B\times D}$ 。
 
 论文没有把 Figure 3 的精确计算张量写得像 Figure 4 那样清楚，因此复现时应把两类指标分开命名：
 
-- `sample_token_erank`：每个样本上的 $T\times D$；
-- `batch_channel_erank`：每个 token 跨样本的 $B\times D$。
+- `sample_token_erank`：每个样本上的 $T\times D$ ；
+- `batch_channel_erank`：每个 token 跨样本的 $B\times D$ 。
 
 ---
 
@@ -208,7 +208,7 @@ y^{(k)}
 
 ### 5.1 MI 的估计流程
 
-对 batch 表示 $\mathbf{E}\in\mathbb{R}^{B\times T\times D}$，论文将每个 token 的连续表示用 K-means 离散成 $K$ 个 cluster，再计算 token $i$ 与 token $j$ 的离散互信息：
+对 batch 表示 $\mathbf{E}\in\mathbb{R}^{B\times T\times D}$ ，论文将每个 token 的连续表示用 K-means 离散成 $K$ 个 cluster，再计算 token $i$ 与 token $j$ 的离散互信息：
 
 ```math
 M_{ij}
@@ -247,7 +247,7 @@ P(a,b)\log\frac{P(a,b)}{P_i(a)P_j(b)}.
 
 此外，MI 是通过 K-means 离散化估计的，会受以下因素影响：
 
-- cluster 数 $K$；
+- cluster 数 $K$ ；
 - K-means 初始化；
 - 抽样规模；
 - 表示标准化方式；
@@ -619,7 +619,7 @@ Order 任务对购买意图的细粒度区分要求更高，Cross Embedding 和�
 385\times17+835\times17+14\times17=20{,}978,
 ```
 
-当前 backbone 为 $T=16$、$D=768$、$L=2$。
+当前 backbone 为 $T=16$ 、 $D=768$ 、 $L=2$ 。
 
 ### 17.1 先建立诊断基线 RU-D0
 
@@ -645,8 +645,8 @@ Order 任务对购买意图的细粒度区分要求更高，Cross Embedding 和�
 
 保持：
 
-- $T=16$；
-- $D=768$；
+- $T=16$ ；
+- $D=768$ ；
 - 两层 RankMixer；
 - PFFN 参数与训练配置；
 - 每个字段完整的 17 维 embedding。
@@ -655,7 +655,7 @@ Order 任务对购买意图的细粒度区分要求更高，Cross Embedding 和�
 
 ### 17.3 RU-G1：15 Local + 1 Global
 
-为保持 $T=16$ 和 $H=T$，首版不额外增加第 17 个 token，而是：
+为保持 $T=16$ 和 $H=T$ ，首版不额外增加第 17 个 token，而是：
 
 ```text
 15 local sparse tokens + 1 global token
