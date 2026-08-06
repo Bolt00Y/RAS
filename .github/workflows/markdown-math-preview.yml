@@ -36,6 +36,9 @@ jobs:
       - name: Reject Markdown that still needs normalization
         run: python .github/scripts/normalize_markdown_math.py .
 
+      - name: Reject simple equations formatted as code
+        run: python .github/scripts/audit_markdown_math_classification.py
+
       - name: Verify GitHub GFM recognizes every formula as math
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
