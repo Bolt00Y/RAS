@@ -8,10 +8,10 @@
 - Batch size：2048；
 - 稀疏特征：user 385 个、item 835 个、creative 14 个，共 1234 个字段；
 - 每个字段 embedding 维度：17；
-- 展开输入：`[B, 20978]`；
+- 展开输入： $\mathbb{R}^{B\times20{,}978}$ ；
 - Autosplit：16 个连续 segment；
 - 每个 segment 独立投影到 768 维；
-- RankMixer：2 个 block，`T=H=16`；
+- RankMixer：2 个 block， $T=H=16$ ；
 - 输出：Mean Pooling + CVR 二分类头；
 - 当前实现不使用 Sparse MoE。
 

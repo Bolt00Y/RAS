@@ -59,10 +59,10 @@ Sparse MoE: disabled
 
 推荐采用连续时间窗口：
 
-```text
-Train:      [t0, t1)
-Validation: [t1, t2)
-Test:       [t2, t3)
+```math
+\mathcal{D}_{\mathrm{train}}=[t_0,t_1),\qquad
+\mathcal{D}_{\mathrm{valid}}=[t_1,t_2),\qquad
+\mathcal{D}_{\mathrm{test}}=[t_2,t_3).
 ```
 
 不要随机打散样本后切分，以避免：
@@ -89,7 +89,7 @@ CVR 标签必须达到既定成熟窗口。例如业务定义为点击后 7 天�
 
 ## 3.3 clicked-only 与 entire-space 必须区分
 
-- clicked-only CVR：目标是 `P(conversion | click, x)`；
+- clicked-only CVR：目标是 $P(\mathrm{conversion}\mid\mathrm{click},x)$；
 - entire-space 训练：需要曝光、点击和转化标签，并可采用 ESMM 类目标；
 - 两种样本空间的 AUC 和 LogLoss 不应直接横向比较。
 
@@ -257,7 +257,7 @@ AUC 提升不能代替 LogLoss 和校准检查。
 
 ### Effective Rank
 
-对单样本 token matrix `H_b ∈ R^[16,768]`：
+对单样本 token matrix $H_b\in\mathbb{R}^{16\times768}$：
 
 ```math
 p_i=\frac{\sigma_i}{\sum_j\sigma_j},\qquad
@@ -285,7 +285,7 @@ p_i=\frac{\sigma_i}{\sum_j\sigma_j},\qquad
 记录：
 
 - 每个 token projector/PFFN 的梯度范数；
-- 参数更新比 `||ΔW||/||W||`；
+- 参数更新比 $\lVert\Delta W\rVert/\lVert W\rVert$；
 - activation RMS；
 - dead ReLU / gate saturation；
 - MoE expert load、router entropy 和 dropped tokens；
@@ -407,7 +407,7 @@ x-axis: P99 latency or GPU cost
 
 ## 9.3 Learnable Mixing
 
-- `gamma=0` 时严格回归基线；
+- $\gamma=0$ 时严格回归基线；
 - mixing matrix 行/列和；
 - 温度退火轨迹；
 - matrix entropy 与稀疏度；
@@ -417,7 +417,7 @@ x-axis: P99 latency or GPU cost
 ## 9.4 DCNv2 支路
 
 - Cross branch zero-init 输出一致性；
-- rank `r` 和层数独立消融；
+- rank $r$ 和层数独立消融；
 - 与“同参数宽化 PFFN”对照；
 - side branch kernel 数和 MFU；
 - cross 输出与 RankMixer 输出的相关性；
@@ -483,7 +483,7 @@ RM-T2 + pSwiGLU / Pre-RMSNorm
 RM-T4 L=4 + inter-residual
 ```
 
-仅当 `L=2` block 升级已经获益时研究深层版本。
+仅当 $L=2$ block 升级已经获益时研究深层版本。
 
 ## Phase 3：互补交互
 
@@ -493,7 +493,7 @@ RM-U1 简单 learned token mixing
 RM-U3 UniMixing-Lite adapter
 ```
 
-先用简单 learned `16×16` mixing 判断问题是否存在，再上结构更复杂版本。
+先用简单 learned $16\times16$ mixing 判断问题是否存在，再上结构更复杂版本。
 
 ## Phase 4：容量 scaling
 
@@ -525,7 +525,7 @@ RM-E1 ESMM + task-specific pooling
 4. 效率成本可接受；
 5. 两者建模假设具有互补性。
 
-组合后使用 2×2 factorial design：
+组合后使用 $2\times2$ factorial design：
 
 | A | B | 实验 |
 |---|---|---|

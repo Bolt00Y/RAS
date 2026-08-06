@@ -30,11 +30,11 @@ logit / probability
 
 设：
 
-- token 数 `T=16`；
-- 隐藏维度 `D=768`；
-- block 数 `L=2`；
-- PFFN 扩张倍数为 `k`；
-- 输入展开维度 `F=20978`。
+- token 数 $T=16$；
+- 隐藏维度 $D=768$；
+- block 数 $L=2$；
+- PFFN 扩张倍数为 $k$；
+- 输入展开维度 $F=20{,}978$。
 
 输入投影参数量近似为：
 
@@ -48,13 +48,15 @@ P_{tokenizer}=F\times D=20,978\times768=16,111,104.
 P_{PFFN/block}\approx 2kTD^2.
 ```
 
-如果 `k=4`，则：
+如果 $k=4$，则：
 
-```text
-PFFN / block ≈ 75.50M
-2 blocks      ≈ 150.99M
-Tokenizer     ≈ 16.11M
-Dense total   ≈ 167.11M
+```math
+\begin{aligned}
+P_{\mathrm{PFFN/block}} &\approx 75.50\,\mathrm{M}, \\
+P_{\mathrm{2\ blocks}} &\approx 150.99\,\mathrm{M}, \\
+P_{\mathrm{tokenizer}} &\approx 16.11\,\mathrm{M}, \\
+P_{\mathrm{dense,total}} &\approx 167.11\,\mathrm{M}.
+\end{aligned}
 ```
 
 这里不计 bias、LayerNorm 和任务头。Token Mixing 本身是参数无关的 reshape / split / concat 操作。
@@ -78,7 +80,7 @@ RankMixer 的两个核心模块分别解决不同问题：
 
 ### 3.1 Multi-head Token Mixing
 
-每个 token 被切成 `H` 个 channel head，同一个 head index 的切片在不同 token 之间重新拼接。论文设置 `H=T`，从而保持 mixing 前后 token 数相同并支持残差连接。
+每个 token 被切成 `H` 个 channel head，同一个 head index 的切片在不同 token 之间重新拼接。论文设置 $H=T$，从而保持 mixing 前后 token 数相同并支持残差连接。
 
 该操作具有：
 
@@ -104,7 +106,7 @@ RankMixer 的两个核心模块分别解决不同问题：
 
 原始 RankMixer 将 mixing 后的 token 与 mixing 前同位置 token 直接相加。虽然张量形状相同，但位置语义已经发生了重新组合。TokenMixer-Large 将其称为 residual semantic misalignment，并通过 Mixing & Reverting 恢复原 token 布局后再进行跨层残差。
 
-对于当前 `L=2`，该问题不一定造成明显训练不稳定；但它会限制继续向 `L=4/6/8` 扩展时的收益。
+对于当前 $L=2$，该问题不一定造成明显训练不稳定；但它会限制继续向 $L\in\{4,6,8\}$ 扩展时的收益。
 
 ---
 
@@ -196,7 +198,7 @@ https://arxiv.org/html/2604.00590
 UniMixer 将固定 TokenMixer 视为一个巨大的 permutation matrix，并对其进行结构化参数化。主要意义是：
 
 - mixing pattern 可以由数据学习；
-- 不再强制 `H=T`；
+- 不再强制 $H=T$；
 - 可以同时表达局部和全局 mixing；
 - UniMixing-Lite 使用 basis-composed local matrices 和低秩 global matrix 控制参数/FLOPs；
 - 通过 Sinkhorn-Knopp 约束 mixing matrix 接近双随机矩阵，并使用温度退火获得稀疏模式。
@@ -215,11 +217,11 @@ https://arxiv.org/abs/2008.13535
 DCNv2 显式学习 bounded-degree feature crosses，并通过低秩和 mixture 结构控制成本。它与 RankMixer 的互补性在于：
 
 - RankMixer 主要依赖固定 token mixing + 非线性 PFFN 隐式形成交互；
-- DCNv2 直接引入 `x0 ⊙ f(xl)` 形式的乘法交叉；
+- DCNv2 直接引入 $x_0\odot f(x_l)$ 形式的乘法交叉；
 - 显式低阶交叉可能更快学习 user × item、item × creative、price × preference 等强结构信号；
 - 低秩 CrossNet 可以在很小的附加参数下实现。
 
-但不能直接在 20,978 维原始向量上使用 full-rank matrix：单层矩阵约为 `20,978² ≈ 440M` 参数。建议先将 16 个 token 压缩到 512 维左右，再运行低秩 CrossNet。
+但不能直接在 20,978 维原始向量上使用 full-rank matrix：单层矩阵约为 $20{,}978^2\approx 440\,\mathrm{M}$ 参数。建议先将 16 个 token 压缩到 512 维左右，再运行低秩 CrossNet。
 
 ### 5.2 DCN²
 
@@ -259,7 +261,7 @@ FiBiNET 使用 SENET 动态学习不同 field 对当前样本的重要性，并�
 \binom{1234}{2}=760,761
 ```
 
-个字段对。若显式保留每个 pair 的 17 维交互，batch 2048 的中间张量不可接受。应把 FiBiNET 思路迁移到 `T=16` 的 token 层，或使用低秩 factorized gate。
+个字段对。若显式保留每个 pair 的 17 维交互，batch 2048 的中间张量不可接受。应把 FiBiNET 思路迁移到 $T=16$ 的 token 层，或使用低秩 factorized gate。
 
 ### 6.2 MaskNet
 
@@ -271,7 +273,7 @@ MaskNet 指出纯加性 FFN 对常见乘法交互的建模效率有限，并使�
 - identity initialization；
 - 限制 gate 范围；
 - 防止长尾 token 被持续压低；
-- 避免生成完整 `[B,16,768]` 的大 MLP mask。
+- 避免生成完整 $\mathbb{R}^{B\times16\times768}$ 的大 MLP mask。
 
 推荐使用 token gate 与 channel gate 的外积作为低秩 mask。
 
@@ -368,7 +370,7 @@ PLE 明确分离 shared experts 和 task-specific experts，以缓解多任务�
 
 ### 10.1 不建议完整字段级 Self-Attention
 
-1234 fields 的 attention score 为 `1234²≈1.52M` 个/样本，batch 2048 下仅 score 张量就非常大，并且异构 ID 空间的内积相似度未必合理。若研究 attention，应在 16 token 层进行，并与固定 mixing 做严格 FLOPs 匹配。
+1234 fields 的 attention score 为 $1234^2\approx1.52\,\mathrm{M}$ 个/样本，batch 2048 下仅 score 张量就非常大，并且异构 ID 空间的内积相似度未必合理。若研究 attention，应在 16 token 层进行，并与固定 mixing 做严格 FLOPs 匹配。
 
 ### 10.2 不建议在 20,978 维上使用 full-rank DCNv2
 

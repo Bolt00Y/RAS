@@ -2,13 +2,11 @@
 
 ## 0. 统一记号
 
-```text
-B = 2048
-F = 20978
-T = 16
-D = 768
-L = 2
-X0 = [B, T, D]
+```math
+\begin{aligned}
+B &= 2048, & F &= 20{,}978, & T &= 16, \\
+D &= 768, & L &= 2, & X_0 &\in \mathbb{R}^{B\times T\times D}.
+\end{aligned}
 ```
 
 当前基线：
@@ -52,9 +50,11 @@ perm = torch.randperm(1234, generator=fixed_generator)
 
 然后将完整的 17 维 field embedding 按 permutation 顺序分到 16 组：
 
-```text
-2 groups × 78 fields -> 1326 input dims
-14 groups × 77 fields -> 1309 input dims
+```math
+\begin{aligned}
+2\text{ groups}:&\quad 78\times17=1326, \\
+14\text{ groups}:&\quad 77\times17=1309.
+\end{aligned}
 ```
 
 每组仍使用独立投影：
@@ -65,11 +65,11 @@ x_i=W_i\operatorname{Concat}(e_j:j\in G_i)+b_i,\quad x_i\in\mathbb{R}^{768}.
 
 最终仍为：
 
-```text
-X0_random: [B, 16, 768]
+```math
+X_{0,\mathrm{random}}\in\mathbb{R}^{B\times16\times768}.
 ```
 
-因此 backbone、`T=H=16`、PFFN 参数和输出头完全不变。
+因此 backbone、 $T=H=16$ 、PFFN 参数和输出头完全不变。
 
 ### 实现约束
 
@@ -101,15 +101,17 @@ X0_random: [B, 16, 768]
 
 1234 个 fields 分成 15 个 local groups：
 
-```text
-4 groups × 83 fields -> 1411 dims
-11 groups × 82 fields -> 1394 dims
+```math
+\begin{aligned}
+4\text{ groups}:&\quad 83\times17=1411, \\
+11\text{ groups}:&\quad 82\times17=1394.
+\end{aligned}
 ```
 
 得到：
 
-```text
-X_local: [B, 15, 768]
+```math
+X_{\mathrm{local}}\in\mathbb{R}^{B\times15\times768}.
 ```
 
 使用 local token 的一阶与二阶统计构造 global token：
@@ -125,21 +127,21 @@ g &= W_2\operatorname{SiLU}(W_1u)\in\mathbb{R}^{768}.
 
 首版设置：
 
-```text
-W1: 1536 -> 192
-W2: 192  -> 768
+```math
+W_1:\mathbb{R}^{1536}\to\mathbb{R}^{192},\qquad
+W_2:\mathbb{R}^{192}\to\mathbb{R}^{768}.
 ```
 
 附加参数约：
 
-```text
-1536 × 192 + 192 × 768 = 442,368
+```math
+1536\times192+192\times768=442{,}368.
 ```
 
 最终：
 
-```text
-X0 = concat([g, X_local], dim=1) -> [B, 16, 768]
+```math
+X_0=\operatorname{Concat}(g,X_{\mathrm{local}})\in\mathbb{R}^{B\times16\times768}.
 ```
 
 ### 为什么不是 raw flatten -> global MLP
@@ -177,14 +179,14 @@ RM-R4: RM-R3 + selective multi-embedding
 
 ## 1.7 诊断指标
 
-对每层输出 `H ∈ R^[B,T,D]`，按样本计算：
+对每层输出 $H\in\mathbb{R}^{B\times T\times D}$，按样本计算：
 
 ```math
 \operatorname{erank}(H_b)=\exp\left(-\sum_i p_i\log p_i\right),
 \quad p_i=\frac{\sigma_i}{\sum_j\sigma_j}.
 ```
 
-由于 `T=16`，每个样本只需对 `16×768` 矩阵做 SVD；训练时每隔固定步数抽样计算即可。
+由于 $T=16$，每个样本只需对 $16\times768$ 矩阵做 SVD；训练时每隔固定步数抽样计算即可。
 
 同时记录：
 
@@ -216,22 +218,24 @@ Random Split 至少运行 3 个固定 seed。若只有一个 seed 获益，不�
 
 对输入：
 
-```text
-X: [B, 16, 768]
+```math
+X\in\mathbb{R}^{B\times16\times768}.
 ```
 
 先按原 RankMixer 方式 mixing：
 
-```text
-H = Mix(X): [B, 16, 768]
+```math
+H=\operatorname{Mix}(X)\in\mathbb{R}^{B\times16\times768}.
 ```
 
 在 mixed layout 中进行 per-token SwiGLU，然后将 channel/token 布局 revert 回原 token 语义位置：
 
-```text
-H1 = H + pSwiGLU_mix(RMSNorm(H))
-R  = Revert(H1)                  # [B,16,768]
-X1 = X + pSwiGLU_orig(RMSNorm(R))
+```math
+\begin{aligned}
+H_1 &= H+\operatorname{pSwiGLU}_{\mathrm{mix}}(\operatorname{RMSNorm}(H)), \\
+R &= \operatorname{Revert}(H_1)\in\mathbb{R}^{B\times16\times768}, \\
+X_1 &= X+\operatorname{pSwiGLU}_{\mathrm{orig}}(\operatorname{RMSNorm}(R)).
+\end{aligned}
 ```
 
 可在 block 末尾再做 RMSNorm，或采用完整 PreNorm 形式。关键是跨 block residual 对齐到原 token layout，而不是把 mixed token 与原 token 直接逐位置相加。
@@ -246,22 +250,22 @@ X1 = X + pSwiGLU_orig(RMSNorm(R))
 
 ### 参数匹配
 
-如果基线是 `k=4` 的 GELU FFN：
+如果基线是 $k=4$ 的 GELU FFN：
 
-```text
-D -> 4D -> D
+```math
+D\longrightarrow4D\longrightarrow D.
 ```
 
 单 token 参数约：
 
-```text
-2 × 768 × 3072 = 4,718,592
+```math
+2\times768\times3072=4{,}718{,}592.
 ```
 
 单个参数匹配 SwiGLU 的 hidden size 为 2048：
 
-```text
-3 × 768 × 2048 = 4,718,592
+```math
+3\times768\times2048=4{,}718{,}592.
 ```
 
 但一个 TokenMixer-Large block 有 mixed-space 和 original-space 两个 pSwiGLU。建议同时跑两种预算：
@@ -275,11 +279,12 @@ pSwiGLU_orig hidden = 1024
 
 两个模块合计：
 
-```text
-2 × 3 × 768 × 1024 = 4,718,592 / token / block
+```math
+2\times3\times768\times1024=4{,}718{,}592
+\quad\text{parameters per token per block}.
 ```
 
-与一个 `k=4` 基线 PFFN 参数和主要 GEMM FLOPs 近似一致。
+与一个 $k=4$ 基线 PFFN 参数和主要 GEMM FLOPs 近似一致。
 
 ### 容量增强版
 
@@ -301,13 +306,13 @@ PFFN 参数/FLOPs 约为基线 2 倍，用来验证收益究竟来自结构还�
 
 ## 2.5 深层版本
 
-先验证 `L=2` 的 block 替换，再研究：
+先验证 $L=2$ 的 block 替换，再研究：
 
-```text
-L = 4, 6
+```math
+L\in\{4,6\}.
 ```
 
-当 `L>=4` 时：
+当 $L\ge4$ 时：
 
 - 每 2 层增加一次 inter-residual；
 - 最后一层不接低层 inter-residual；
@@ -320,8 +325,8 @@ L = 4, 6
 
 建议搜索：
 
-```text
-lambda_aux ∈ {0.05, 0.1, 0.2}
+```math
+\lambda_{\mathrm{aux}}\in\{0.05,0.1,0.2\}.
 ```
 
 辅助 head 仅用于训练，推理时删除。
@@ -351,7 +356,7 @@ RM-T6: RM-T3, L=2, capacity enhanced
 
 - 一个 block 内两次 pSwiGLU，若不做预算匹配会把结构收益和 FLOPs 收益混在一起；
 - 需要高效 revert kernel；
-- `L=2` 时深层优化组件可能收益很小；
+- $L=2$ 时深层优化组件可能收益很小；
 - block 改动大于 side module，warm-start 难度较高。
 
 推荐优先级：P0，但首版必须使用计算量匹配配置。
@@ -379,32 +384,32 @@ RankMixer 的 mixing 是固定 permutation。是否可以在保留结构化、�
 
 将：
 
-```text
-X: [B,16,768]
+```math
+X\in\mathbb{R}^{B\times16\times768}.
 ```
 
 展平为：
 
-```text
-v: [B,12288]
+```math
+v\in\mathbb{R}^{B\times12{,}288}.
 ```
 
-以 channel block size `Bc=48` 分块：
+以 channel block size $B_c=48$ 分块：
 
-```text
-M = 12288 / 48 = 256 blocks
-V: [B,256,48]
+```math
+M=\frac{12{,}288}{48}=256,\qquad
+V\in\mathbb{R}^{B\times256\times48}.
 ```
 
 ### Local mixing
 
-定义 `b=4` 个 basis matrices：
+定义 $b=4$ 个 basis matrices：
 
-```text
-Z_l: [48,48], l=1..4
+```math
+Z_l\in\mathbb{R}^{48\times48},\qquad l\in\{1,2,3,4\}.
 ```
 
-每个 block 有系数 `omega_i ∈ R^4`：
+每个 block 有系数 $\omega_i\in\mathbb{R}^{4}$：
 
 ```math
 W_{local}^{(i)}=\operatorname{Sinkhorn}\left(\sum_{l=1}^{4}\omega_l^{(i)}Z_l\right).
@@ -412,12 +417,12 @@ W_{local}^{(i)}=\operatorname{Sinkhorn}\left(\sum_{l=1}^{4}\omega_l^{(i)}Z_l\rig
 
 ### Global mixing
 
-使用 rank `r=16` 的低秩矩阵：
+使用 rank $r=16$ 的低秩矩阵：
 
-```text
-A: [256,16]
-B: [16,256]
-W_global = Sinkhorn(A @ B): [256,256]
+```math
+A\in\mathbb{R}^{256\times16},\quad
+B\in\mathbb{R}^{16\times256},\quad
+W_{\mathrm{global}}=\operatorname{Sinkhorn}(AB)\in\mathbb{R}^{256\times256}.
 ```
 
 先做 local mixing，再在 256 个 blocks 之间做 global mixing，最后 reshape 回 `[B,16,768]`。
@@ -434,14 +439,16 @@ X_{adapt}=X+\gamma\cdot\operatorname{UniMixLite}(X).
 
 配置 `Bc=48, M=256, b=4, r=16`：
 
-```text
-Local bases:        4 × 48 × 48 = 9,216
-Block coefficients:256 × 4      = 1,024
-Global low-rank:    2 × 256 ×16 = 8,192
-Total:                            18,432 parameters
+```math
+\begin{aligned}
+P_{\mathrm{local}} &= 4\times48\times48=9{,}216, \\
+P_{\mathrm{coeff}} &= 256\times4=1{,}024, \\
+P_{\mathrm{global}} &= 2\times256\times16=8{,}192, \\
+P_{\mathrm{total}} &= 18{,}432.
+\end{aligned}
 ```
 
-主要矩阵计算约为每样本 7.5M FLOPs 量级，不含 Sinkhorn 迭代和 kernel overhead。相对于 `k=4`、两层 RankMixer 的 PFFN 主计算较小，但必须实测，因为 256×256 mixing 可能成为 memory-bound 小算子。
+主要矩阵计算约为每样本 7.5M FLOPs 量级，不含 Sinkhorn 迭代和 kernel overhead。相对于 $k=4$、两层 RankMixer 的 PFFN 主计算较小，但必须实测，因为 256×256 mixing 可能成为 memory-bound 小算子。
 
 ## 3.5 训练策略
 
@@ -463,7 +470,7 @@ RM-U4: RM-U3 without temperature annealing
 RM-U5: RM-U3 without Sinkhorn constraints
 ```
 
-如果简单的 `16×16` token mixing 已获得同等收益，应优先选择简单版本，不应为了论文形式保留更复杂 adapter。
+如果简单的 $16\times16$ token mixing 已获得同等收益，应优先选择简单版本，不应为了论文形式保留更复杂 adapter。
 
 ## 3.7 可行性与风险
 
@@ -488,18 +495,20 @@ RankMixer 的固定 mixing 与 PFFN 是否需要较多数据/层数才能学习�
 
 先从 tokenizer 输出压缩：
 
-```text
-X0: [B,16,768]
-C_i: 768 -> 32
-Z0: [B,16,32]
-z0: [B,512]
+```math
+\begin{aligned}
+X_0 &\in\mathbb{R}^{B\times16\times768}, \\
+C_i &: \mathbb{R}^{768}\to\mathbb{R}^{32}, \\
+Z_0 &\in\mathbb{R}^{B\times16\times32}, \\
+z_0 &\in\mathbb{R}^{B\times512}.
+\end{aligned}
 ```
 
 每个 token 可使用独立压缩矩阵，以保留 feature-subspace heterogeneity。
 
 ## 4.3 低秩 CrossNet
 
-设置 `m=512, r=64, N_cross=3`：
+设置 $m=512,\ r=64,\ N_{\mathrm{cross}}=3$：
 
 ```math
 \begin{aligned}
@@ -509,20 +518,20 @@ z_{l+1} &= z_l+z_0\odot c_l.
 \end{aligned}
 ```
 
-其中 `U_l,V_l ∈ R^[512,64]`，`phi` 可先使用 identity 或 GELU，二者分别消融。
+其中 $U_l,V_l\in\mathbb{R}^{512\times64}$，`phi` 可先使用 identity 或 GELU，二者分别消融。
 
 ## 4.4 与 RankMixer 融合
 
 主干输出：
 
-```text
-h_rm = mean(XL, dim=1): [B,768]
+```math
+h_{\mathrm{rm}}=\operatorname{MeanPool}(X_L)\in\mathbb{R}^{B\times768}.
 ```
 
 Cross 输出：
 
-```text
-g_cross = W_o LayerNorm(z3): [B,768]
+```math
+g_{\mathrm{cross}}=W_o\operatorname{LayerNorm}(z_3)\in\mathbb{R}^{B\times768}.
 ```
 
 使用安全 gated residual：
@@ -536,18 +545,20 @@ h=h_{rm}+\alpha g_{cross}.
 
 ## 4.5 参数估算
 
-```text
-Token compression: 16 × 768 × 32        = 393,216
-3 low-rank layers: 3 × 2 × 512 × 64     = 196,608
-Output projection: 512 × 768             = 393,216
-Total ≈ 983,040 parameters
+```math
+\begin{aligned}
+P_{\mathrm{compress}} &= 16\times768\times32=393{,}216, \\
+P_{\mathrm{cross}} &= 3\times2\times512\times64=196{,}608, \\
+P_{\mathrm{output}} &= 512\times768=393{,}216, \\
+P_{\mathrm{total}} &\approx 983{,}040.
+\end{aligned}
 ```
 
-不到 `k=4` 基线 dense 参数的 1%。主要每样本计算约 2M FLOPs 量级，但实际效率取决于 kernel fusion。
+不到 $k=4$ 基线 dense 参数的 1%。主要每样本计算约 2M FLOPs 量级，但实际效率取决于 kernel fusion。
 
 ## 4.6 CrossNet-Mix 后续版本
 
-只有在单一低秩 CrossNet 获益后，才增加 `E=4` experts：
+只有在单一低秩 CrossNet 获益后，才增加 $E=4$ experts：
 
 ```math
 c_l=\sum_{e=1}^{E}g_e(z_l)U_{l,e}\phi(V_{l,e}^Tz_l).
@@ -595,8 +606,8 @@ Per-token FFN 能区分 feature subspaces，但所有样本都走相同强度的
 
 输入：
 
-```text
-X: [B,16,768]
+```math
+X\in\mathbb{R}^{B\times16\times768}.
 ```
 
 构造全局上下文：
@@ -620,25 +631,27 @@ M &= a\otimes b\in\mathbb{R}^{16\times768},\\
 \end{aligned}
 ```
 
-推荐 `rho`：
+推荐 $\rho$：
 
-```text
-初始上限 0.1
-稳定后搜索 {0.1, 0.2, 0.3}
+```math
+\rho_{\mathrm{init}}\le 0.1,\qquad
+\rho\in\{0.1,0.2,0.3\}.
 ```
 
-将 `W_t` 和 `W_d` zero-init，使初始 `M=1`。
+将 `W_t` 和 `W_d` zero-init，使初始 $M=1$。
 
 ## 5.3 参数量
 
-```text
-Context: 1536 × 64         = 98,304
-Token gate: 64 × 16        = 1,024
-Channel gate: 64 × 768     = 49,152
-Total ≈ 148,480 parameters
+```math
+\begin{aligned}
+P_{\mathrm{context}} &= 1536\times64=98{,}304, \\
+P_{\mathrm{token}} &= 64\times16=1{,}024, \\
+P_{\mathrm{channel}} &= 64\times768=49{,}152, \\
+P_{\mathrm{total}} &\approx 148{,}480.
+\end{aligned}
 ```
 
-这是对完整 `[16,768]` mask 的 rank-1 factorization。若 rank-1 不足，可扩展为 `R=4` 个外积之和，但必须单独消融。
+这是对完整 $16\times768$ mask 的 rank-1 factorization。若 rank-1 不足，可扩展为 $R=4$ 个外积之和，但必须单独消融。
 
 ## 5.4 插入位置
 
@@ -668,7 +681,7 @@ h=\sum_i\alpha_ix_i.
 \mathcal{L}_{gate}=\lambda_g\|M-1\|_2^2.
 ```
 
-建议从 `lambda_g ∈ {0, 1e-5, 1e-4}` 搜索。
+建议从 $\lambda_g\in\{0,10^{-5},10^{-4}\}$ 搜索。
 
 必须监控：
 
@@ -725,10 +738,10 @@ RM-G6: RM-G3 without identity initialization
 
 ## 6.3 计算匹配配置
 
-基线 `k=4` GELU PFFN 的单 token 参数/活跃计算：
+基线 $k=4$ GELU PFFN 的单 token 参数/活跃计算：
 
-```text
-2 × 768 × 3072 = 4,718,592
+```math
+2\times768\times3072=4{,}718{,}592.
 ```
 
 建议首版：
@@ -741,20 +754,20 @@ active = 1 always-on shared + 1 top-1 routed
 
 每个 SwiGLU expert 参数：
 
-```text
-3 × 768 × 1024 = 2,359,296
+```math
+3\times768\times1024=2{,}359{,}296.
 ```
 
 单 token 总容量：
 
-```text
-4 × 2,359,296 = 9,437,184
+```math
+4\times2{,}359{,}296=9{,}437{,}184.
 ```
 
 单 token活跃计算：
 
-```text
-2 × 2,359,296 = 4,718,592
+```math
+2\times2{,}359{,}296=4{,}718{,}592.
 ```
 
 因此：
@@ -770,8 +783,8 @@ active = 1 always-on shared + 1 top-1 routed
 
 对 token `t`：
 
-```text
-router_t: R^768 -> R^3
+```math
+\operatorname{router}_t:\mathbb{R}^{768}\to\mathbb{R}^{3}.
 ```
 
 3 个 routed experts 中选择 top-1，再加 always-on shared expert。
@@ -780,7 +793,7 @@ router_t: R^768 -> R^3
 y_t=E_{shared,t}(x_t)+\alpha\,g_{j^*}(x_t)E_{j^*,t}(x_t).
 ```
 
-激活比例为 1:2 时，TokenMixer-Large 的经验建议 `alpha≈2`。必须同时测试 `alpha ∈ {1,2}`，不能直接假设论文最优值可迁移。
+激活比例为 1:2 时，TokenMixer-Large 的经验建议 $\alpha\approx2$。必须同时测试 $\alpha\in\{1,2\}$ ，不能直接假设论文最优值可迁移。
 
 增加 load-balance loss，并记录每个 token 内 3 个 routed experts 的分配比例。
 
@@ -790,7 +803,7 @@ y_t=E_{shared,t}(x_t)+\alpha\,g_{j^*}(x_t)E_{j^*,t}(x_t).
 
 1. `Dense pSwiGLU hidden=2048`：与基线参数/FLOPs匹配，验证激活函数和门控本身；
 2. `Dense pSwiGLU hidden=4096`：约 2 倍计算，验证额外容量是否真的带来收益；
-3. 将 4096 hidden 切成 `4×1024` experts，激活 shared+top1，把活跃计算降回基线。
+3. 将 4096 hidden 切成 $4\times1024$ experts，激活 shared+top1，把活跃计算降回基线。
 
 只有阶段 2 明确优于阶段 1，阶段 3 的 sparsification 才有科学意义。否则“增加不可用容量”没有价值。
 
@@ -858,8 +871,8 @@ impression label / click label / conversion label
 
 保留：
 
-```text
-XL: [B,16,768]
+```math
+X_L\in\mathbb{R}^{B\times16\times768}.
 ```
 
 分别为 CTR 和 CVR 学习 pooling query：
@@ -910,7 +923,7 @@ p_{CTCVR}=p_{CTR}\cdot p_{CVR}.
 - 使用成熟转化窗口，避免尚未回流的正例被当作负例；
 - 按 label delay 分桶评估；
 - 同时报告 CTR AUC、CTCVR AUC、CVR AUC、LogLoss 和 calibration；
-- 监控 `sum(pred)/sum(label)` 的 CVR bias；
+- 监控 $\sum_i\hat p_i/\sum_i y_i$ 的 CVR bias；
 - 线上排序分数究竟使用 pCVR 还是 pCTR×pCVR 必须由业务目标决定；
 - 不能用未来转化信息构造训练时特征。
 
