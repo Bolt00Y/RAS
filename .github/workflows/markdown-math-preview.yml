@@ -8,21 +8,24 @@ on:
       - "**/*.md"
       - ".github/scripts/**"
       - ".github/workflows/markdown-math-preview.yml"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".github/scripts/**"
+      - ".github/workflows/markdown-math-preview.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate-and-fix:
-    if: github.actor != 'github-actions[bot]'
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out RankMixer branch
+      - name: Check out the exact revision
         uses: actions/checkout@v4
         with:
-          ref: RankMixer
           fetch-depth: 0
 
       - name: Set up Python
@@ -30,20 +33,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Convert equation-like code to GitHub math
-        run: |
-          python .github/scripts/fix_rankmixer_math_rendering.py
-          python .github/scripts/fix_rankmixer_math_rendering_post.py
-
       - name: Reject Markdown that still needs normalization
         run: python .github/scripts/normalize_markdown_math.py .
 
-      - name: Diagnose GitHub inline math recognition
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python .github/scripts/diagnose_github_inline_math.py
-
-      - name: Validate GitHub GFM math classification
+      - name: Verify GitHub GFM recognizes every formula as math
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/validate_github_markdown_render.py
@@ -51,7 +44,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Parse every Markdown math block with MathJax
         shell: bash
@@ -66,24 +59,5 @@ jobs:
             "$validator_dir/validate_markdown_math.mjs"
           node "$validator_dir/validate_markdown_math.mjs" "$GITHUB_WORKSPACE"
 
-      - name: Check and show intended diff
-        run: |
-          git diff --check
-          git diff -- RankMixer/README.md RankMixer/docs
-
-      - name: Commit corrected Markdown
-        shell: bash
-        run: |
-          if git diff --quiet -- RankMixer/README.md RankMixer/docs; then
-            echo "No Markdown corrections were needed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898287+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            RankMixer/README.md \
-            RankMixer/docs/01_literature_and_diagnosis.md \
-            RankMixer/docs/02_modification_schemes.md \
-            RankMixer/docs/03_experiment_protocol.md
-          git commit -m "Fix formula classification for GitHub Preview [skip ci]"
-          git push origin HEAD:RankMixer
+      - name: Check whitespace integrity
+        run: git diff --check
