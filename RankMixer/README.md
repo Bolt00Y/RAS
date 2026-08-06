@@ -22,7 +22,8 @@
 1. [文献综述与基线诊断](docs/01_literature_and_diagnosis.md)
 2. [详细改进方案](docs/02_modification_schemes.md)
 3. [实验与统计检验协议](docs/03_experiment_protocol.md)
-4. [机器可读实验矩阵](configs/experiment_matrix.yaml)
+4. [RankUp 论文图解与复现分析](docs/04_rankup_paper_walkthrough.md)
+5. [机器可读实验矩阵](configs/experiment_matrix.yaml)
 
 ## 推荐优先级
 
