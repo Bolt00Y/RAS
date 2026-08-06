@@ -1,0 +1,62 @@
+name: Markdown Math Preview
+
+on:
+  push:
+    branches:
+      - RankMixer
+    paths:
+      - "**/*.md"
+      - ".github/scripts/**"
+      - ".github/workflows/markdown-math-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  normalize-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out RankMixer branch
+        uses: actions/checkout@v4
+        with:
+          ref: RankMixer
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Normalize display math to GitHub math fences
+        run: python .github/scripts/normalize_markdown_math.py --write .
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install the MathJax parser used by the validator
+        run: npm install --no-save --ignore-scripts mathjax-full@3.2.2
+
+      - name: Parse every Markdown math block with MathJax
+        run: node .github/scripts/validate_markdown_math.mjs .
+
+      - name: Show normalization diff
+        run: git diff --check && git diff -- "*.md" "**/*.md"
+
+      - name: Commit normalized Markdown when needed
+        shell: bash
+        run: |
+          if git diff --quiet -- "*.md" "**/*.md"; then
+            echo "Markdown math is already normalized."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "*.md" "**/*.md"
+          git commit -m "Normalize Markdown math for GitHub Preview [skip ci]"
+          git push origin HEAD:RankMixer
