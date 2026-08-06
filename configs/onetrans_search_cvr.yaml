@@ -1,0 +1,174 @@
+# OneTrans search-CVR modeling configurations
+# Dense parameter estimates exclude sparse embedding tables.
+
+data:
+  daily_samples: 550000000
+  user:
+    fields: 385
+    embedding_dim: 17
+    flattened_dim: 6545
+  item:
+    fields: 835
+    embedding_dim: 17
+    flattened_dim: 14195
+  creative:
+    fields: 14
+    embedding_dim: 17
+    flattened_dim: 238
+  total_flattened_dim: 20978
+  labels:
+    click: optional_but_required_for_p2
+    conversion: required
+    conversion_must_imply_click: true
+    mature_window_days: set_by_business
+
+common:
+  d_model: 256
+  num_layers: 6
+  num_heads: 4
+  head_dim: 64
+  ffn_ratio: 4
+  norm: rmsnorm
+  pre_norm: true
+  precision: bf16
+  dropout: 0.0
+  dense_optimizer:
+    name: rmsprop
+    learning_rate: 0.005
+    alpha: 0.99999
+    momentum: 0.0
+    weight_decay: 0.0
+  dense_grad_clip: 90
+  global_batch_size: 32768
+  warmup_steps: 3000
+
+variants:
+  p0_faithful_static:
+    tokenizer:
+      type: global_low_rank_auto_split
+      hidden_dim: 512
+      ns_tokens: 12
+    attention:
+      type: causal
+      token_specific_qkv: true
+      shared_output_projection: true
+    ffn:
+      token_specific: true
+    head:
+      type: flatten_mlp
+      dims: [3072, 512, 128, 1]
+    objective:
+      type: clicked_only_cvr_bce
+    approximate_dense_params_millions: 66
+
+  p1_entity_hierarchical:
+    tokenizer:
+      type: entity_hierarchical_auto_split
+      field_saliency: true
+      field_saliency_rank:
+        user: 64
+        item: 64
+        creative: 8
+      tokens:
+        user: 5
+        item: 9
+        creative: 1
+        cvr: 1
+      bottleneck:
+        user: 512
+        item: 512
+        creative: 128
+    attention:
+      type: causal
+      token_specific_qkv: true
+      user_prefix_cache: true
+    ffn:
+      token_specific: true
+    head:
+      type: last_cvr_token
+      dims: [256, 128, 1]
+    objective:
+      type: clicked_only_cvr_bce
+    approximate_dense_params_millions: 85
+
+  p2_funnel_task_token:
+    base_tokenizer: p1_entity_hierarchical
+    tokens:
+      user: 5
+      item: 9
+      creative: 1
+      ctr: 1
+      cvr: 1
+      ctcvr: 1
+    task_mask:
+      private_layers: 4
+      cascade_layers: 2
+      cascade_order: [ctr, cvr, ctcvr]
+      detach_off_diagonal_task_gradients: true
+    objective:
+      ctr_weight: 1.0
+      ctcvr_product_weight: 1.0
+      ctcvr_direct_weight: 0.5
+      consistency_weight: 0.05
+      clicked_cvr_aux_weight_after_warmup: 0.1
+    serving_outputs:
+      post_click_cvr: p_cvr
+      exposure_conversion: p_ctr_times_p_cvr
+      diagnostic: p_ctcvr_direct
+
+  p3_search_bias_decoupled:
+    tokenizer:
+      semantic_tokens:
+        user: 5
+        item: 8
+        creative: 1
+        bias_anchor: 1
+        cvr: 1
+      require_feature_schema_partition: true
+    late_fusion:
+      type: film
+      heavy_projection_dim: 256
+      gamma_scale: 0.1
+    bias_net:
+      hidden_dims: [128, 64, 1]
+      zero_init_last_layer: true
+      additive_logit: true
+    objective:
+      pointwise_weight: 1.0
+      request_pairwise_weight: 0.1
+      semantic_bias_orthogonal_weight: 0.01
+      bias_l2_weight: 0.0001
+    candidate_independence_mask: true
+
+  p4_lowrank_adaptive:
+    base_tokenizer: p1_entity_hierarchical
+    factorized_mixed_parameters:
+      shared_base: true
+      adapter_rank: 16
+      input_dependent_gate: true
+    ns_query_schedule: [16, 16, 12, 8, 4, 1]
+    cvr_token_always_active: true
+    inactive_token_update: identity
+    serving_topk: fixed_by_token_type
+    distillation:
+      teacher: best_full_token_specific_model
+      probability_kl_weight: 0.5
+      representation_cosine_weight: 0.1
+    approximate_backbone_params_millions: 11
+
+evaluation:
+  temporal_split: true
+  next_batch_eval: true
+  metrics:
+    - cvr_auc_clicked_space
+    - cvr_uauc_clicked_space
+    - ctcvr_auc_exposure_space
+    - ctcvr_uauc_exposure_space
+    - logloss
+    - pr_auc
+    - ece
+    - request_gauc
+    - p99_latency
+    - samples_per_second
+    - mfu
+    - peak_hbm
