@@ -73,7 +73,7 @@ node .github/scripts/validate_markdown_math.mjs .
 
 规范化脚本会把遗留的块级双美元符号公式转换为 `math` fenced block，并拒绝旧式分隔符。验证脚本会提取所有 `math` block，使用 MathJax 逐个解析；任何未知命令、未闭合环境或 MathJax error node 都必须导致提交失败。
 
-GitHub Actions 工作流 `.github/workflows/markdown-math-preview.yml` 必须保持启用，用于在远端再次执行同一套规范化与 MathJax 检查。
+GitHub Actions 工作流 `.github/workflows/markdown-math-preview.yml` 必须保持启用，用于在远端再次执行同一套规范化与 MathJax 检查。工作流未通过时，不得将 Markdown 公式修改视为完成。
 
 ### 6. 内容保护
 
