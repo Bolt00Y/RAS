@@ -1,0 +1,541 @@
+# Research manifest for the RankMixer branch.
+# This file is framework-agnostic and is not an executable training config.
+
+version: 1
+project: rankmixer_cvr_research
+repository: Bolt00Y/RAS
+branch: RankMixer
+
+baseline:
+  id: RM-B0
+  description: Paper-aligned RankMixer baseline
+  data:
+    samples_per_day: 550000000
+    sample_space: to_be_declared_per_experiment
+    conversion_maturation_window: to_be_declared
+  input:
+    batch_size: 2048
+    embedding_dim: 17
+    fields:
+      user: 385
+      item: 835
+      creative: 14
+      total: 1234
+    flattened_dims:
+      user: 6545
+      item: 14195
+      creative: 238
+      total: 20978
+    tokenizer:
+      type: ordered_continuous_autosplit
+      num_tokens: 16
+      segment_dims: [1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 1313]
+      projection_dim: 768
+      independent_projectors: true
+  backbone:
+    type: rankmixer
+    num_blocks: 2
+    num_tokens: 16
+    hidden_dim: 768
+    mixing_heads: 16
+    per_token_ffn: true
+    sparse_moe: false
+    pooling: mean
+  objective:
+    type: binary_cvr
+    loss: binary_cross_entropy_with_logits
+
+controls:
+  freeze_across_first_pass:
+    - absolute_data_windows
+    - field_schema_and_order
+    - embedding_tables
+    - batch_size
+    - seen_examples
+    - optimizer
+    - learning_rate_schedule
+    - warmup
+    - weight_decay
+    - gradient_clipping
+    - precision
+    - sample_weights
+    - checkpoint_selection_rule
+  comparison_budgets:
+    - same_data_same_steps
+    - parameter_or_active_flops_matched
+    - latency_cost_reported
+  minimum_repetitions:
+    baseline_seeds: 3
+    standard_candidate_seeds: 2
+    random_partition_seeds: 3
+
+metrics:
+  quality:
+    primary: to_be_preregistered
+    candidates:
+      - auc
+      - gauc
+      - uauc
+      - logloss
+      - normalized_cross_entropy
+      - pr_auc
+  calibration:
+    - prediction_to_label_ratio
+    - expected_calibration_error
+    - brier_score
+    - reliability_curve
+  structural:
+    - effective_rank_by_layer
+    - pairwise_token_cosine_redundancy
+    - token_activation_variance
+    - gradient_norm_by_token
+    - parameter_update_ratio
+  efficiency:
+    - total_parameters
+    - active_parameters
+    - theoretical_flops_per_example
+    - examples_per_second
+    - steps_per_second
+    - mfu
+    - peak_hbm
+    - kernel_count
+    - inference_p50
+    - inference_p95
+    - inference_p99
+  required_segments:
+    - user_activity
+    - new_vs_existing_user
+    - item_popularity
+    - new_vs_existing_item
+    - item_category
+    - price_bucket
+    - creative_type
+    - query_frequency
+    - query_intent
+    - conversion_delay
+    - head_torso_tail
+
+statistics:
+  confidence_interval: paired_bootstrap_95
+  resampling_unit: user_or_request_or_day
+  multiple_testing: benjamini_hochberg_fdr
+  require_practical_mde: true
+  require_primary_metric_preregistration: true
+
+stages:
+  - id: A
+    name: implementation_correctness
+    data_fraction: 0.01
+    decisions:
+      - tensor_and_mapping_checks
+      - overfit_small_batch
+      - identity_initialization_equivalence
+      - finite_loss_and_gradients
+      - no_gate_or_router_collapse
+  - id: B
+    name: medium_scale_screening
+    data_fraction_range: [0.05, 0.10]
+    decisions:
+      - remove_clear_quality_regressions
+      - remove_efficiency_violations
+      - estimate_seed_variance
+  - id: C
+    name: full_scale_offline
+    data_fraction: 1.0
+    decisions:
+      - full_quality_and_calibration
+      - segment_analysis
+      - efficiency_profiling
+      - statistical_confirmation
+  - id: D
+    name: online_experiment
+    prerequisites:
+      - stable_offline_gain
+      - acceptable_calibration
+      - acceptable_latency_and_cost
+      - rollback_plan
+
+experiments:
+  - id: RM-R1
+    family: rankup_lite
+    priority: P0
+    hypothesis: Fixed field-level random partition increases token diversity and effective rank.
+    changes:
+      tokenizer:
+        type: fixed_random_field_permutation
+        num_tokens: 16
+        group_sizes:
+          fields_78: 2
+          fields_77: 14
+        preserve_complete_field_embeddings: true
+        mapping_persisted: true
+    matched_to: RM-B0
+    special_checks:
+      - run_three_partition_seeds
+      - mapping_checksum
+      - effective_rank
+      - token_redundancy
+
+  - id: RM-R2
+    family: rankup_lite
+    priority: P0
+    hypothesis: A compact global token provides a cross-group summary without increasing token count.
+    changes:
+      tokenizer:
+        local_tokens: 15
+        global_tokens: 1
+        local_group_sizes:
+          fields_83: 4
+          fields_82: 11
+      global_token:
+        source_statistics: [token_mean, token_rms]
+        mlp_dims: [1536, 192, 768]
+    matched_to: RM-B0
+    estimated_extra_dense_parameters: 442368
+    special_checks:
+      - global_local_cosine_similarity
+      - information_loss_from_one_fewer_local_token
+
+  - id: RM-R3
+    family: rankup_lite
+    priority: P1
+    hypothesis: Random local tokens and a global token jointly improve initial representation rank.
+    parent_components: [RM-R1, RM-R2]
+    run_only_if:
+      - RM-R1_or_RM-R2_independently_positive
+
+  - id: RM-R4
+    family: rankup_lite
+    priority: P2
+    hypothesis: Selective auxiliary embeddings create useful independent views for anchor IDs.
+    changes:
+      auxiliary_embedding:
+        fields: to_be_selected_from_anchor_ids
+        dimension: 8_or_16_or_17
+        implementation: independent_or_hashed_table
+    prerequisites:
+      - embedding_memory_budget_available
+      - lookup_latency_profiled
+
+  - id: RM-T1
+    family: tokenmixer_large_lite
+    priority: P0
+    hypothesis: Mixing and Reverting corrects residual semantic alignment.
+    changes:
+      block:
+        mixing_and_reverting: true
+        ffn_activation: baseline_activation
+        norm: baseline_norm
+        compute_matched: true
+    matched_to: RM-B0
+    special_checks:
+      - mix_revert_round_trip
+      - residual_layout
+      - active_flops_match
+
+  - id: RM-T2
+    family: tokenmixer_large_lite
+    priority: P0
+    hypothesis: Compute-matched per-token SwiGLU and Pre-RMSNorm improve optimization and expressiveness.
+    changes:
+      block:
+        mixing_and_reverting: true
+        norm: pre_rmsnorm
+        mixed_space_swiglu_hidden: 1024
+        original_space_swiglu_hidden: 1024
+        down_projection_small_init_ratio: 0.01
+    matched_to: RM-B0
+    budget: approximately_match_baseline_k4_ffn
+    special_checks:
+      - compare_compute_matched_before_capacity_enhanced
+      - activation_rms
+      - gradient_norm
+
+  - id: RM-T3
+    family: tokenmixer_large_lite
+    priority: P1
+    hypothesis: A capacity-enhanced block separates structural gain from added compute gain.
+    changes:
+      block:
+        mixed_space_swiglu_hidden: 2048
+        original_space_swiglu_hidden: 2048
+    parent: RM-T2
+    budget: approximately_2x_baseline_ffn_compute
+
+  - id: RM-T4
+    family: tokenmixer_large_lite
+    priority: P1
+    hypothesis: Corrected residuals permit useful depth scaling.
+    changes:
+      num_blocks: 4
+      inter_residual_every_n_blocks: 2
+      final_block_receives_inter_residual: false
+    parent: RM-T2
+    run_only_if:
+      - RM-T2_positive_at_two_blocks
+
+  - id: RM-T5
+    family: tokenmixer_large_lite
+    priority: P2
+    hypothesis: A training-only intermediate head improves deep optimization.
+    changes:
+      auxiliary_loss:
+        location: middle_block
+        weight_candidates: [0.05, 0.10, 0.20]
+        remove_at_inference: true
+    parent: RM-T4
+
+  - id: RM-U1
+    family: learnable_mixing
+    priority: P1
+    hypothesis: A simple learned token mixing matrix can outperform a fixed token pattern.
+    changes:
+      adapter:
+        type: learned_16x16_token_matrix
+        residual_scale_init: 0.0
+    matched_to: RM-B0
+
+  - id: RM-U2
+    family: learnable_mixing
+    priority: P1
+    hypothesis: Low-rank token mixing captures most of the value with fewer parameters.
+    changes:
+      adapter:
+        type: low_rank_16x16_token_matrix
+        rank_candidates: [2, 4, 8]
+        residual_scale_init: 0.0
+    parent: RM-U1
+
+  - id: RM-U3
+    family: unimixer_inspired
+    priority: P1_P2
+    hypothesis: Structured local/global learnable mixing improves the fixed permutation while preserving efficiency.
+    changes:
+      adapter:
+        channel_block_size: 48
+        num_blocks: 256
+        local_basis_count: 4
+        global_rank: 16
+        sinkhorn_iterations: [3, 5]
+        temperature_start: 1.0
+        temperature_end: 0.05
+        residual_scale_init: 0.0
+    estimated_extra_dense_parameters: 18432
+    run_after:
+      - RM-U1
+    special_checks:
+      - row_and_column_sums
+      - matrix_entropy
+      - no_global_averaging_collapse
+      - inference_matrix_freezing_equivalence
+
+  - id: RM-D1
+    family: explicit_cross
+    priority: P1
+    hypothesis: A compact low-rank cross branch learns strong multiplicative interactions efficiently.
+    changes:
+      compression:
+        per_token_dims: [768, 32]
+        flattened_cross_dim: 512
+      dcnv2:
+        num_layers: 2
+        rank: 32
+      fusion:
+        type: zero_initialized_residual
+    estimated_extra_dense_parameters: under_1_million
+    matched_controls:
+      - wider_rankmixer_with_similar_parameter_count
+    special_checks:
+      - branch_output_correlation_with_backbone
+      - kernel_count
+      - mfu
+
+  - id: RM-D2
+    family: explicit_cross
+    priority: P1
+    hypothesis: Three rank-64 cross layers provide a stronger explicit interaction branch.
+    changes:
+      compression:
+        per_token_dims: [768, 32]
+        flattened_cross_dim: 512
+      dcnv2:
+        num_layers: 3
+        rank: 64
+      fusion:
+        type: scalar_gated_residual
+        output_projection: [512, 768]
+        zero_init: true
+    estimated_extra_dense_parameters: 983040
+    matched_controls:
+      - wider_rankmixer_with_similar_parameter_count
+
+  - id: RM-D3
+    family: explicit_cross
+    priority: P2
+    hypothesis: CrossNet-Mix captures heterogeneous explicit crosses after a single CrossNet proves useful.
+    changes:
+      dcnv2:
+        mixture_experts: 4
+    parent: RM-D2
+    run_only_if:
+      - RM-D2_positive
+
+  - id: RM-G1
+    family: instance_conditioned_gate
+    priority: P1
+    hypothesis: Sample-specific token importance improves over fixed token strength.
+    changes:
+      gate:
+        type: token_only
+        context: token_mean_and_rms
+        context_hidden: 64
+        identity_init: true
+        maximum_initial_deviation: 0.10
+    matched_to: RM-B0
+
+  - id: RM-G2
+    family: instance_conditioned_gate
+    priority: P1
+    hypothesis: Sample-specific channel importance improves over fixed channel strength.
+    changes:
+      gate:
+        type: channel_only
+        context_hidden: 64
+        identity_init: true
+    matched_to: RM-B0
+
+  - id: RM-G3
+    family: instance_conditioned_gate
+    priority: P1
+    hypothesis: A rank-1 token-channel mask combines sample-specific token and channel selection cheaply.
+    changes:
+      gate:
+        type: factorized_token_outer_channel
+        context_dims: [1536, 64]
+        token_output_dim: 16
+        channel_output_dim: 768
+        identity_init: true
+        rho_candidates: [0.10, 0.20, 0.30]
+        regularization_candidates: [0.0, 0.00001, 0.0001]
+    estimated_extra_dense_parameters: 148480
+    special_checks:
+      - gate_saturation
+      - tail_token_suppression
+      - segment_specific_gate_distributions
+
+  - id: RM-G4
+    family: output_pooling
+    priority: P1
+    hypothesis: Learned token pooling is better than equal Mean Pooling.
+    changes:
+      pooling:
+        type: learned_softmax_weighted_sum
+    matched_to: RM-B0
+    note: Run independently from input gating in the first pass.
+
+  - id: RM-M1
+    family: capacity_scaling
+    priority: P2
+    hypothesis: Dense per-token SwiGLU improves the FFN at matched parameter/FLOP budget.
+    changes:
+      pffn:
+        type: dense_per_token_swiglu
+        hidden_dim: 2048
+    matched_to: baseline_k4_gelu_ffn
+
+  - id: RM-M2
+    family: capacity_scaling
+    priority: P2
+    hypothesis: Enlarging the dense FFN demonstrates that the model is capacity-limited.
+    changes:
+      pffn:
+        type: dense_per_token_swiglu
+        hidden_dim: 4096
+    parent: RM-M1
+    budget: approximately_2x_active_ffn_compute
+
+  - id: RM-M3
+    family: sparse_pertoken_moe
+    priority: P2
+    hypothesis: Per-token experts double total FFN capacity at approximately baseline active GEMM FLOPs.
+    changes:
+      moe:
+        expert_scope: per_token
+        experts_per_token: 4
+        expert_type: swiglu
+        hidden_dim_per_expert: 1024
+        always_on_shared_experts: 1
+        routed_experts_active: 1
+        routed_pool_size: 3
+        routing: top1_within_token
+        gate_scale_candidates: [1.0, 2.0]
+        down_projection_small_init_ratio: 0.01
+    capacity:
+      total_ffn_capacity_vs_baseline: approximately_2x
+      active_ffn_gemm_vs_baseline: approximately_equal
+    prerequisites:
+      - RM-M2_outperforms_RM-M1
+      - grouped_gemm_available
+      - dispatch_and_latency_profiled
+    special_checks:
+      - expert_load_by_token
+      - router_entropy
+      - shared_expert_ablation
+      - communication_and_dispatch_time
+      - inference_p99
+
+  - id: RM-E1
+    family: entire_space_multitask
+    priority: conditional_P0
+    hypothesis: ESMM reduces clicked-only sample selection bias when full impression labels are available.
+    eligibility:
+      required_labels: [impression, click, conversion]
+      entire_space_training: true
+      mature_conversion_window: true
+    changes:
+      objective:
+        ctr_head: true
+        cvr_head: true
+        ctcvr_probability: pctr_times_pcvr
+        losses: [ctr_bce, ctcvr_bce]
+      pooling:
+        ctr: task_specific_token_pooling
+        cvr: task_specific_token_pooling
+    special_checks:
+      - ctr_cvr_ctcvr_metrics_separately
+      - task_seesaw
+      - probability_calibration
+      - no_fake_cvr_labels_for_unclicked_samples
+
+recommended_execution_order:
+  phase_0:
+    - RM-B0
+  phase_1:
+    - RM-R1
+    - RM-R2
+    - RM-G1
+  phase_2:
+    - RM-T1
+    - RM-T2
+    - RM-T4
+  phase_3:
+    - RM-D1
+    - RM-D2
+    - RM-U1
+    - RM-U3
+  phase_4:
+    - RM-M1
+    - RM-M2
+    - RM-M3
+  conditional_parallel:
+    - RM-E1
+
+combination_policy:
+  require_each_component_independently_positive: true
+  require_2x2_factorial_design: true
+  forbid_first_pass_module_stacking: true
+  recommended_combinations_after_confirmation:
+    - [RM-R1_or_RM-R2, RM-T2]
+    - [RM-R1_or_RM-R2, RM-M3]
+    - [RM-D2, RM-G3]
+    - [best_backbone, RM-E1]
