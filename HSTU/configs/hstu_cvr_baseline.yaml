@@ -1,0 +1,210 @@
+# HSTU-CVR 建议起始配置。
+# 字段名称、词表大小、归因窗口和 GPU token budget 必须按真实系统修改。
+
+experiment:
+  name: hstu_cvr_paper_faithful_v1
+  seed: 20260806
+  task: sponsored_search_cvr
+  profile: paper_faithful
+
+data:
+  daily_impressions: 550000000
+  sample_unit: user_request
+  chronological_split: true
+  user_key: user_id
+  request_key: request_id
+  event_time_key: rank_time
+  sparse_embedding_dim: 17
+  fields:
+    user: 385
+    item: 835
+    creative: 14
+  attribution_window_days: null  # 必须由业务填写
+  online_history_delay_seconds: null  # 必须按线上可见性填写
+  require_mature_conversion_label: true
+  candidates_per_request:
+    train: 16
+    eval: all_available
+  history:
+    max_events: 128
+    min_events: 0
+    order: chronological
+    layout: interleaved_item_action
+    current_candidate_action_is_zero: true
+  packing:
+    jagged: true
+    length_buckets: [64, 128, 256, 512, 1024]
+    global_candidate_targets: 2048
+    max_tokens_per_gpu: null  # 由硬件 profile 决定
+
+feature_tokenizer:
+  preserve_field_boundaries: true
+  split_flat_embedding_by_dimension: false
+  field_projection:
+    input_dim: 17
+    output_dim: 32
+    sharing: semantic_group
+    activation: silu
+    norm: rmsnorm
+  add_field_id_embedding: true
+  add_domain_embedding: true
+  semantic_group_pooling:
+    type: gated_attention
+    output_dim: 32
+  context_tokens: 8
+  query_tokens: 2
+  historical_event_tokens_per_event: 2  # content + action
+  candidate_tokens_per_candidate: 1
+  candidate_target_type_embedding: true
+
+model:
+  name: hstu
+  d_model: 256
+  num_layers: 6
+  num_heads: 4
+  attention_dim_per_head: 64
+  linear_dim_per_head: 64
+  input_dropout: 0.20
+  output_dropout: 0.10
+  normalization: layernorm
+  causal: true
+  target_aware: true
+  candidate_isolation: true
+  attention:
+    activation: silu
+    softmax: false
+    relative_position_bias: true
+    relative_time_bias: true
+    num_position_buckets: 8192
+    num_time_buckets: 2048
+    max_attention_length: null
+  postprocessor:
+    enabled: true
+    timestamp_features:
+      - {period_seconds: 3600, buckets: 24}
+      - {period_seconds: 86400, buckets: 7}
+  candidate_tower:
+    enabled: true
+    hidden_dims: [512]
+    output_dim: 256
+    activation: silu
+    norm: layernorm
+  interaction:
+    type: elementwise_product_and_concat
+  prediction_head:
+    hidden_dims: [512]
+    activation: silu
+    norm: layernorm
+
+objectives:
+  ctr:
+    enabled: true
+    loss: binary_cross_entropy
+    weight: 1.0
+    sample_space: all_impressions
+  conditional_cvr:
+    enabled: true
+    loss: binary_cross_entropy
+    direct_clicked_aux_weight: 0.2
+  ctcvr:
+    enabled: true
+    probability_constraint: p_ctr_times_p_cvr
+    loss: binary_cross_entropy
+    weight: 1.0
+    sample_space: all_impressions
+  historical_actions:
+    enabled: true
+    tasks: [click, conversion]
+    loss: binary_cross_entropy
+    weight: 0.2
+  pairwise_request_loss:
+    enabled: false
+    weight: 0.1
+  delayed_feedback:
+    mode: mature_labels
+    hazard_buckets: []
+  value_head:
+    enabled: false
+
+optimization:
+  optimizer: adamw
+  dense_learning_rate: 0.001
+  embedding_learning_rate: 0.001
+  dense_weight_decay: 0.0001
+  embedding_weight_decay: 0.0
+  warmup_steps: 5000
+  schedule: cosine
+  gradient_clip_global_norm: 1.0
+  precision: bf16
+  gradient_accumulation_steps: 1
+  activation_recomputation:
+    normed_x: true
+    uvqk: true
+    output_intermediate: true
+  compile: true
+
+distributed:
+  user_level_data_sharding: true
+  embedding_sharding: torchrec_or_existing_parameter_server
+  balance_by_attention_load: true
+  stochastic_length:
+    enabled: false
+    alpha: null
+  context_parallelism:
+    enabled: false
+
+serving:
+  history_kv_cache: true
+  item_group_token_cache: true
+  creative_group_token_cache: true
+  candidate_chunk_size: 16
+  candidate_order_invariant: true
+  fallback_model: existing_rankmixer
+  precision: bf16
+
+profiles:
+  smoke_test:
+    data.history.max_events: 64
+    data.candidates_per_request.train: 4
+    model.num_layers: 4
+    feature_tokenizer.query_tokens: 1
+  paper_faithful:
+    data.history.max_events: 128
+    data.history.layout: interleaved_item_action
+    model.d_model: 256
+    model.num_layers: 6
+  production_base:
+    data.history.max_events: 256
+    data.history.layout: merged_item_action
+    feature_tokenizer.historical_event_tokens_per_event: 1
+    model.d_model: 512
+    model.num_layers: 5
+    model.num_heads: 4
+    model.attention_dim_per_head: 128
+    model.linear_dim_per_head: 128
+  long_history_research:
+    data.history.max_events: 1024
+    data.history.layout: merged_item_action
+    distributed.stochastic_length.enabled: true
+    distributed.stochastic_length.alpha: 1.5
+    model.attention.max_attention_length: null
+
+evaluation:
+  probability_metrics: [auc, gauc, pr_auc, logloss, normalized_entropy, brier, ece]
+  ranking_metrics: [ndcg_at_5, ndcg_at_10, pairwise_accuracy]
+  system_metrics: [targets_per_second, tokens_per_second, step_p50, step_p95, step_p99, hbm_peak]
+  slices:
+    - history_length
+    - query_frequency
+    - new_user
+    - new_item
+    - new_creative
+    - price_bucket
+    - traffic_source
+    - slot_or_position
+    - conversion_delay
+  invariance_tests:
+    candidate_order: true
+    candidate_isolation: true
+    no_future_event: true
+    dense_jagged_parity: true
