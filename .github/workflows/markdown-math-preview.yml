@@ -32,6 +32,11 @@ jobs:
       - name: Reject Markdown that still needs normalization
         run: python .github/scripts/normalize_markdown_math.py .
 
+      - name: Probe GitHub official Markdown renderer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python .github/scripts/probe_github_markdown_math.py
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
