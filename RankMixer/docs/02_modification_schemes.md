@@ -83,7 +83,7 @@ X_{0,\mathrm{random}}\in\mathbb{R}^{B\times16\times768}.
 
 若已知每个 field 的覆盖率、基数和非零率，可增加一个“分层随机”对照：
 
-1. 按 `log(cardinality)`、coverage、历史梯度范数分桶；
+1. 按 $\log(\mathrm{cardinality})$ 、coverage、历史梯度范数分桶；
 2. 每个桶内部随机；
 3. round-robin 分配到 16 个 token。
 
@@ -91,7 +91,7 @@ X_{0,\mathrm{random}}\in\mathbb{R}^{B\times16\times768}.
 
 ## 1.4 方案 1B：15 Local Tokens + 1 Global Token
 
-直接在 16 个 local tokens 之外追加 global token 会使 `T=17`，而 `768` 不能被 `17` 整除，也会破坏原始 `H=T` 约束。
+直接在 16 个 local tokens 之外追加 global token 会使 $T=17$ ，而 `768` 不能被 `17` 整除，也会破坏原始 $H=T$ 约束。
 
 推荐保持总 token 数为 16：
 
@@ -146,7 +146,7 @@ X_0=\operatorname{Concat}(g,X_{\mathrm{local}})\in\mathbb{R}^{B\times16\times768
 
 ### 为什么不是 raw flatten -> global MLP
 
-直接将 `[B,20978]` 投影为 768 维会再增加约 16.1M 参数和很大的输入 GEMM，几乎复制一次 tokenizer。基于 local token 统计的 global token 更适合作为低风险首版。
+直接将 $\mathbb{R}^{B\times20{,}978}$ 投影为 768 维会再增加约 16.1M 参数和很大的输入 GEMM，几乎复制一次 tokenizer。基于 local token 统计的 global token 更适合作为低风险首版。
 
 ## 1.5 方案 1C：Selective Multi-Embedding
 
@@ -425,7 +425,7 @@ B\in\mathbb{R}^{16\times256},\quad
 W_{\mathrm{global}}=\operatorname{Sinkhorn}(AB)\in\mathbb{R}^{256\times256}.
 ```
 
-先做 local mixing，再在 256 个 blocks 之间做 global mixing，最后 reshape 回 `[B,16,768]`。
+先做 local mixing，再在 256 个 blocks 之间做 global mixing，最后 reshape 回 $\mathbb{R}^{B\times16\times768}$。
 
 ### 安全残差
 
@@ -491,7 +491,7 @@ RankMixer 的固定 mixing 与 PFFN 是否需要较多数据/层数才能学习�
 
 ## 4.2 设计原则
 
-不在 `[B,20978]` 上使用 full-rank DCNv2，也不把大型 DCN 串联在每个 RankMixer block 中。
+不在 $\mathbb{R}^{B\times20{,}978}$ 上使用 full-rank DCNv2，也不把大型 DCN 串联在每个 RankMixer block 中。
 
 先从 tokenizer 输出压缩：
 
