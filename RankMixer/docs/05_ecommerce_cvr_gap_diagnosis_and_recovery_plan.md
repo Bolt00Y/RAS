@@ -2,11 +2,11 @@
 
 > 适用场景：仅使用当前已经存在的 user、item、creative 稀疏特征及 CVR 标签，不引入新的行为序列、外部预训练向量、新标签或额外数据源。
 >
-> 当前结论基于以下已知事实：每天约 5.5 亿条训练样本，batch size 为 2048；小模型 RankMixer 为 $T=16$、$D=768$、$L=2$；大模型 RankMixer 为 $T=32$、$D=1536$、$L=2$；强 Base 为 `BN -> hierarchical SENet -> DCNv2 -> MLP`。
+> 当前结论基于以下已知事实：每天约 5.5 亿条训练样本，batch size 为 2048；小模型 RankMixer 为 $T=16$ 、 $D=768$ 、 $L=2$ ；大模型 RankMixer 为 $T=32$ 、 $D=1536$ 、 $L=2$ ；强 Base 为 `BN -> hierarchical SENet -> DCNv2 -> MLP`。
 
 ## 1. 执行摘要
 
-当前小模型 RankMixer 的 CVR AUC 为 $0.86188$，同期 Base 为 $0.86865$，绝对差值为：
+当前小模型 RankMixer 的 CVR AUC 为 $0.86188$ ，同期 Base 为 $0.86865$ ，绝对差值为：
 
 ```math
 \Delta \mathrm{AUC}
@@ -37,7 +37,7 @@ N_{\mathrm{step}}\approx
 
 ### 核心决策
 
-1. **暂不建议直接给原始大模型 RankMixer 完整训练预算。** 在相同层数和 PFFN 扩张率下，PFFN 主体参数及 FLOPs 近似正比于 $TD^2$，因此 $T=32,D=1536$ 相对 $T=16,D=768$ 放大约 8 倍，但没有补回 Base 已证明有效的归纳偏置。
+1. **暂不建议直接给原始大模型 RankMixer 完整训练预算。** 在相同层数和 PFFN 扩张率下，PFFN 主体参数及 FLOPs 近似正比于 $TD^2$ ，因此 $T=32,D=1536$ 相对 $T=16,D=768$ 放大约 8 倍，但没有补回 Base 已证明有效的归纳偏置。
 2. **第一优先级不是“让 RankMixer 单独替代 Base”，而是“保留 Base 的强能力，让 RankMixer 学习剩余误差”。** 最安全的生产研究路线是 Base-preserving residual hybrid。
 3. **当前实验不是纯粹的 backbone 对比。** 两个模型同时在输入归一化、动态特征选择、显式交叉、输出聚合和任务头上存在差异，不能把全部差距归因于 Token Mixing。
 4. **最可能造成差距的三个因素是：** 缺失层级条件 SENet、缺失 DCNv2 显式乘法交叉、Mean Pooling 加弱任务头导致信息稀释。
@@ -177,7 +177,7 @@ FinalMLP 的工业与公开实验表明，两路表示、特征选择和 interac
 
 当前 Autosplit 严格符合 RankMixer 原始公式，不是实现错误。但 RankUp 指出，固定 Autosplit 或语义分组可能让强相关字段集中，造成 token 冗余和有效秩不足。RankUp 通过字段级随机排列、Multi-embedding 和 Global Token 提高初始表示多样性，并在工业广告任务上获得一致增益。[RankUp](https://arxiv.org/html/2604.17878v3)
 
-这可能解释为什么参数很多却没有转化成有效表示容量。不过 RankUp 中单项 Random Split 的 Realtime AUC 增益约为 $0.06\%$ 到 $0.08\%$，远小于当前绝对 AUC 差距，因而它更像重要补充，而不是唯一解法。
+这可能解释为什么参数很多却没有转化成有效表示容量。不过 RankUp 中单项 Random Split 的 Realtime AUC 增益约为 $0.06\%$ 到 $0.08\%$ ，远小于当前绝对 AUC 差距，因而它更像重要补充，而不是唯一解法。
 
 ## 3.5 H5：原始 RankMixer block 的残差与归一化设计限制效果
 
@@ -219,7 +219,7 @@ P_{\mathrm{PFFN}}
 \frac{32\times1536^2}{16\times768^2}=8.
 ```
 
-若 $k=4$、$L=2$，仅 PFFN 权重约为：
+若 $k=4$ 、 $L=2$ ，仅 PFFN 权重约为：
 
 ```math
 P_{\mathrm{small,PFFN}}\approx 151\,\mathrm{M},
@@ -227,7 +227,7 @@ P_{\mathrm{small,PFFN}}\approx 151\,\mathrm{M},
 P_{\mathrm{large,PFFN}}\approx 1.208\,\mathrm{B}.
 ```
 
-Tokenizer 权重则从约 $16.11\,\mathrm{M}$ 增加到 $32.22\,\mathrm{M}$。这是一笔很大的预算。如果小模型的主要问题是缺少条件选择和显式交叉，8 倍扩容只会放大不匹配的结构。
+Tokenizer 权重则从约 $16.11\,\mathrm{M}$ 增加到 $32.22\,\mathrm{M}$ 。这是一笔很大的预算。如果小模型的主要问题是缺少条件选择和显式交叉，8 倍扩容只会放大不匹配的结构。
 
 ---
 
@@ -737,7 +737,7 @@ RU-S1: stratified balanced random split
 
 ## 9.2 保持 token 数不变的 Global Adapter
 
-由于当前 RankMixer 要求 $H=T$，直接增加一个 token 会改变结构。可先使用保持 $T$ 不变的全局上下文注入：
+由于当前 RankMixer 要求 $H=T$ ，直接增加一个 token 会改变结构。可先使用保持 $T$ 不变的全局上下文注入：
 
 ```math
 \mathbf g
@@ -800,13 +800,13 @@ X
 
 ## 10.2 计算量匹配
 
-假设原 PFFN 扩张倍数为 $k$，单个普通 PFFN 的主要参数为：
+假设原 PFFN 扩张倍数为 $k$ ，单个普通 PFFN 的主要参数为：
 
 ```math
 2kD^2.
 ```
 
-Mixing & Reverting block 包含两个 pSwiGLU。若每个 pSwiGLU hidden size 为 $h$，总主要参数约为：
+Mixing & Reverting block 包含两个 pSwiGLU。若每个 pSwiGLU hidden size 为 $h$ ，总主要参数约为：
 
 ```math
 6Dh.
@@ -880,11 +880,11 @@ p_s^{(\tau)}=\sigma(z_s/\tau).
 \right).
 ```
 
-建议把 $\lambda$、$\tau$ 作为小规模搜索变量，并严格检查 calibration。
+建议把 $\lambda$ 、 $\tau$ 作为小规模搜索变量，并严格检查 calibration。
 
 ## 11.2 中间表示蒸馏
 
-若能读取 Base 的 DCNv2/MLP 隐层表示 $\mathbf h_t$，可增加：
+若能读取 Base 的 DCNv2/MLP 隐层表示 $\mathbf h_t$ ，可增加：
 
 ```math
 \mathcal L_{\mathrm{repr}}
@@ -912,7 +912,7 @@ p_s^{(\tau)}=\sigma(z_s/\tau).
 
 # 12. 大模型训练策略：拆开 $T$ 与 $D$
 
-当前从 $T=16,D=768$ 直接跳到 $T=32,D=1536$，同时改变了 token granularity 和 width，无法判断哪个轴有效。
+当前从 $T=16,D=768$ 直接跳到 $T=32,D=1536$ ，同时改变了 token granularity 和 width，无法判断哪个轴有效。
 
 应先做四格实验：
 
