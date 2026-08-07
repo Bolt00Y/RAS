@@ -24,7 +24,8 @@
 3. [实验与统计检验协议](docs/03_experiment_protocol.md)
 4. [RankUp 论文图解与复现分析](docs/04_rankup_paper_walkthrough.md)
 5. [电商推广搜 CVR：RankMixer 与强 Base 的差距诊断及改进路线](docs/05_ecommerce_cvr_gap_diagnosis_and_recovery_plan.md)
-6. [机器可读实验矩阵](configs/experiment_matrix.yaml)
+6. [大参数 RankMixer 若仍弱于 Base：系统消融实验方案](docs/06_large_rankmixer_underperformance_ablation_plan.md)
+7. [机器可读实验矩阵](configs/experiment_matrix.yaml)
 
 ## 当前问题驱动的推荐优先级
 
@@ -64,4 +65,4 @@ B2  Base + zero-init RankMixer residual
 B3  RankMixer + low-rank DCNv2 adapter
 ```
 
-先确认能否缩小或闭合当前 Base 差距，再进入 Random Split、TokenMixer-Large、大模型扩展或 Sparse-Pertoken MoE。
+若大参数模型仍弱于 Base，优先执行文档 06 中的 Base 反向消融、规模轴 2×2 拆分、pooling/head、BN/SENet 与 DCNv2 对照，再进入 Random Split、TokenMixer-Large、MoE 或更大规模训练。
