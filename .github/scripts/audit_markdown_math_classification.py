@@ -10,9 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TARGETS = [
     ROOT / "RankMixer/README.md",
-    ROOT / "RankMixer/docs/01_literature_and_diagnosis.md",
-    ROOT / "RankMixer/docs/02_modification_schemes.md",
-    ROOT / "RankMixer/docs/03_experiment_protocol.md",
+    *sorted((ROOT / "RankMixer/docs").glob("*.md")),
 ]
 INLINE_CODE_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
