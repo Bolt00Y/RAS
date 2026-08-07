@@ -23,23 +23,27 @@
 2. [详细改进方案](docs/02_modification_schemes.md)
 3. [实验与统计检验协议](docs/03_experiment_protocol.md)
 4. [RankUp 论文图解与复现分析](docs/04_rankup_paper_walkthrough.md)
-5. [机器可读实验矩阵](configs/experiment_matrix.yaml)
+5. [电商推广搜 CVR：RankMixer 与强 Base 的差距诊断及改进路线](docs/05_ecommerce_cvr_gap_diagnosis_and_recovery_plan.md)
+6. [机器可读实验矩阵](configs/experiment_matrix.yaml)
 
-## 推荐优先级
+## 当前问题驱动的推荐优先级
 
 | 优先级 | 方案 | 主要目的 | 首版风险 |
 |---|---|---|---|
-| P0 | RankUp-Lite：固定随机划分 + Global Token | 提升输入表示秩、降低 token 冗余 | 低 |
-| P0 | TokenMixer-Large Block Lite | 修复 mixing 前后残差语义错位，并为加深网络做准备 | 中 |
-| P1 | 低秩 DCNv2 显式交叉支路 | 补充受控的显式乘法交互 | 中 |
-| P1 | 实例条件 Token-Channel Gate | 动态选择当前请求的重要 token/channel | 低 |
-| P1/P2 | UniMixer-inspired Learnable Mixing Adapter | 让固定 mixing 模式可学习，同时保持结构化约束 | 中 |
-| P2 | Sparse-Pertoken MoE | 在近似固定激活 FLOPs 下扩大容量 | 高 |
-| 条件方案 | ESMM + 任务特定池化 | 处理全曝光 CVR 的样本选择偏差和稀疏性 | 取决于标签 |
+| P0 | Base-preserving zero-init RankMixer residual | 保住强 Base，只让 RankMixer 学习剩余误差 | 中 |
+| P0 | 复用 Base 的 BN + hierarchical SENet 前端 | 恢复样本条件的 user/item/creative 特征选择 | 低到中 |
+| P0 | Base-matched MLP head + task-aware pooling | 避免 Mean Pooling 稀释强 token | 低 |
+| P0/P1 | DCNv2 并行支路或低秩 adapter | 恢复显式乘法交叉 | 中 |
+| P1 | RankUp-Lite：固定随机划分 + Global Adapter | 提升输入表示秩、降低 token 冗余 | 低到中 |
+| P1 | TokenMixer-Large Block Lite | 修复 residual 语义错位，并为大模型扩展做准备 | 中 |
+| P1 | Base teacher distillation | 将强 Base 的决策边界迁移到单分支 RankMixer | 中 |
+| P2 | 原样扩大到 $T=32,D=1536$ | 验证纯容量 scaling | 高，当前不宜直接给完整预算 |
+| P3 | Sparse-Pertoken MoE | 在 dense scaling 已获益后提高容量效率 | 高 |
 
 ## 研究原则
 
 - 所有方案必须与原始 RankMixer 基线进行单变量对照；
+- 当前 Base 是同数据上的最强结构证据，新模型应先继承其有效归纳偏置；
 - 同时报告参数匹配、FLOPs 匹配和线上延迟匹配三类结果；
 - 不把多个模块一次性串联后只报告最终指标；
 - 不以参数增加本身作为创新，必须说明新增模块补足了哪类建模缺口；
@@ -50,12 +54,14 @@
 ## 建议首轮实验
 
 ```text
-RM-B0  原始 RankMixer 基线
-RM-R1  固定随机 feature permutation，T=16
-RM-R2  15 local tokens + 1 global token
-RM-T1  Mixing & Reverting，计算量匹配版
-RM-D1  低秩 DCNv2 并行支路
-RM-G1  输入层 Factorized Token-Channel Gate
+A0  当前 Base 与 RankMixer 的多 seed / checkpoint 复现
+A1  RankMixer + Base bucket-wise BN
+A2  RankMixer + Base-matched MLP head
+A3  Mean + Attention residual pooling
+A4  calibrated Base / RankMixer logit blend
+B1  BN + hierarchical SENet + RankMixer
+B2  Base + zero-init RankMixer residual
+B3  RankMixer + low-rank DCNv2 adapter
 ```
 
-先在完全一致的数据窗口和训练步数下完成以上实验，再决定是否进入深层 TokenMixer-Large、UniMixing 或 Sparse-Pertoken MoE。
+先确认能否缩小或闭合当前 Base 差距，再进入 Random Split、TokenMixer-Large、大模型扩展或 Sparse-Pertoken MoE。
