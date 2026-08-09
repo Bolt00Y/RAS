@@ -7,9 +7,9 @@ Repository convention for new or edited Markdown:
 - legacy `math` fenced blocks remain readable so existing documents do not need
   a risky bulk rewrite, but new documents should not introduce them;
 - TeX delimiters written as backslash-parenthesis or backslash-bracket are
-  rejected outside code fences.
+  rejected outside code fences and inline-code examples.
 
-The checker is deliberately non-mutating.  It verifies balanced code fences and
+The checker is deliberately non-mutating. It verifies balanced code fences and
 balanced standalone double-dollar blocks, and reports ambiguous same-line
 `$$...$$` constructs because GitHub Preview is most reliable when delimiters are
 on their own lines.
@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Iterable
 
 FENCE_RE = re.compile(r"^(?P<indent>\s*)(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
+INLINE_CODE_RE = re.compile(r"(?<!`)`[^`\n]+`(?!`)")
 LEGACY_DELIMITERS = (r"\(", r"\)", r"\[", r"\]")
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build"}
 
@@ -80,13 +81,15 @@ def validate_text(text: str, path: Path) -> list[str]:
             display_math_start = line_no
             continue
 
-        if "$$" in line:
+        line_without_inline_code = INLINE_CODE_RE.sub("", line)
+
+        if "$$" in line_without_inline_code:
             errors.append(
                 f"{path}:{line_no}: display-math delimiters must be standalone `$$` lines"
             )
 
         for delimiter in LEGACY_DELIMITERS:
-            if delimiter in line:
+            if delimiter in line_without_inline_code:
                 errors.append(
                     f"{path}:{line_no}: legacy math delimiter {delimiter!r} is not allowed"
                 )
