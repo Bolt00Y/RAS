@@ -2,7 +2,7 @@
 """Verify that GitHub's official GFM renderer classifies every formula as math.
 
 MathJax syntax validation alone is insufficient: GitHub's Markdown parser must
-first turn the source delimiters into `math-renderer` elements.  This script
+first turn the source delimiters into `math-renderer` elements. This script
 counts source formulas written with `$...$`, standalone `$$` blocks, and legacy
 `math` fences, renders each Markdown document through GitHub's Markdown API,
 and requires exact agreement with the resulting inline/display math elements.
@@ -108,12 +108,12 @@ def analyze_source(source: str) -> tuple[int, int, list[str]]:
             display_line = line_no
             continue
 
-        if "$$" in line:
+        line_without_code = INLINE_CODE_RE.sub("", line)
+        if "$$" in line_without_code:
             errors.append(
                 f"line {line_no}: display-math delimiters must be standalone `$$` lines"
             )
 
-        line_without_code = INLINE_CODE_RE.sub("", line)
         inline_count += len(INLINE_MATH_RE.findall(line_without_code))
 
     if open_fence is not None:
@@ -124,8 +124,13 @@ def analyze_source(source: str) -> tuple[int, int, list[str]]:
     return display_count, inline_count, errors
 
 
+def emit_annotation(path: Path, message: str) -> None:
+    safe = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::error file={path.as_posix()},line=1,title=GitHub math render mismatch::{safe}")
+
+
 def main() -> int:
-    failures: list[str] = []
+    failures: list[tuple[Path, str]] = []
     total_source_display = 0
     total_source_inline = 0
     total_rendered_display = 0
@@ -136,7 +141,7 @@ def main() -> int:
         source = path.read_text(encoding="utf-8")
         source_display, source_inline, source_errors = analyze_source(source)
         for error in source_errors:
-            failures.append(f"{relative}: {error}")
+            failures.append((relative, error))
 
         rendered = render_gfm(source)
         rendered_display = len(DISPLAY_RENDER_RE.findall(rendered))
@@ -154,13 +159,19 @@ def main() -> int:
 
         if source_display != rendered_display:
             failures.append(
-                f"{relative}: {source_display} source display formula(s), "
-                f"but GitHub produced {rendered_display} display math renderer(s)"
+                (
+                    relative,
+                    f"{source_display} source display formula(s), but GitHub produced "
+                    f"{rendered_display} display math renderer(s)",
+                )
             )
         if source_inline != rendered_inline:
             failures.append(
-                f"{relative}: {source_inline} source inline formula(s), "
-                f"but GitHub produced {rendered_inline} inline math renderer(s)"
+                (
+                    relative,
+                    f"{source_inline} source inline formula(s), but GitHub produced "
+                    f"{rendered_inline} inline math renderer(s)",
+                )
             )
 
     print(
@@ -171,8 +182,10 @@ def main() -> int:
 
     if failures:
         print("GitHub Markdown render validation failed:", file=sys.stderr)
-        for failure in failures:
-            print(f"- {failure}", file=sys.stderr)
+        for relative, failure in failures:
+            print(f"- {relative}: {failure}", file=sys.stderr)
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                emit_annotation(relative, failure)
         return 1
 
     return 0
