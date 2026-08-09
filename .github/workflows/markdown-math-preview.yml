@@ -8,30 +8,30 @@ on:
       - "**/*.md"
       - ".github/scripts/**"
       - ".github/workflows/markdown-math-preview.yml"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".github/scripts/**"
+      - ".github/workflows/markdown-math-preview.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix-and-validate:
-    if: github.actor != 'github-actions[bot]'
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out RankMixer
+      - name: Check out the exact revision
         uses: actions/checkout@v4
         with:
-          ref: RankMixer
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Convert family documents to GitHub dollar math
-        run: python .github/scripts/convert_family_docs_to_github_dollar_math.py
 
       - name: Reject invalid Markdown math delimiters
         run: python .github/scripts/normalize_markdown_math.py .
@@ -62,36 +62,5 @@ jobs:
             "$validator_dir/validate_markdown_math.mjs"
           node "$validator_dir/validate_markdown_math.mjs" "$GITHUB_WORKSPACE"
 
-      - name: Check intended diff
-        run: |
-          git diff --check
-          git diff -- RankMixer/docs/07_rankmixer_paper_detailed_review.md \
-            RankMixer/docs/08_tokenmixer_large_paper_detailed_review.md \
-            RankMixer/docs/09_mixformer_paper_detailed_review.md \
-            RankMixer/docs/10_unimixer_paper_detailed_review.md \
-            RankMixer/docs/11_rankmixer_family_evolution_overview.md \
-            RankMixer/docs/12_rankup_paper_detailed_review.md
-
-      - name: Commit converted family documents
-        shell: bash
-        run: |
-          if git diff --quiet -- RankMixer/docs/07_rankmixer_paper_detailed_review.md \
-            RankMixer/docs/08_tokenmixer_large_paper_detailed_review.md \
-            RankMixer/docs/09_mixformer_paper_detailed_review.md \
-            RankMixer/docs/10_unimixer_paper_detailed_review.md \
-            RankMixer/docs/11_rankmixer_family_evolution_overview.md \
-            RankMixer/docs/12_rankup_paper_detailed_review.md; then
-            echo "No family-document conversion was needed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            RankMixer/docs/07_rankmixer_paper_detailed_review.md \
-            RankMixer/docs/08_tokenmixer_large_paper_detailed_review.md \
-            RankMixer/docs/09_mixformer_paper_detailed_review.md \
-            RankMixer/docs/10_unimixer_paper_detailed_review.md \
-            RankMixer/docs/11_rankmixer_family_evolution_overview.md \
-            RankMixer/docs/12_rankup_paper_detailed_review.md
-          git commit -m "Normalize family paper formulas for GitHub Preview [skip ci]"
-          git push origin HEAD:RankMixer
+      - name: Check whitespace integrity
+        run: git diff --check
