@@ -6,6 +6,8 @@ The conversion is intentionally limited to docs 07-12:
   `$$...$$` line;
 - TeX line breaks such as `\\` and aligned environments are preserved;
 - unambiguous spaces are added around inline `$...$` expressions;
+- two malformed right-delimiter fragments introduced while serializing the
+  original Markdown are restored to `\\right)`;
 - fenced code blocks are left untouched.
 """
 
@@ -58,8 +60,19 @@ def collapse_formula(lines: list[str], path: Path, start_line: int) -> str:
     return f"$${content}$$"
 
 
+def repair_serialized_tex(source: str) -> str:
+    # The original tool payload interpreted the `\\r` prefix of two
+    # `\\right)` commands as a carriage-return boundary. Restore only the
+    # exact malformed fragment observed in the two affected formulas.
+    return source.replace(
+        "\n\night).",
+        "\n" + chr(92) + "right).",
+    )
+
+
 def convert(path: Path) -> bool:
-    source = path.read_text(encoding="utf-8")
+    original = path.read_text(encoding="utf-8")
+    source = repair_serialized_tex(original)
     source_lines = source.splitlines()
     output: list[str] = []
 
@@ -114,7 +127,7 @@ def convert(path: Path) -> bool:
         raise RuntimeError(f"{path}: unclosed fenced code block")
 
     updated = "\n".join(output) + "\n"
-    if updated == source:
+    if updated == original:
         return False
     path.write_text(updated, encoding="utf-8")
     return True
