@@ -36,27 +36,13 @@ RankMixer
 
 RankMixer 把输入特征压缩为：
 
-$$
-\mathbf X_0
-\in
-\mathbb R^{B\times T\times D}.
-$$
+$$\mathbf X_0 \in \mathbb R^{B\times T\times D}.$$
 
 一个 block 由：
 
-$$
-\mathbf M_l
-=
-\operatorname{Mix}(\mathbf X_{l-1}),
-$$
+$$\mathbf M_l = \operatorname{Mix}(\mathbf X_{l-1}),$$
 
-$$
-\mathbf X_l
-=
-\operatorname{PFFN}(\mathbf M_l)
-+
-\text{residual / norm}
-$$
+$$\mathbf X_l = \operatorname{PFFN}(\mathbf M_l) + \text{residual / norm}$$
 
 组成。
 
@@ -184,15 +170,7 @@ RankMixer 与 MixFormer 的 tokenizer 更接近“连续向量切片”；RankUp
 
 固定 reshape mixing：
 
-$$
-\mathbf X
-\rightarrow
-\operatorname{reshape}
-\rightarrow
-\operatorname{transpose}
-\rightarrow
-\widetilde{\mathbf X}.
-$$
+$$\mathbf X \rightarrow \operatorname{reshape} \rightarrow \operatorname{transpose} \rightarrow \widetilde{\mathbf X}.$$
 
 优点：无参数、无 score、规则高效。缺点：对所有样本和所有训练阶段固定。
 
@@ -200,15 +178,7 @@ $$
 
 Mixing pattern 基本不变，但增加 inverse operation：
 
-$$
-\mathbf X
-\xrightarrow{\operatorname{Mix}}
-\mathbf M
-\xrightarrow{\operatorname{Nonlinear}}
-\mathbf M'
-\xrightarrow{\operatorname{Revert}}
-\mathbf R.
-$$
+$$\mathbf X \xrightarrow{\operatorname{Mix}} \mathbf M \xrightarrow{\operatorname{Nonlinear}} \mathbf M' \xrightarrow{\operatorname{Revert}} \mathbf R.$$
 
 重点是语义对齐，而不是学习新 pattern。
 
@@ -216,22 +186,13 @@ $$
 
 RankUp 不直接修改 Token Mixing，而是修改进入 mixer 的表示分布。它相信：
 
-$$
-\text{better input basis}
-\Rightarrow
-\text{higher effective rank after mixing}.
-$$
+$$\text{better input basis} \Rightarrow \text{higher effective rank after mixing}.$$
 
 ### 6.4 MixFormer
 
 在 fixed HeadMixing 外增加动态序列 Cross-Attention：
 
-$$
-\operatorname{softmax}
-\left(
-\frac{QK^\top}{\sqrt d}
-\right)V.
-$$
+$$\operatorname{softmax} \left( \frac{QK^\top}{\sqrt d} \right)V.$$
 
 因此非序列 head mixing 固定，序列读取按样本动态。
 
@@ -239,12 +200,7 @@ $$
 
 将 fixed permutation 改为可训练矩阵：
 
-$$
-\mathbf y
-=
-\mathbf x
-\mathbf W_{\mathrm{mix}}.
-$$
+$$\mathbf y = \mathbf x \mathbf W_{\mathrm{mix}}.$$
 
 再用低秩、basis 和 Sinkhorn 约束保持计算与结构可控。
 
@@ -284,32 +240,15 @@ Post-Norm 在初始 RankMixer 中足以支撑两层模型，但后续工作普�
 
 RankMixer 的 dense 参数近似为：
 
-$$
-P
-\approx
-2kLTD^2.
-$$
+$$P \approx 2kLTD^2.$$
 
 这一公式只描述参数数量，不描述参数是否产生互补表示。
 
 RankUp 使用 effective rank：
 
-$$
-\operatorname{erank}(\mathbf H)
-=
-\exp
-\left(
--
-\sum_i
-p_i\log p_i
-\right),
-$$
+$$\operatorname{erank}(\mathbf H) = \exp \left( - \sum_i p_i\log p_i \right),$$
 
-$$
-p_i
-=
-\frac{\sigma_i}{\sum_j\sigma_j}.
-$$
+$$p_i = \frac{\sigma_i}{\sum_j\sigma_j}.$$
 
 它发现 RankMixer 常出现：
 
@@ -478,21 +417,11 @@ Random Split
 
 当前已知输入：
 
-$$
-\begin{aligned}
-\mathbf E_u &\in \mathbb R^{B\times385\times17},\\
-\mathbf E_i &\in \mathbb R^{B\times835\times17},\\
-\mathbf E_c &\in \mathbb R^{B\times14\times17}.
-\end{aligned}
-$$
+$$\begin{aligned} \mathbf E_u &\in \mathbb R^{B\times385\times17},\\ \mathbf E_i &\in \mathbb R^{B\times835\times17},\\ \mathbf E_c &\in \mathbb R^{B\times14\times17}. \end{aligned}$$
 
 当前两种 RankMixer：
 
-$$
-(T,D,L)
-\in
-\{(16,768,2),(32,1536,2)\}.
-$$
+$$(T,D,L) \in \{(16,768,2),(32,1536,2)\}.$$
 
 强 Base 为：
 

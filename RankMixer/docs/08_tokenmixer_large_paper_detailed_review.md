@@ -69,35 +69,19 @@ Residual / Inter-residual
 
 RankMixer 输入：
 
-$$
-\mathbf X
-\in
-\mathbb R^{B\times T\times D}.
-$$
+$$\mathbf X \in \mathbb R^{B\times T\times D}.$$
 
 Token Mixing 后：
 
-$$
-\mathbf M
-=
-\operatorname{Mix}(\mathbf X).
-$$
+$$\mathbf M = \operatorname{Mix}(\mathbf X).$$
 
 虽然 $\mathbf M$ 与 $\mathbf X$ 形状相同，但第 $t$ 个 mixed token 已经由所有原 token 的某个 channel slice 拼接而成，因此：
 
-$$
-\operatorname{Semantics}(\mathbf M_t)
-\neq
-\operatorname{Semantics}(\mathbf X_t).
-$$
+$$\operatorname{Semantics}(\mathbf M_t) \neq \operatorname{Semantics}(\mathbf X_t).$$
 
 原 RankMixer 仍直接执行：
 
-$$
-\mathbf Y_t
-=
-\operatorname{LN}(\mathbf M_t+\mathbf X_t).
-$$
+$$\mathbf Y_t = \operatorname{LN}(\mathbf M_t+\mathbf X_t).$$
 
 这在张量维度上合法，却在 token 语义上不严格对齐。两层模型可能仍能训练，但随着深度增加，跨层 residual 会不断混合“原布局语义”和“mixed 布局语义”。
 
@@ -120,11 +104,7 @@ TokenMixer-Large 把这一问题定义为 Token Semantic Alignment 问题。
 
 与 RankMixer 相同，先把每个 token 按 channel 切成若干片段，并跨 token 重新组合：
 
-$$
-\mathbf M
-=
-\operatorname{Mix}(\mathbf X).
-$$
+$$\mathbf M = \operatorname{Mix}(\mathbf X).$$
 
 此时 $\mathbf M$ 位于 mixed layout。
 
@@ -132,16 +112,7 @@ $$
 
 每个 mixed token 使用独立 SwiGLU：
 
-$$
-\operatorname{SwiGLU}_t(\mathbf m_t)
-=
-\left(
-\operatorname{SiLU}(\mathbf m_t\mathbf W_{g,t})
-\odot
-\mathbf m_t\mathbf W_{u,t}
-\right)
-\mathbf W_{d,t}.
-$$
+$$\operatorname{SwiGLU}_t(\mathbf m_t) = \left( \operatorname{SiLU}(\mathbf m_t\mathbf W_{g,t}) \odot \mathbf m_t\mathbf W_{u,t} \right) \mathbf W_{d,t}.$$
 
 其中：
 
@@ -154,22 +125,11 @@ $$
 
 对 mixed representation 执行逆置换，恢复原 token 布局：
 
-$$
-\mathbf R
-=
-\operatorname{Revert}(\mathbf M').
-$$
+$$\mathbf R = \operatorname{Revert}(\mathbf M').$$
 
 理想情况下：
 
-$$
-\operatorname{Revert}
-\left(
-\operatorname{Mix}(\mathbf X)
-\right)
-=
-\mathbf X.
-$$
+$$\operatorname{Revert} \left( \operatorname{Mix}(\mathbf X) \right) = \mathbf X.$$
 
 在经过 mixed-layout 非线性变换后，Revert 输出不再等于输入，但每个位置重新对应原始 token 子空间。
 
@@ -177,21 +137,11 @@ $$
 
 恢复原布局后，再由第二组 Per-token SwiGLU 建模：
 
-$$
-\mathbf O_t
-=
-\operatorname{SwiGLU}^{\mathrm{orig}}_t(\mathbf R_t).
-$$
+$$\mathbf O_t = \operatorname{SwiGLU}^{\mathrm{orig}}_t(\mathbf R_t).$$
 
 最终 residual 发生在同一语义布局：
 
-$$
-\mathbf X_{l+1}
-=
-\mathbf X_l
-+
-\mathbf O.
-$$
+$$\mathbf X_{l+1} = \mathbf X_l + \mathbf O.$$
 
 ### 4.5 相比 RankMixer 的本质变化
 
@@ -227,25 +177,11 @@ Original layout
 
 RankMixer 使用两层 GELU FFN：
 
-$$
-\operatorname{FFN}(\mathbf x)
-=
-\mathbf W_2
-\operatorname{GELU}(\mathbf W_1\mathbf x).
-$$
+$$\operatorname{FFN}(\mathbf x) = \mathbf W_2 \operatorname{GELU}(\mathbf W_1\mathbf x).$$
 
 TokenMixer-Large 改为 SwiGLU：
 
-$$
-\operatorname{SwiGLU}(\mathbf x)
-=
-\left(
-\operatorname{SiLU}(\mathbf x\mathbf W_g)
-\odot
-\mathbf x\mathbf W_u
-\right)
-\mathbf W_d.
-$$
+$$\operatorname{SwiGLU}(\mathbf x) = \left( \operatorname{SiLU}(\mathbf x\mathbf W_g) \odot \mathbf x\mathbf W_u \right) \mathbf W_d.$$
 
 SwiGLU 的乘法 gate 提供输入条件的通道选择，可以比纯加性 GELU FFN 更高效地表达乘法和条件交互。
 
@@ -259,36 +195,19 @@ SwiGLU 的乘法 gate 提供输入条件的通道选择，可以比纯加性 GEL
 
 普通扩张倍数为 $k$ 的 FFN，主要参数为：
 
-$$
-P_{\mathrm{FFN}}
-\approx
-2kD^2.
-$$
+$$P_{\mathrm{FFN}} \approx 2kD^2.$$
 
-若一个 block 中有两个 SwiGLU，每个 hidden size 为 $h$，主要参数为：
+若一个 block 中有两个 SwiGLU，每个 hidden size 为 $h$ ，主要参数为：
 
-$$
-P_{\mathrm{2\ SwiGLU}}
-\approx
-6Dh.
-$$
+$$P_{\mathrm{2\ SwiGLU}} \approx 6Dh.$$
 
 计算匹配时可令：
 
-$$
-h
-\approx
-\frac{kD}{3}.
-$$
+$$h \approx \frac{kD}{3}.$$
 
-例如 $k=4$：
+例如 $k=4$ ：
 
-$$
-\begin{aligned}
-D=768 &:\quad h\approx1024,\\
-D=1536 &:\quad h\approx2048.
-\end{aligned}
-$$
+$$\begin{aligned} D=768 &:\quad h\approx1024,\\ D=1536 &:\quad h\approx2048. \end{aligned}$$
 
 这也是迁移到当前 RankMixer 时最合理的首版对照。
 
@@ -300,27 +219,11 @@ $$
 
 原 RankMixer 采用 Post-LayerNorm。TokenMixer-Large 使用 Pre-RMSNorm：
 
-$$
-\operatorname{RMSNorm}(\mathbf x)
-=
-\frac{\mathbf x}
-{\sqrt{\frac{1}{D}\sum_{j=1}^{D}x_j^2+\epsilon}}
-\odot
-\boldsymbol\gamma.
-$$
+$$\operatorname{RMSNorm}(\mathbf x) = \frac{\mathbf x} {\sqrt{\frac{1}{D}\sum_{j=1}^{D}x_j^2+\epsilon}} \odot \boldsymbol\gamma.$$
 
 简化 block 为：
 
-$$
-\mathbf X_{l+1}
-=
-\mathbf X_l
-+
-\mathcal F
-\left(
-\operatorname{RMSNorm}(\mathbf X_l)
-\right).
-$$
+$$\mathbf X_{l+1} = \mathbf X_l + \mathcal F \left( \operatorname{RMSNorm}(\mathbf X_l) \right).$$
 
 相较 Post-Norm，Pre-Norm 为梯度提供更直接的 residual 路径。论文指出 Post-Norm 在大规模实验中可能短暂带来小幅收益，但存在最终数值发散和 NaN 风险，因此使用 Pre-Norm 作为稳定 scaling 方案。
 
@@ -328,13 +231,7 @@ $$
 
 论文只缩小 SwiGLU down projection 的初始化尺度，而不同时缩小 gate 和 up projection：
 
-$$
-\operatorname{Std}(W_d)
-=
-0.01
-\times
-\operatorname{Std}(W_u).
-$$
+$$\operatorname{Std}(W_d) = 0.01 \times \operatorname{Std}(W_u).$$
 
 这样 residual 分支初始输出较小，网络起点更接近恒等映射。消融中，去掉该策略相对下降约 0.03%。
 
@@ -346,26 +243,13 @@ $$
 
 随着层数增加，仅依赖相邻层 residual 仍可能使早层梯度不足。TokenMixer-Large 增加间隔 residual：
 
-$$
-\mathbf X_l
-=
-\mathcal B_l(\mathbf X_{l-1})
-+
-\mathbf X_{l-r},
-$$
+$$\mathbf X_l = \mathcal B_l(\mathbf X_{l-1}) + \mathbf X_{l-r},$$
 
 其中 $r$ 可以是 2 或 3 层间隔。
 
 同时在中间层接辅助预测头：
 
-$$
-\mathcal L
-=
-\mathcal L_{\mathrm{main}}
-+
-\lambda
-\mathcal L_{\mathrm{aux}}.
-$$
+$$\mathcal L = \mathcal L_{\mathrm{main}} + \lambda \mathcal L_{\mathrm{aux}}.$$
 
 辅助损失的目标是：
 
@@ -396,18 +280,9 @@ RankMixer 的 MoE 使用 Dense-Training/Sparse-Inference，训练和推理激活
 - 同时激活少量 routed experts；
 - 路由权重保留原始 gate value scaling。
 
-对于 token $t$：
+对于 token $t$ ：
 
-$$
-\mathbf y_t
-=
-\alpha_{t,s}
-\operatorname{Expert}_{t,s}(\mathbf x_t)
-+
-\sum_{e\in\operatorname{TopK}(t)}
-\alpha_{t,e}
-\operatorname{Expert}_{t,e}(\mathbf x_t).
-$$
+$$\mathbf y_t = \alpha_{t,s} \operatorname{Expert}_{t,s}(\mathbf x_t) + \sum_{e\in\operatorname{TopK}(t)} \alpha_{t,e} \operatorname{Expert}_{t,e}(\mathbf x_t).$$
 
 其中 shared expert 始终激活，routed expert 由 Top-K 选择。
 
@@ -453,25 +328,11 @@ TokenMixer-Large 不再只把 tokenizer 当作无关紧要的预处理，而是�
 
 Local tokens 表达不同特征组，Global Token 提供全局摘要：
 
-$$
-\mathbf g
-=
-\operatorname{MLP}
-\left(
-\operatorname{Pool}
-\left(
-\{\mathbf e_i\}_{i=1}^{N}
-\right)
-\right).
-$$
+$$\mathbf g = \operatorname{MLP} \left( \operatorname{Pool} \left( \{\mathbf e_i\}_{i=1}^{N} \right) \right).$$
 
 初始 token 序列为：
 
-$$
-\mathbf X_0
-=
-[\mathbf g;\mathbf x_1;\ldots;\mathbf x_T].
-$$
+$$\mathbf X_0 = [\mathbf g;\mathbf x_1;\ldots;\mathbf x_T].$$
 
 4B 消融中，去掉 Global Token 下降约 0.02%，说明它有增益，但重要性低于 Mixing & Reverting 和 Per-token SwiGLU。
 
@@ -605,13 +466,7 @@ TokenMixer-Large 的规模能力不只来自数学结构，还依赖系统协同
 
 当前 RankMixer 大模型为：
 
-$$
-T=32,
-\qquad
-D=1536,
-\qquad
-L=2.
-$$
+$$T=32, \qquad D=1536, \qquad L=2.$$
 
 若原始大模型仍弱于 Base，TokenMixer-Large 提供的最合理消融顺序是：
 

@@ -61,53 +61,29 @@ Per-token FFN
 
 ### 3.1 原始 embedding 拼接
 
-设共有 $N$ 个输入特征，每个特征经过 embedding 后得到向量 $\mathbf e_i$。RankMixer 首先按预先确定的特征顺序进行拼接：
+设共有 $N$ 个输入特征，每个特征经过 embedding 后得到向量 $\mathbf e_i$ 。RankMixer 首先按预先确定的特征顺序进行拼接：
 
-$$
-\mathbf e_{\mathrm{input}}
-=
-[\mathbf e_1;\mathbf e_2;\ldots;\mathbf e_N]
-\in\mathbb R^F.
-$$
+$$\mathbf e_{\mathrm{input}} = [\mathbf e_1;\mathbf e_2;\ldots;\mathbf e_N] \in\mathbb R^F.$$
 
 论文强调可以利用业务知识把语义相关的特征排列在相邻位置，但后续切分发生在拼接后的连续向量上，并不要求每个切分边界严格对齐字段边界。
 
 ### 3.2 Autosplit
 
-把长度为 $F$ 的连续向量切成 $T$ 个 segment。第 $t$ 个 segment 记为 $\mathbf s_t$：
+把长度为 $F$ 的连续向量切成 $T$ 个 segment。第 $t$ 个 segment 记为 $\mathbf s_t$ ：
 
-$$
-\mathbf s_t
-=
-\mathbf e_{\mathrm{input}}[a_t:b_t].
-$$
+$$\mathbf s_t = \mathbf e_{\mathrm{input}}[a_t:b_t].$$
 
-每个 segment 使用独立投影矩阵映射到统一维度 $D$：
+每个 segment 使用独立投影矩阵映射到统一维度 $D$ ：
 
-$$
-\mathbf x_t
-=
-\mathbf W_t\mathbf s_t+\mathbf b_t,
-\qquad
-\mathbf x_t\in\mathbb R^D.
-$$
+$$\mathbf x_t = \mathbf W_t\mathbf s_t+\mathbf b_t, \qquad \mathbf x_t\in\mathbb R^D.$$
 
 最后堆叠得到：
 
-$$
-\mathbf X_0
-=
-[\mathbf x_1;\mathbf x_2;\ldots;\mathbf x_T]
-\in\mathbb R^{T\times D}.
-$$
+$$\mathbf X_0 = [\mathbf x_1;\mathbf x_2;\ldots;\mathbf x_T] \in\mathbb R^{T\times D}.$$
 
 对 batch 输入：
 
-$$
-\mathbf X_0
-\in
-\mathbb R^{B\times T\times D}.
-$$
+$$\mathbf X_0 \in \mathbb R^{B\times T\times D}.$$
 
 这一设计的重要性质是：
 
@@ -124,43 +100,23 @@ $$
 
 输入为：
 
-$$
-\mathbf X
-\in
-\mathbb R^{B\times T\times D}.
-$$
+$$\mathbf X \in \mathbb R^{B\times T\times D}.$$
 
-每个 token 沿 channel 维切成 $H$ 个 head，每个 head 宽度为 $D/H$：
+每个 token 沿 channel 维切成 $H$ 个 head，每个 head 宽度为 $D/H$ ：
 
-$$
-\mathbf X
-\rightarrow
-\mathbb R^{B\times T\times H\times(D/H)}.
-$$
+$$\mathbf X \rightarrow \mathbb R^{B\times T\times H\times(D/H)}.$$
 
 然后交换 token 轴与 head 轴：
 
-$$
-\mathbb R^{B\times T\times H\times(D/H)}
-\rightarrow
-\mathbb R^{B\times H\times T\times(D/H)}.
-$$
+$$\mathbb R^{B\times T\times H\times(D/H)} \rightarrow \mathbb R^{B\times H\times T\times(D/H)}.$$
 
 最后把后两维拼接：
 
-$$
-\operatorname{Mix}(\mathbf X)
-\in
-\mathbb R^{B\times H\times(TD/H)}.
-$$
+$$\operatorname{Mix}(\mathbf X) \in \mathbb R^{B\times H\times(TD/H)}.$$
 
-论文设置 $H=T$，于是输出重新变为：
+论文设置 $H=T$ ，于是输出重新变为：
 
-$$
-\operatorname{Mix}(\mathbf X)
-\in
-\mathbb R^{B\times T\times D}.
-$$
+$$\operatorname{Mix}(\mathbf X) \in \mathbb R^{B\times T\times D}.$$
 
 因此可以与输入做逐位置残差相加。
 
@@ -188,7 +144,7 @@ New Token 4 = [h14, h24, h34, h44]
 
 ### 4.3 与 Self-Attention 的区别
 
-Self-Attention 需要根据输入动态计算 $QK^\top$，复杂度包含 $T^2D$ 项；RankMixer 的 Token Mixing 只是 reshape、transpose 和 concat：
+Self-Attention 需要根据输入动态计算 $QK^\top$ ，复杂度包含 $T^2D$ 项；RankMixer 的 Token Mixing 只是 reshape、transpose 和 concat：
 
 - 无可学习参数；
 - 无 softmax；
@@ -206,51 +162,28 @@ Token Mixing 负责信息交换，真正的非线性建模主要由 Per-token FF
 
 对于第 $t$ 个 token：
 
-$$
-\operatorname{PFFN}_t(\mathbf x_t)
-=
-\mathbf W_{2,t}
-\operatorname{GELU}
-(
-\mathbf W_{1,t}\mathbf x_t+\mathbf b_{1,t}
-)
-+
-\mathbf b_{2,t}.
-$$
+$$\operatorname{PFFN}_t(\mathbf x_t) = \mathbf W_{2,t} \operatorname{GELU} ( \mathbf W_{1,t}\mathbf x_t+\mathbf b_{1,t} ) + \mathbf b_{2,t}.$$
 
 每个 token 拥有独立参数：
 
-$$
-\operatorname{PFFN}_i
-\neq
-\operatorname{PFFN}_j,
-\qquad i\neq j.
-$$
+$$\operatorname{PFFN}_i \neq \operatorname{PFFN}_j, \qquad i\neq j.$$
 
 这使模型同时具备：
 
 - Token Mixing 提供跨子空间交互；
 - Per-token FFN 保留不同 token 的独立表达能力；
-- 参数量可以随 $T$、$D$、FFN 扩张倍数线性或二次扩展；
+- 参数量可以随 $T$ 、 $D$ 、FFN 扩张倍数线性或二次扩展；
 - 各 token 的大 GEMM 可以组织为 grouped GEMM。
 
-若 FFN 扩张倍数为 $k$，单层 dense PFFN 的主要参数量近似为：
+若 FFN 扩张倍数为 $k$ ，单层 dense PFFN 的主要参数量近似为：
 
-$$
-P_{\mathrm{PFFN/layer}}
-\approx
-2kTD^2.
-$$
+$$P_{\mathrm{PFFN/layer}} \approx 2kTD^2.$$
 
 $L$ 层总参数近似为：
 
-$$
-P_{\mathrm{PFFN}}
-\approx
-2kLTD^2.
-$$
+$$P_{\mathrm{PFFN}} \approx 2kLTD^2.$$
 
-前向与反向主要计算量近似随 $LTD^2$ 增长，因此论文将 $T$、$D$、$L$ 和 expert 数视为主要 scaling 轴。
+前向与反向主要计算量近似随 $LTD^2$ 增长，因此论文将 $T$ 、 $D$ 、 $L$ 和 expert 数视为主要 scaling 轴。
 
 ---
 
@@ -258,37 +191,13 @@ $$
 
 原论文采用 Post-LayerNorm 风格。简化表达为：
 
-$$
-\mathbf S_l
-=
-\operatorname{LN}
-\left(
-\operatorname{Mix}(\mathbf X_{l-1})
-+
-\mathbf X_{l-1}
-\right),
-$$
+$$\mathbf S_l = \operatorname{LN} \left( \operatorname{Mix}(\mathbf X_{l-1}) + \mathbf X_{l-1} \right),$$
 
-$$
-\mathbf X_l
-=
-\operatorname{LN}
-\left(
-\operatorname{PFFN}(\mathbf S_l)
-+
-\mathbf S_l
-\right).
-$$
+$$\mathbf X_l = \operatorname{LN} \left( \operatorname{PFFN}(\mathbf S_l) + \mathbf S_l \right).$$
 
 最后使用 Mean Pooling：
 
-$$
-\mathbf h
-=
-\frac{1}{T}
-\sum_{t=1}^{T}
-\mathbf x_{L,t}.
-$$
+$$\mathbf h = \frac{1}{T} \sum_{t=1}^{T} \mathbf x_{L,t}.$$
 
 再送入一个或多个任务塔。
 
@@ -302,13 +211,7 @@ RankMixer 进一步把 Per-token FFN 扩展为 Sparse MoE。每个 token 拥有�
 
 一般形式为：
 
-$$
-\mathbf y_t
-=
-\sum_{e=1}^{E}
- g_{t,e}(\mathbf x_t)
-\operatorname{Expert}_{t,e}(\mathbf x_t).
-$$
+$$\mathbf y_t = \sum_{e=1}^{E} g_{t,e}(\mathbf x_t) \operatorname{Expert}_{t,e}(\mathbf x_t).$$
 
 论文提出 Dense-Training/Sparse-Inference 思路：训练早期让更多专家获得梯度，缓解路由不充分和专家失衡；推理时仅激活少量专家，以控制 FLOPs 和延迟。
 
@@ -448,23 +351,11 @@ RankMixer 主要解决非序列特征交互。若另接一个序列模型，dens
 
 当前小模型：
 
-$$
-T=16,
-\qquad
-D=768,
-\qquad
-L=2.
-$$
+$$T=16, \qquad D=768, \qquad L=2.$$
 
 当前大模型：
 
-$$
-T=32,
-\qquad
-D=1536,
-\qquad
-L=2.
-$$
+$$T=32, \qquad D=1536, \qquad L=2.$$
 
 两者都与论文代表配置高度一致。需要特别注意：
 

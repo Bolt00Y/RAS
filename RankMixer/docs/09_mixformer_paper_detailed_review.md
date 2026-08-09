@@ -66,30 +66,13 @@ Output Fusion
 
 设 user、item、context 等非序列 embedding 拼接后为：
 
-$$
-\mathbf e_{\mathrm{ns}}
-\in
-\mathbb R^F.
-$$
+$$\mathbf e_{\mathrm{ns}} \in \mathbb R^F.$$
 
-MixFormer 将其均匀切成 $N$ 个连续 head，并分别投影到隐藏维度 $D$：
+MixFormer 将其均匀切成 $N$ 个连续 head，并分别投影到隐藏维度 $D$ ：
 
-$$
-\mathbf q_n^{(0)}
-=
-\mathbf W_n
-\mathbf e_{\mathrm{ns}}[a_n:b_n]
-+
-\mathbf b_n,
-$$
+$$\mathbf q_n^{(0)} = \mathbf W_n \mathbf e_{\mathrm{ns}}[a_n:b_n] + \mathbf b_n,$$
 
-$$
-\mathbf Q^{(0)}
-=
-[\mathbf q_1^{(0)};\ldots;\mathbf q_N^{(0)}]
-\in
-\mathbb R^{N\times D}.
-$$
+$$\mathbf Q^{(0)} = [\mathbf q_1^{(0)};\ldots;\mathbf q_N^{(0)}] \in \mathbb R^{N\times D}.$$
 
 从 tokenizer 角度看，它与 RankMixer Autosplit 非常接近：
 
@@ -104,22 +87,11 @@ $$
 
 用户行为序列表示为：
 
-$$
-\mathbf S
-=
-[\mathbf s_1;\mathbf s_2;\ldots;\mathbf s_L]
-\in
-\mathbb R^{L\times D_s}.
-$$
+$$\mathbf S = [\mathbf s_1;\mathbf s_2;\ldots;\mathbf s_L] \in \mathbb R^{L\times D_s}.$$
 
 每个行为位置可以包含 item、action、context 等现有序列特征。不同 block 对 sequence action vectors 使用独立变换：
 
-$$
-\widetilde{\mathbf S}^{(l)}
-=
-\operatorname{SwiGLU}^{(l)}_{\mathrm{seq}}
-(\mathbf S).
-$$
+$$\widetilde{\mathbf S}^{(l)} = \operatorname{SwiGLU}^{(l)}_{\mathrm{seq}} (\mathbf S).$$
 
 这样每一层可以从不同表示空间理解同一段历史，而不是所有层共享一套固定 sequence encoding。
 
@@ -131,27 +103,15 @@ $$
 
 Query Mixer 的 HeadMixing 与 RankMixer Token Mixing 本质相同。输入：
 
-$$
-\mathbf Q
-\in
-\mathbb R^{B\times N\times D}.
-$$
+$$\mathbf Q \in \mathbb R^{B\times N\times D}.$$
 
 每个 query head 按 channel 切成 $N$ 片：
 
-$$
-\mathbf Q
-\rightarrow
-\mathbb R^{B\times N\times N\times(D/N)}.
-$$
+$$\mathbf Q \rightarrow \mathbb R^{B\times N\times N\times(D/N)}.$$
 
 交换两个 $N$ 维轴，并重新拼接：
 
-$$
-\operatorname{HeadMixing}(\mathbf Q)
-\in
-\mathbb R^{B\times N\times D}.
-$$
+$$\operatorname{HeadMixing}(\mathbf Q) \in \mathbb R^{B\times N\times D}.$$
 
 与 RankMixer 一样，它是无参数 reshape / transpose 操作，不生成 $N\times N$ attention score。
 
@@ -159,30 +119,11 @@ $$
 
 HeadMixing 后，每个 query head 使用独立 SwiGLU：
 
-$$
-\mathbf U_n
-=
-\operatorname{SwiGLU}_n
-\left(
-\operatorname{HeadMixing}(\mathbf Q)_n
-\right).
-$$
+$$\mathbf U_n = \operatorname{SwiGLU}_n \left( \operatorname{HeadMixing}(\mathbf Q)_n \right).$$
 
 Query Mixer 的简化 residual 形式为：
 
-$$
-\mathbf Q'
-=
-\mathbf Q
-+
-\operatorname{PHSwiGLU}
-\left(
-\operatorname{HeadMixing}
-\left(
-\operatorname{RMSNorm}(\mathbf Q)
-\right)
-\right).
-$$
+$$\mathbf Q' = \mathbf Q + \operatorname{PHSwiGLU} \left( \operatorname{HeadMixing} \left( \operatorname{RMSNorm}(\mathbf Q) \right) \right).$$
 
 其中 PHSwiGLU 表示 Per-head SwiGLU。
 
@@ -205,42 +146,15 @@ user-item compatibility × context
 
 对于第 $n$ 个 query head：
 
-$$
-\mathbf q_n
-=
-\mathbf Q'_n\mathbf W_{Q,n}.
-$$
+$$\mathbf q_n = \mathbf Q'_n\mathbf W_{Q,n}.$$
 
 序列产生 head-specific key 和 value：
 
-$$
-\mathbf K_n
-=
-\widetilde{\mathbf S}
-\mathbf W_{K,n},
-\qquad
-\mathbf V_n
-=
-\widetilde{\mathbf S}
-\mathbf W_{V,n}.
-$$
+$$\mathbf K_n = \widetilde{\mathbf S} \mathbf W_{K,n}, \qquad \mathbf V_n = \widetilde{\mathbf S} \mathbf W_{V,n}.$$
 
 Cross-Attention 为：
 
-$$
-\mathbf c_n
-=
-\operatorname{softmax}
-\left(
-\frac{
-\mathbf q_n
-\mathbf K_n^\top
-}{\sqrt{d_k}}
-+
-\mathbf M
-\right)
-\mathbf V_n.
-$$
+$$\mathbf c_n = \operatorname{softmax} \left( \frac{ \mathbf q_n \mathbf K_n^\top }{\sqrt{d_k}} + \mathbf M \right) \mathbf V_n.$$
 
 其中 $\mathbf M$ 可以包含 padding mask 或其他序列约束。
 
@@ -276,24 +190,11 @@ Block 3 richer query semantics -> attend sequence again
 
 Cross-Attention 输出需要与 query 表示融合。MixFormer 使用每个 head 独立的 SwiGLU：
 
-$$
-\mathbf o_n
-=
-\operatorname{SwiGLU}^{\mathrm{out}}_n
-\left(
-[\mathbf Q'_n;\mathbf c_n]
-\right).
-$$
+$$\mathbf o_n = \operatorname{SwiGLU}^{\mathrm{out}}_n \left( [\mathbf Q'_n;\mathbf c_n] \right).$$
 
 再通过 residual 形成下一层 query：
 
-$$
-\mathbf Q^{(l+1)}_n
-=
-\mathbf Q'_n
-+
-\mathbf o_n.
-$$
+$$\mathbf Q^{(l+1)}_n = \mathbf Q'_n + \mathbf o_n.$$
 
 Per-head Output Fusion 的作用是：
 
@@ -309,49 +210,13 @@ Per-head Output Fusion 的作用是：
 
 简化表示一个 block：
 
-$$
-\widetilde{\mathbf Q}^{(l)}
-=
-\mathbf Q^{(l)}
-+
-\operatorname{PHSwiGLU}^{(l)}_{\mathrm{query}}
-\left(
-\operatorname{HeadMixing}
-\left(
-\operatorname{RMSNorm}(\mathbf Q^{(l)})
-\right)
-\right),
-$$
+$$\widetilde{\mathbf Q}^{(l)} = \mathbf Q^{(l)} + \operatorname{PHSwiGLU}^{(l)}_{\mathrm{query}} \left( \operatorname{HeadMixing} \left( \operatorname{RMSNorm}(\mathbf Q^{(l)}) \right) \right),$$
 
-$$
-\widetilde{\mathbf S}^{(l)}
-=
-\operatorname{SwiGLU}^{(l)}_{\mathrm{seq}}
-\left(
-\operatorname{RMSNorm}(\mathbf S)
-\right),
-$$
+$$\widetilde{\mathbf S}^{(l)} = \operatorname{SwiGLU}^{(l)}_{\mathrm{seq}} \left( \operatorname{RMSNorm}(\mathbf S) \right),$$
 
-$$
-\mathbf C^{(l)}
-=
-\operatorname{CrossAttn}^{(l)}
-\left(
-\widetilde{\mathbf Q}^{(l)},
-\widetilde{\mathbf S}^{(l)}
-\right),
-$$
+$$\mathbf C^{(l)} = \operatorname{CrossAttn}^{(l)} \left( \widetilde{\mathbf Q}^{(l)}, \widetilde{\mathbf S}^{(l)} \right),$$
 
-$$
-\mathbf Q^{(l+1)}
-=
-\widetilde{\mathbf Q}^{(l)}
-+
-\operatorname{PHSwiGLU}^{(l)}_{\mathrm{out}}
-\left(
-[\widetilde{\mathbf Q}^{(l)};\mathbf C^{(l)}]
-\right).
-$$
+$$\mathbf Q^{(l+1)} = \widetilde{\mathbf Q}^{(l)} + \operatorname{PHSwiGLU}^{(l)}_{\mathrm{out}} \left( [\widetilde{\mathbf Q}^{(l)};\mathbf C^{(l)}] \right).$$
 
 这种结构形成了交替循环：
 
@@ -386,9 +251,7 @@ $$
 
 UI-MixFormer 将 query heads 分成：
 
-$$
-N=N_U+N_I.
-$$
+$$N=N_U+N_I.$$
 
 其中：
 
@@ -407,14 +270,7 @@ UI-MixFormer 对 HeadMixing 增加结构 mask：
 
 可以抽象为 block mixing matrix：
 
-$$
-\mathbf M_{\mathrm{UI}}
-=
-\begin{bmatrix}
-\mathbf M_{UU} & \mathbf 0\\
-\mathbf M_{IU} & \mathbf M_{II}
-\end{bmatrix}.
-$$
+$$\mathbf M_{\mathrm{UI}} = \begin{bmatrix} \mathbf M_{UU} & \mathbf 0\\ \mathbf M_{IU} & \mathbf M_{II} \end{bmatrix}.$$
 
 上右角为零，表示 item 信息不能反向污染 user-only path。
 
@@ -527,7 +383,7 @@ Figure 3 可以读出两个趋势：
 
 ### 12.3 Co-Scaling 的真正含义
 
-Co-Scaling 不是简单同时增大 $D$ 和 $L$，而是统一参数化后，dense 与 sequence 能力在每层相互促进：
+Co-Scaling 不是简单同时增大 $D$ 和 $L$ ，而是统一参数化后，dense 与 sequence 能力在每层相互促进：
 
 - dense query 更强，序列检索更精准；
 - sequence evidence 更丰富，下一层 dense interaction 更有效；
@@ -547,28 +403,13 @@ Figure 6 主要展示 UI decoupling 后的效率收益。对多候选排序请�
 
 与只看单样本 FLOPs 不同，推荐系统在线成本取决于：
 
-$$
-\mathrm{Cost/request}
-=
-\mathrm{UserCost}
-+
-K\times\mathrm{ItemCost},
-$$
+$$\mathrm{Cost/request} = \mathrm{UserCost} + K\times\mathrm{ItemCost},$$
 
 其中 $K$ 是每个请求的候选数。
 
 若不解耦：
 
-$$
-\mathrm{Cost/request}
-=
-K
-\left(
-\mathrm{UserCost}
-+
-\mathrm{ItemCost}
-ight).
-$$
+$$\mathrm{Cost/request} = K \left( \mathrm{UserCost} + \mathrm{ItemCost} \right).$$
 
 因此 UI-MixFormer 的价值随候选数增大而提高。
 

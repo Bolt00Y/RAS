@@ -33,43 +33,19 @@ UniMixer 关注 RankMixer 体系中的另一个根本问题：
 
 RankMixer 输入：
 
-$$
-\mathbf X
-\in
-\mathbb R^{T\times D}.
-$$
+$$\mathbf X \in \mathbb R^{T\times D}.$$
 
 将其 flatten：
 
-$$
-\mathbf x
-=
-\operatorname{vec}(\mathbf X)
-\in
-\mathbb R^{L},
-\qquad
-L=TD.
-$$
+$$\mathbf x = \operatorname{vec}(\mathbf X) \in \mathbb R^{L}, \qquad L=TD.$$
 
 RankMixer 的 reshape、transpose 和 concat 可以等价写成一个置换矩阵：
 
-$$
-\operatorname{vec}
-\left(
-\operatorname{TokenMix}(\mathbf X)
-\right)
-=
-\mathbf x
-\mathbf W_{\mathrm{perm}},
-$$
+$$\operatorname{vec} \left( \operatorname{TokenMix}(\mathbf X) \right) = \mathbf x \mathbf W_{\mathrm{perm}},$$
 
 其中：
 
-$$
-\mathbf W_{\mathrm{perm}}
-\in
-\{0,1\}^{L\times L}.
-$$
+$$\mathbf W_{\mathrm{perm}} \in \{0,1\}^{L\times L}.$$
 
 置换矩阵具有：
 
@@ -81,15 +57,9 @@ $$
 
 当 $H=T$ 时，这个置换还可以表达为更小 mixing matrix 与单位矩阵的 Kronecker 结构：
 
-$$
-\mathbf W_{\mathrm{perm}}
-=
-\mathbf G
-\otimes
-\mathbf I.
-$$
+$$\mathbf W_{\mathrm{perm}} = \mathbf G \otimes \mathbf I.$$
 
-这里 $\mathbf G$ 描述 token/head 级交换，$\mathbf I$ 保留局部 channel 子块。
+这里 $\mathbf G$ 描述 token/head 级交换， $\mathbf I$ 保留局部 channel 子块。
 
 UniMixer 的出发点是：既然固定 TokenMixer 可以写成矩阵，就可以把矩阵从人工规则改造成可学习参数。
 
@@ -134,25 +104,13 @@ Block-specific Local Mixing
 
 将长度为 $L=TD$ 的 flatten 向量按 block size $B$ 切分：
 
-$$
-\mathbf x
-=
-[\mathbf x_1;\mathbf x_2;\ldots;\mathbf x_M],
-$$
+$$\mathbf x = [\mathbf x_1;\mathbf x_2;\ldots;\mathbf x_M],$$
 
 其中：
 
-$$
-M
-=
-\frac{L}{B},
-\qquad
-\mathbf x_i
-\in
-\mathbb R^B.
-$$
+$$M = \frac{L}{B}, \qquad \mathbf x_i \in \mathbb R^B.$$
 
-UniMixer 不再强制 block 必须等于原 token，也不强制 head 数等于 token 数。$B$ 控制 mixing 粒度：
+UniMixer 不再强制 block 必须等于原 token，也不强制 head 数等于 token 数。 $B$ 控制 mixing 粒度：
 
 - $B=D$ 时，一个 block 近似对应一个 token；
 - $B=D/H$ 时，一个 block 近似对应一个 token head；
@@ -167,23 +125,13 @@ UniMixer 不再强制 block 必须等于原 token，也不强制 head 数等于 
 
 设有 $M$ 个 blocks。Global Mixing 使用矩阵：
 
-$$
-\mathbf W_G
-\in
-\mathbb R^{M\times M}.
-$$
+$$\mathbf W_G \in \mathbb R^{M\times M}.$$
 
 它控制输入 block $i$ 对输出 block $j$ 的贡献。
 
 若先把每个 block 看成一个向量，global mixing 可写为：
 
-$$
-\widetilde{\mathbf x}_j
-=
-\sum_{i=1}^{M}
-W_{G,ij}
-\mathbf x_i.
-$$
+$$\widetilde{\mathbf x}_j = \sum_{i=1}^{M} W_{G,ij} \mathbf x_i.$$
 
 与 RankMixer 固定 permutation 相比：
 
@@ -193,7 +141,7 @@ $$
 - 一个输出 block 可以聚合多个输入 blocks；
 - 训练后可通过温度得到接近稀疏置换的模式。
 
-与 attention 相比，$\mathbf W_G$ 是参数矩阵，不需要对每个样本计算 $QK^\top$，因此推理路径更稳定、规则。
+与 attention 相比， $\mathbf W_G$ 是参数矩阵，不需要对每个样本计算 $QK^\top$ ，因此推理路径更稳定、规则。
 
 ---
 
@@ -203,39 +151,17 @@ Global Mixing 决定 block 间交换，Local Mixing 决定每个 block 内部的
 
 第 $i$ 个 block 使用：
 
-$$
-\mathbf W_B^{(i)}
-\in
-\mathbb R^{B\times B}.
-$$
+$$\mathbf W_B^{(i)} \in \mathbb R^{B\times B}.$$
 
 局部变换：
 
-$$
-\mathbf z_i
-=
-\mathbf x_i
-\mathbf W_B^{(i)}.
-$$
+$$\mathbf z_i = \mathbf x_i \mathbf W_B^{(i)}.$$
 
-如果所有 blocks 共用同一个 $\mathbf W_B$，模型会失去不同特征子空间的独立性。UniMixer 因此保留 block-specific local matrices。
+如果所有 blocks 共用同一个 $\mathbf W_B$ ，模型会失去不同特征子空间的独立性。UniMixer 因此保留 block-specific local matrices。
 
 完整 mixing 可以抽象为：
 
-$$
-\operatorname{UniMixing}(\mathbf X)
-=
-\operatorname{reshape}
-\left(
-\mathbf W_G
-\begin{bmatrix}
-\mathbf x_1\mathbf W_B^{(1)}\\
-\mathbf x_2\mathbf W_B^{(2)}\\
-\vdots\\
-\mathbf x_M\mathbf W_B^{(M)}
-\end{bmatrix}
-ight).
-$$
+$$\operatorname{UniMixing}(\mathbf X) = \operatorname{reshape} \left( \mathbf W_G \begin{bmatrix} \mathbf x_1\mathbf W_B^{(1)}\\ \mathbf x_2\mathbf W_B^{(2)}\\ \vdots\\ \mathbf x_M\mathbf W_B^{(M)} \end{bmatrix} \right).$$
 
 这一公式把“跨块交互”和“块内异构变换”明确拆开。
 
@@ -275,16 +201,7 @@ Figure 3 的核心信息是：
 
 Self-Attention 可写为：
 
-$$
-\mathbf A(\mathbf X)
-=
-\operatorname{softmax}
-\left(
-\frac{
-\mathbf Q\mathbf K^\top
-}{\sqrt d}
-\right).
-$$
+$$\mathbf A(\mathbf X) = \operatorname{softmax} \left( \frac{ \mathbf Q\mathbf K^\top }{\sqrt d} \right).$$
 
 Global Mixing 由输入动态决定，local value transform 通常共享。
 
@@ -300,14 +217,7 @@ TokenMixer 的 global mixing 是固定 permutation，local mixing 通常是固�
 
 FM 的 pairwise product 可以被视为特定局部交互与全局聚合模式：
 
-$$
-\sum_{i<j}
-\langle
-\mathbf v_i,
-\mathbf v_j
-\rangle
-x_ix_j.
-$$
+$$\sum_{i<j} \langle \mathbf v_i, \mathbf v_j \rangle x_ix_j.$$
 
 UniMixer 通过 block-specific local matrices 和 global combination，提供一个更一般的线性 mixing 框架，再由后续 SwiGLU 完成非线性表达。
 
@@ -330,29 +240,15 @@ UniMixer 通过 block-specific local matrices 和 global combination，提供一
 
 不为每个 block 保存完整独立矩阵，而是学习 $b$ 个 basis：
 
-$$
-\{\mathbf Z_1,\mathbf Z_2,\ldots,\mathbf Z_b\},
-\qquad
-\mathbf Z_j
-\in
-\mathbb R^{B\times B}.
-$$
+$$\{\mathbf Z_1,\mathbf Z_2,\ldots,\mathbf Z_b\}, \qquad \mathbf Z_j \in \mathbb R^{B\times B}.$$
 
 第 $i$ 个 local matrix 由 basis 线性组合：
 
-$$
-\mathbf W_B^{(i)}
-=
-\sum_{j=1}^{b}
-\omega_j^{(i)}
-\mathbf Z_j.
-$$
+$$\mathbf W_B^{(i)} = \sum_{j=1}^{b} \omega_j^{(i)} \mathbf Z_j.$$
 
 这样既保留 block-specific 差异，又把参数从 $MB^2$ 降到：
 
-$$
-bB^2+Mb.
-$$
+$$bB^2+Mb.$$
 
 当 $b\ll M$ 时，节省明显。
 
@@ -360,30 +256,15 @@ $$
 
 Global matrix 使用低秩分解：
 
-$$
-\mathbf W_G
-=
-\mathbf A_G
-\mathbf B_G,
-$$
+$$\mathbf W_G = \mathbf A_G \mathbf B_G,$$
 
 其中：
 
-$$
-\mathbf A_G
-\in
-\mathbb R^{M\times r},
-\qquad
-\mathbf B_G
-\in
-\mathbb R^{r\times M}.
-$$
+$$\mathbf A_G \in \mathbb R^{M\times r}, \qquad \mathbf B_G \in \mathbb R^{r\times M}.$$
 
 参数从 $M^2$ 降为：
 
-$$
-2Mr.
-$$
+$$2Mr.$$
 
 低秩 global mixing 假设跨 block 交互主要由少量潜在 mixing patterns 组成。
 
@@ -393,29 +274,15 @@ $$
 
 RankMixer permutation matrix 是 doubly stochastic：每行、每列和都为 1。UniMixer 希望可学习矩阵在保留柔性的同时继承这种稳定结构。
 
-对任意非负矩阵 $\mathbf A$，交替进行行归一化和列归一化：
+对任意非负矩阵 $\mathbf A$ ，交替进行行归一化和列归一化：
 
-$$
-A_{ij}
-\leftarrow
-\frac{A_{ij}}
-{\sum_kA_{ik}},
-$$
+$$A_{ij} \leftarrow \frac{A_{ij}} {\sum_kA_{ik}},$$
 
-$$
-A_{ij}
-\leftarrow
-\frac{A_{ij}}
-{\sum_kA_{kj}}.
-$$
+$$A_{ij} \leftarrow \frac{A_{ij}} {\sum_kA_{kj}}.$$
 
 多次迭代后得到近似 doubly stochastic matrix：
 
-$$
-\sum_jA_{ij}\approx1,
-\qquad
-\sum_iA_{ij}\approx1.
-$$
+$$\sum_jA_{ij}\approx1, \qquad \sum_iA_{ij}\approx1.$$
 
 其作用是：
 
@@ -433,14 +300,7 @@ $$
 
 在 Sinkhorn 前对 logits 使用温度：
 
-$$
-\mathbf A
-=
-\exp
-\left(
-\frac{\mathbf Z}{\tau}
-\right).
-$$
+$$\mathbf A = \exp \left( \frac{\mathbf Z}{\tau} \right).$$
 
 - 高温度 $\tau$ 使权重平滑；
 - 低温度使权重尖锐、接近稀疏置换；
@@ -647,7 +507,7 @@ UniMixer 不是 attention 的完全替代，而是面向工业 ranking 的中间
 
 ## 21. 对当前电商推广搜 CVR 的意义
 
-当前 RankMixer 使用 $T=16,D=768$ 或 $T=32,D=1536$。UniMixer 最值得验证的问题是：
+当前 RankMixer 使用 $T=16,D=768$ 或 $T=32,D=1536$ 。UniMixer 最值得验证的问题是：
 
 > 当前固定 Autosplit + 固定 Token Mixing 是否把模型限制在错误的跨 token 交互模式上？
 
@@ -657,44 +517,23 @@ UniMixer 不是 attention 的完全替代，而是面向工业 ranking 的中间
 
 先不直接实现完整 UniMixer，只加入一个 token-level matrix：
 
-$$
-\widetilde{\mathbf X}
-=
-\mathbf A
-\mathbf X,
-$$
+$$\widetilde{\mathbf X} = \mathbf A \mathbf X,$$
 
 其中：
 
-$$
-\mathbf A
-\in
-\mathbb R^{T\times T}.
-$$
+$$\mathbf A \in \mathbb R^{T\times T}.$$
 
 使用 identity initialization：
 
-$$
-\mathbf A\big|_{\mathrm{init}}
-=
-\mathbf I.
-$$
+$$\mathbf A\big|_{\mathrm{init}} = \mathbf I.$$
 
 这回答最基础问题：一个可学习 $T\times T$ mixing 是否优于固定 HeadMixing。
 
 ### 21.2 低秩 global adapter
 
-$$
-\mathbf A
-=
-\mathbf U\mathbf V^\top,
-$$
+$$\mathbf A = \mathbf U\mathbf V^\top,$$
 
-$$
-\mathbf U,\mathbf V
-\in
-\mathbb R^{T\times r}.
-$$
+$$\mathbf U,\mathbf V \in \mathbb R^{T\times r}.$$
 
 在 $T=16$ 或 $32$ 时，这个模块参数非常小，适合作为低成本实验。
 

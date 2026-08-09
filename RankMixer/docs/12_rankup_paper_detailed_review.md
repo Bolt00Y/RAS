@@ -31,55 +31,29 @@ RankUp 不认为 RankMixer 的主要问题是“参数不够多”，而是提�
 
 设表示矩阵为：
 
-$$
-\mathbf H
-\in
-\mathbb R^{m\times n}.
-$$
+$$\mathbf H \in \mathbb R^{m\times n}.$$
 
 奇异值为：
 
-$$
-\sigma_1,\sigma_2,\ldots,\sigma_k,
-\qquad
-k=\min(m,n).
-$$
+$$\sigma_1,\sigma_2,\ldots,\sigma_k, \qquad k=\min(m,n).$$
 
 归一化奇异值：
 
-$$
-p_i
-=
-\frac{\sigma_i}
-{\sum_{j=1}^{k}\sigma_j}.
-$$
+$$p_i = \frac{\sigma_i} {\sum_{j=1}^{k}\sigma_j}.$$
 
 Effective rank 定义为：
 
-$$
-\operatorname{erank}(\mathbf H)
-=
-\exp
-\left(
--
-\sum_{i=1}^{k}
-p_i\log p_i
-\right).
-$$
+$$\operatorname{erank}(\mathbf H) = \exp \left( - \sum_{i=1}^{k} p_i\log p_i \right).$$
 
 ### 2.1 为什么普通 rank 不够
 
 两组奇异值：
 
-$$
-[100,1,1,1,1]
-$$
+$$[100,1,1,1,1]$$
 
 与：
 
-$$
-[20,20,20,20,20]
-$$
+$$[20,20,20,20,20]$$
 
 普通 rank 都为 5，但第一组几乎被单一方向支配，第二组均匀使用 5 个方向。Effective rank 能区分这种差异。
 
@@ -87,25 +61,15 @@ $$
 
 单样本 token matrix：
 
-$$
-\mathbf H_b
-\in
-\mathbb R^{T\times D}.
-$$
+$$\mathbf H_b \in \mathbb R^{T\times D}.$$
 
 其 effective rank 上限是：
 
-$$
-\min(T,D).
-$$
+$$\min(T,D).$$
 
 固定 token 跨 batch 的表示矩阵：
 
-$$
-\mathbf E_t
-\in
-\mathbb R^{B\times D}.
-$$
+$$\mathbf E_t \in \mathbb R^{B\times D}.$$
 
 它衡量一个 token 在样本维度上的 channel diversity。复现时应分开记录：
 
@@ -151,44 +115,23 @@ Tasks
 
 设有 $M$ 个 sparse fields：
 
-$$
-\mathcal F
-=
-\{f_1,f_2,\ldots,f_M\}.
-$$
+$$\mathcal F = \{f_1,f_2,\ldots,f_M\}.$$
 
 生成字段级排列：
 
-$$
-\mathcal F_{\sigma}
-=
-\{f_{\sigma(1)},f_{\sigma(2)},\ldots,f_{\sigma(M)}\}.
-$$
+$$\mathcal F_{\sigma} = \{f_{\sigma(1)},f_{\sigma(2)},\ldots,f_{\sigma(M)}\}.$$
 
 将排列后字段均衡分成 $T$ 组：
 
-$$
-G_1,G_2,\ldots,G_T.
-$$
+$$G_1,G_2,\ldots,G_T.$$
 
 第 $t$ 组完整拼接字段 embeddings：
 
-$$
-\mathbf u_t
-=
-\operatorname{Concat}
-\left(
-\{\mathbf e_j:j\in G_t\}
-\right).
-$$
+$$\mathbf u_t = \operatorname{Concat} \left( \{\mathbf e_j:j\in G_t\} \right).$$
 
 独立投影为 token：
 
-$$
-\mathbf x_t
-=
-\mathbf W_t\mathbf u_t+\mathbf b_t.
-$$
+$$\mathbf x_t = \mathbf W_t\mathbf u_t+\mathbf b_t.$$
 
 ### 4.1 与 RankMixer Autosplit 的区别
 
@@ -224,24 +167,11 @@ $$
 
 连续 token 表示先用 K-means 离散，再估计互信息：
 
-$$
-I(X_i;X_j)
-=
-\sum_{a,b}
-P(a,b)
-\log
-\frac{P(a,b)}{P_i(a)P_j(b)}.
-$$
+$$I(X_i;X_j) = \sum_{a,b} P(a,b) \log \frac{P(a,b)}{P_i(a)P_j(b)}.$$
 
 差分矩阵：
 
-$$
-\Delta\mathbf M
-=
-\mathbf M_{\mathrm{Random}}
--
-\mathbf M_{\mathrm{Semantic}}.
-$$
+$$\Delta\mathbf M = \mathbf M_{\mathrm{Random}} - \mathbf M_{\mathrm{Semantic}}.$$
 
 图中大面积蓝色表示随机分组后 token pair 的 MI 更低，支持“整体冗余下降”的假设。
 
@@ -288,20 +218,11 @@ pairwise redundancy
 
 传统单 embedding mapping：
 
-$$
-\psi:
-\mathcal F
-\rightarrow
-\mathbb R^d.
-$$
+$$\psi: \mathcal F \rightarrow \mathbb R^d.$$
 
 RankUp 为同一个字段提供多个独立表示视角：
 
-$$
-\mathbf e_j
-=
-\{\psi_k(f_j):\psi_k\in\mathcal K_j\}.
-$$
+$$\mathbf e_j = \{\psi_k(f_j):\psi_k\in\mathcal K_j\}.$$
 
 例如同一个 item ID 可以拥有：
 
@@ -340,25 +261,11 @@ interaction-token embedding
 
 论文定义：
 
-$$
-\mathbf g
-=
-\operatorname{func}
-\left(
-\operatorname{Pool}
-\left(
-\{\operatorname{Embed}(f_i)\}_{i=1}^{M}
-\right)
-\right).
-$$
+$$\mathbf g = \operatorname{func} \left( \operatorname{Pool} \left( \{\operatorname{Embed}(f_i)\}_{i=1}^{M} \right) \right).$$
 
 初始序列：
 
-$$
-\mathbf H_0
-=
-[\mathbf g;\mathbf x_1;\ldots;\mathbf x_T].
-$$
+$$\mathbf H_0 = [\mathbf g;\mathbf x_1;\ldots;\mathbf x_T].$$
 
 Global Token 与最终 Mean Pooling 不同：
 
@@ -375,23 +282,11 @@ Global Token 与最终 Mean Pooling 不同：
 
 若已有预训练 user/item dense embeddings：
 
-$$
-\mathbf z_u,
-\mathbf z_i
-\in
-\mathbb R^{d_p}.
-$$
+$$\mathbf z_u, \mathbf z_i \in \mathbb R^{d_p}.$$
 
 构造逐元素交互：
 
-$$
-\mathbf e_{\mathrm{cross}}
-=
-\operatorname{Proj}
-\left(
-\mathbf z_u\odot\mathbf z_i
-\right).
-$$
+$$\mathbf e_{\mathrm{cross}} = \operatorname{Proj} \left( \mathbf z_u\odot\mathbf z_i \right).$$
 
 它提供 Factorization-Machine 风格的匹配先验：只有 user 和 item 在同一 latent dimension 同时激活时，乘积才显著。
 
@@ -409,21 +304,11 @@ $$
 
 对于 $K$ 个任务，增加可学习 tokens：
 
-$$
-\{\mathbf t_1,\mathbf t_2,\ldots,\mathbf t_K\}.
-$$
+$$\{\mathbf t_1,\mathbf t_2,\ldots,\mathbf t_K\}.$$
 
 它们和共享 tokens 一起进入 backbone，但每个 task tower 只读取自己的 task token：
 
-$$
-\widehat y_k
-=
-\operatorname{Tower}_k
-\left(
-\mathbf t_k^{(L)},
-\operatorname{Pool}(\mathbf H_L)
-\right).
-$$
+$$\widehat y_k = \operatorname{Tower}_k \left( \mathbf t_k^{(L)}, \operatorname{Pool}(\mathbf H_L) \right).$$
 
 Task Token 在表示空间中提供任务私有汇聚位置，与 MMoE / PLE 的参数路径解耦不同。
 
@@ -437,14 +322,7 @@ Task Token 在表示空间中提供任务私有汇聚位置，与 MMoE / PLE 的
 
 论文将 task representation 聚类后计算 cluster assignment $Z$ 与标签 $Y$ 的互信息：
 
-$$
-I(Z;Y)
-=
-\sum_{z,y}
-P(z,y)
-\log
-\frac{P(z,y)}{P(z)P(y)}.
-$$
+$$I(Z;Y) = \sum_{z,y} P(z,y) \log \frac{P(z,y)}{P(z)P(y)}.$$
 
 带 Task Token 的表示在多个 cluster 粒度下与任务标签具有更高 MI，支持任务私有表示的假设。
 
@@ -550,23 +428,11 @@ Order 任务 GMV：
 
 当前 1234 个字段分为 16 tokens 时：
 
-$$
-1234
-=
-2\times78
-+
-14\times77.
-$$
+$$1234 = 2\times78 + 14\times77.$$
 
 分为 32 tokens 时：
 
-$$
-1234
-=
-18\times39
-+
-14\times38.
-$$
+$$1234 = 18\times39 + 14\times38.$$
 
 推荐实验：
 
