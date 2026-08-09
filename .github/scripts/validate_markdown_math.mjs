@@ -9,7 +9,8 @@
  *
  * Existing `math` fenced blocks are still parsed for backwards compatibility.
  * Both display and inline expressions are sent through MathJax and any error
- * node is treated as a CI failure.
+ * node is treated as a CI failure. GitHub Actions receives file/line annotations
+ * for every invalid formula.
  */
 
 import fs from "node:fs";
@@ -116,17 +117,19 @@ function extractMath(filePath) {
     }
 
     if (stripped === "$$" || lineWithoutCode.includes("$$")) {
-      errors.push(
-        `${filePath}:${lineNumber}: display math must use $$formula$$ on one physical line`,
-      );
+      errors.push({
+        line: lineNumber,
+        message: "display math must use $$formula$$ on one physical line",
+      });
       continue;
     }
 
     for (const delimiter of legacyDelimiters) {
       if (lineWithoutCode.includes(delimiter)) {
-        errors.push(
-          `${filePath}:${lineNumber}: legacy delimiter ${JSON.stringify(delimiter)} is forbidden`,
-        );
+        errors.push({
+          line: lineNumber,
+          message: `legacy delimiter ${JSON.stringify(delimiter)} is forbidden`,
+        });
       }
     }
 
@@ -142,12 +145,12 @@ function extractMath(filePath) {
   }
 
   if (openFence !== null) {
-    errors.push(`${filePath}:${openFenceLine}: unclosed fenced block`);
+    errors.push({ line: openFenceLine, message: "unclosed fenced block" });
   }
 
   for (const item of expressions) {
     if (item.expression.length === 0) {
-      errors.push(`${filePath}:${item.line}: empty ${item.kind}`);
+      errors.push({ line: item.line, message: `empty ${item.kind}` });
     }
   }
 
@@ -175,6 +178,20 @@ function validateExpression(expression, display) {
   }
 }
 
+function escapeAnnotation(message) {
+  return message
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
+}
+
+function annotate(relativePath, line, message) {
+  if (process.env.GITHUB_ACTIONS !== "true") return;
+  console.log(
+    `::error file=${relativePath},line=${line},title=MathJax formula error::${escapeAnnotation(message)}`,
+  );
+}
+
 const markdownFiles = walkMarkdown(root);
 const failures = [];
 let displayCount = 0;
@@ -183,16 +200,23 @@ let inlineCount = 0;
 for (const filePath of markdownFiles) {
   const relativePath = path.relative(root, filePath);
   const { expressions, errors } = extractMath(filePath);
-  failures.push(...errors.map((message) => message.replace(filePath, relativePath)));
+
+  for (const error of errors) {
+    failures.push(`${relativePath}:${error.line}: ${error.message}`);
+    annotate(relativePath, error.line, error.message);
+  }
 
   for (const item of expressions) {
     if (item.display) displayCount += 1;
     else inlineCount += 1;
     const error = validateExpression(item.expression, item.display);
     if (error !== null) {
-      failures.push(
-        `${relativePath}:${item.line}: ${item.kind}: ${error}\n${item.expression}`,
-      );
+      const excerpt = item.expression.length > 200
+        ? `${item.expression.slice(0, 197)}...`
+        : item.expression;
+      const message = `${item.kind}: ${error}: ${excerpt}`;
+      failures.push(`${relativePath}:${item.line}: ${message}`);
+      annotate(relativePath, item.line, message);
     }
   }
 }
