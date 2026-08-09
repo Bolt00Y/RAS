@@ -5,7 +5,7 @@
  *
  * New repository convention:
  *   - inline mathematics: $...$
- *   - display mathematics: standalone $$ delimiter lines
+ *   - display mathematics: $$...$$ on one physical line
  *
  * Existing `math` fenced blocks are still parsed for backwards compatibility.
  * Both display and inline expressions are sent through MathJax and any error
@@ -32,6 +32,7 @@ const skippedDirectories = new Set([
   "build",
 ]);
 const legacyDelimiters = ["\\(", "\\)", "\\[", "\\]"];
+const displayMathPattern = /^\s*\$\$(.+?)\$\$\s*$/;
 const inlineMathPattern = /(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g;
 const inlineCodePattern = /(?<!`)`[^`\n]+`(?!`)/g;
 
@@ -60,10 +61,6 @@ function extractMath(filePath) {
   let openInfo = "";
   let openFenceLine = 0;
   let fenceBuffer = [];
-
-  let displayOpen = false;
-  let displayLine = 0;
-  let displayBuffer = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1;
@@ -96,23 +93,6 @@ function extractMath(filePath) {
       continue;
     }
 
-    if (displayOpen) {
-      if (line.trim() === "$$") {
-        expressions.push({
-          expression: displayBuffer.join("\n").trim(),
-          line: displayLine,
-          display: true,
-          kind: "double-dollar block",
-        });
-        displayOpen = false;
-        displayLine = 0;
-        displayBuffer = [];
-      } else {
-        displayBuffer.push(line);
-      }
-      continue;
-    }
-
     if (match !== null) {
       openFence = match[2];
       openInfo = match[3].trim().toLowerCase();
@@ -121,28 +101,35 @@ function extractMath(filePath) {
       continue;
     }
 
-    if (line.trim() === "$$") {
-      displayOpen = true;
-      displayLine = lineNumber;
-      displayBuffer = [];
+    const lineWithoutCode = line.replace(inlineCodePattern, "");
+    const stripped = lineWithoutCode.trim();
+    const displayMatch = stripped.match(displayMathPattern);
+
+    if (displayMatch !== null) {
+      expressions.push({
+        expression: displayMatch[1].trim(),
+        line: lineNumber,
+        display: true,
+        kind: "double-dollar display math",
+      });
       continue;
     }
 
-    if (line.includes("$$")) {
+    if (stripped === "$$" || lineWithoutCode.includes("$$")) {
       errors.push(
-        `${filePath}:${lineNumber}: display-math delimiters must be standalone $$ lines`,
+        `${filePath}:${lineNumber}: display math must use $$formula$$ on one physical line`,
       );
+      continue;
     }
 
     for (const delimiter of legacyDelimiters) {
-      if (line.includes(delimiter)) {
+      if (lineWithoutCode.includes(delimiter)) {
         errors.push(
           `${filePath}:${lineNumber}: legacy delimiter ${JSON.stringify(delimiter)} is forbidden`,
         );
       }
     }
 
-    const lineWithoutCode = line.replace(inlineCodePattern, "");
     inlineMathPattern.lastIndex = 0;
     for (const inlineMatch of lineWithoutCode.matchAll(inlineMathPattern)) {
       expressions.push({
@@ -156,9 +143,6 @@ function extractMath(filePath) {
 
   if (openFence !== null) {
     errors.push(`${filePath}:${openFenceLine}: unclosed fenced block`);
-  }
-  if (displayOpen) {
-    errors.push(`${filePath}:${displayLine}: unclosed double-dollar block`);
   }
 
   for (const item of expressions) {
