@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Validate GitHub Markdown `math` fenced blocks with MathJax.
+ * Validate Markdown mathematics with MathJax.
  *
- * GitHub renders Markdown mathematics with MathJax. This checker uses the same
- * TeX engine family and treats MathJax error output as a CI failure.
+ * New repository convention:
+ *   - inline mathematics: $...$
+ *   - display mathematics: standalone $$ delimiter lines
+ *
+ * Existing `math` fenced blocks are still parsed for backwards compatibility.
+ * Both display and inline expressions are sent through MathJax and any error
+ * node is treated as a CI failure.
  */
 
 import fs from "node:fs";
@@ -27,6 +32,8 @@ const skippedDirectories = new Set([
   "build",
 ]);
 const legacyDelimiters = ["\\(", "\\)", "\\[", "\\]"];
+const inlineMathPattern = /(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g;
+const inlineCodePattern = /(?<!`)`[^`\n]+`(?!`)/g;
 
 function walkMarkdown(directory) {
   const files = [];
@@ -43,16 +50,20 @@ function fenceMatch(line) {
   return line.match(/^(\s*)(`{3,}|~{3,})(.*)$/);
 }
 
-function extractMathBlocks(filePath) {
+function extractMath(filePath) {
   const source = fs.readFileSync(filePath, "utf8");
   const lines = source.split(/\r?\n/);
-  const blocks = [];
+  const expressions = [];
   const errors = [];
 
   let openFence = null;
   let openInfo = "";
-  let openLine = 0;
-  let buffer = [];
+  let openFenceLine = 0;
+  let fenceBuffer = [];
+
+  let displayOpen = false;
+  let displayLine = 0;
+  let displayBuffer = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1;
@@ -68,17 +79,36 @@ function extractMathBlocks(filePath) {
 
       if (isClosingFence) {
         if (openInfo === "math") {
-          blocks.push({
-            expression: buffer.join("\n").trim(),
-            line: openLine,
+          expressions.push({
+            expression: fenceBuffer.join("\n").trim(),
+            line: openFenceLine,
+            display: true,
+            kind: "math fence",
           });
         }
         openFence = null;
         openInfo = "";
-        openLine = 0;
-        buffer = [];
+        openFenceLine = 0;
+        fenceBuffer = [];
       } else if (openInfo === "math") {
-        buffer.push(line);
+        fenceBuffer.push(line);
+      }
+      continue;
+    }
+
+    if (displayOpen) {
+      if (line.trim() === "$$") {
+        expressions.push({
+          expression: displayBuffer.join("\n").trim(),
+          line: displayLine,
+          display: true,
+          kind: "double-dollar block",
+        });
+        displayOpen = false;
+        displayLine = 0;
+        displayBuffer = [];
+      } else {
+        displayBuffer.push(line);
       }
       continue;
     }
@@ -86,32 +116,58 @@ function extractMathBlocks(filePath) {
     if (match !== null) {
       openFence = match[2];
       openInfo = match[3].trim().toLowerCase();
-      openLine = lineNumber;
-      buffer = [];
+      openFenceLine = lineNumber;
+      fenceBuffer = [];
       continue;
     }
 
     if (line.trim() === "$$") {
-      errors.push(`${filePath}:${lineNumber}: standalone double-dollar delimiter is forbidden; use a math fence`);
+      displayOpen = true;
+      displayLine = lineNumber;
+      displayBuffer = [];
+      continue;
     }
+
+    if (line.includes("$$")) {
+      errors.push(
+        `${filePath}:${lineNumber}: display-math delimiters must be standalone $$ lines`,
+      );
+    }
+
     for (const delimiter of legacyDelimiters) {
       if (line.includes(delimiter)) {
-        errors.push(`${filePath}:${lineNumber}: legacy delimiter ${JSON.stringify(delimiter)} is forbidden`);
+        errors.push(
+          `${filePath}:${lineNumber}: legacy delimiter ${JSON.stringify(delimiter)} is forbidden`,
+        );
       }
+    }
+
+    const lineWithoutCode = line.replace(inlineCodePattern, "");
+    inlineMathPattern.lastIndex = 0;
+    for (const inlineMatch of lineWithoutCode.matchAll(inlineMathPattern)) {
+      expressions.push({
+        expression: inlineMatch[1].trim(),
+        line: lineNumber,
+        display: false,
+        kind: "inline math",
+      });
     }
   }
 
   if (openFence !== null) {
-    errors.push(`${filePath}:${openLine}: unclosed fenced block`);
+    errors.push(`${filePath}:${openFenceLine}: unclosed fenced block`);
+  }
+  if (displayOpen) {
+    errors.push(`${filePath}:${displayLine}: unclosed double-dollar block`);
   }
 
-  for (const block of blocks) {
-    if (block.expression.length === 0) {
-      errors.push(`${filePath}:${block.line}: empty math fenced block`);
+  for (const item of expressions) {
+    if (item.expression.length === 0) {
+      errors.push(`${filePath}:${item.line}: empty ${item.kind}`);
     }
   }
 
-  return { blocks, errors };
+  return { expressions, errors };
 }
 
 const adaptor = liteAdaptor();
@@ -120,9 +176,9 @@ const tex = new TeX({ packages: AllPackages });
 const svg = new SVG({ fontCache: "none" });
 const document = mathjax.document("", { InputJax: tex, OutputJax: svg });
 
-function validateExpression(expression) {
+function validateExpression(expression, display) {
   try {
-    const node = document.convert(expression, { display: true });
+    const node = document.convert(expression, { display });
     const rendered = adaptor.outerHTML(node);
     const hasMathJaxError =
       /<merror\b/i.test(rendered) ||
@@ -137,18 +193,22 @@ function validateExpression(expression) {
 
 const markdownFiles = walkMarkdown(root);
 const failures = [];
-let formulaCount = 0;
+let displayCount = 0;
+let inlineCount = 0;
 
 for (const filePath of markdownFiles) {
   const relativePath = path.relative(root, filePath);
-  const { blocks, errors } = extractMathBlocks(filePath);
+  const { expressions, errors } = extractMath(filePath);
   failures.push(...errors.map((message) => message.replace(filePath, relativePath)));
 
-  for (const block of blocks) {
-    formulaCount += 1;
-    const error = validateExpression(block.expression);
+  for (const item of expressions) {
+    if (item.display) displayCount += 1;
+    else inlineCount += 1;
+    const error = validateExpression(item.expression, item.display);
     if (error !== null) {
-      failures.push(`${relativePath}:${block.line}: ${error}\n${block.expression}`);
+      failures.push(
+        `${relativePath}:${item.line}: ${item.kind}: ${error}\n${item.expression}`,
+      );
     }
   }
 }
@@ -160,5 +220,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Validated ${formulaCount} math fenced block(s) across ${markdownFiles.length} Markdown file(s).`,
+  `Validated ${displayCount} display formula(s) and ${inlineCount} inline formula(s) across ${markdownFiles.length} Markdown file(s).`,
 );
