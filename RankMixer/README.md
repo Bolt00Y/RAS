@@ -21,13 +21,14 @@
 
 建议先阅读总览，再按对应技术问题进入单篇详解。
 
-1. [RankMixer 方法谱系总览：TokenMixer-Large、RankUp、MixFormer 与 UniMixer](docs/11_rankmixer_family_evolution_overview.md)
-2. [RankMixer 论文详解：硬件友好扩展架构](docs/07_rankmixer_paper_detailed_review.md)
-3. [TokenMixer-Large 论文详解：第二代大规模排序主干](docs/08_tokenmixer_large_paper_detailed_review.md)
-4. [RankUp 论文详解：高秩表示学习](docs/12_rankup_paper_detailed_review.md)
-5. [MixFormer 论文详解：Dense 与 Sequence Co-Scaling](docs/09_mixformer_paper_detailed_review.md)
-6. [UniMixer 论文详解：结构化可学习 Mixing](docs/10_unimixer_paper_detailed_review.md)
-7. [RankUp Figure 1–5 扩展图解与复现分析](docs/04_rankup_paper_walkthrough.md)
+1. [RankMixer 后续修改版本总结：架构变化、技术路线与适用边界](docs/13_rankmixer_post_variants_architecture_summary.md)
+2. [RankMixer 方法谱系总览：TokenMixer-Large、RankUp、MixFormer 与 UniMixer](docs/11_rankmixer_family_evolution_overview.md)
+3. [RankMixer 论文详解：硬件友好扩展架构](docs/07_rankmixer_paper_detailed_review.md)
+4. [TokenMixer-Large 论文详解：第二代大规模排序主干](docs/08_tokenmixer_large_paper_detailed_review.md)
+5. [RankUp 论文详解：高秩表示学习](docs/12_rankup_paper_detailed_review.md)
+6. [MixFormer 论文详解：Dense 与 Sequence Co-Scaling](docs/09_mixformer_paper_detailed_review.md)
+7. [UniMixer 论文详解：结构化可学习 Mixing](docs/10_unimixer_paper_detailed_review.md)
+8. [RankUp Figure 1–5 扩展图解与复现分析](docs/04_rankup_paper_walkthrough.md)
 
 ### 方法定位
 
@@ -38,6 +39,7 @@
 | RankUp | 参数增长没有转化为有效表示维度 | Random Split、Multi-embedding、Global/Cross/Task Tokens |
 | MixFormer | 非序列交互与行为序列彼此割裂 | Query Mixer + 每层 Cross-Attention + UI 解耦 |
 | UniMixer | 固定 mixing 不可学习且受 $H=T$ 约束 | Learnable global-local mixing + Lite 压缩与 Sinkhorn |
+| RankElastor | 固定 mixing 扩秩有限，普通 PFFN 反复缩秩 | Parameterized Full Mixing + GLU-improved P-FFN |
 
 ## 当前业务研究文档
 
@@ -61,6 +63,7 @@
 | P1 | UniMixer-Lite Adapter | 验证固定 mixing 是否限制当前数据 | 中 |
 | 条件 P1 | MixFormer / UI-MixFormer | 仅在已有行为序列和请求级多候选条件下研究 | 中高 |
 | P1 | Base teacher distillation | 将强 Base 的决策边界迁移到单分支 RankMixer | 中 |
+| P2 | RankElastor-inspired 低秩 flatten mixing | 验证核心算子谱增强，不直接使用完整 Full Mixing | 高 |
 | P2 | 原样扩大到 $T=32$ 、 $D=1536$ | 验证纯容量 scaling | 高，必须配合利用率诊断 |
 | P3 | Sparse-Pertoken MoE | 在 dense scaling 已获益后提高容量效率 | 高 |
 
@@ -72,7 +75,8 @@
 - 不把多个模块一次性串联后只报告最终指标；
 - 不以参数增加本身作为创新，必须说明新增模块补足了哪类建模缺口；
 - 任何收益都必须同时检查 AUC/GAUC、LogLoss、校准、吞吐、MFU 和 P99 延迟；
-- RankUp 类方案必须同时检查 effective rank 与 token redundancy；
+- RankUp 类方案必须同时检查 entropy effective rank 与 token redundancy；
+- RankElastor 类方案必须单独记录 stable rank，不能与 RankUp 的 effective rank 数值混报；
 - UniMixer 类方案必须加入固定随机 mixing 和同参数 MLP 对照；
 - MixFormer 只有在当前已有行为序列时才属于严格复现；
 - 先验证单模块，再组合两个已独立获益的模块；
@@ -94,4 +98,4 @@ C2  ordered field-aligned / fixed random split
 C3  simple learned token mixing
 ```
 
-若大参数模型仍弱于 Base，优先执行文档 06 中的 Base 反向消融、规模轴 2×2 拆分、pooling/head、BN/SENet 与 DCNv2 对照，再进入完整 RankUp、TokenMixer-Large、UniMixer、MoE 或更大规模训练。
+若大参数模型仍弱于 Base，优先执行文档 06 中的 Base 反向消融、规模轴 2×2 拆分、pooling/head、BN/SENet 与 DCNv2 对照，再进入完整 RankUp、TokenMixer-Large、UniMixer、RankElastor-inspired mixing、MoE 或更大规模训练。
