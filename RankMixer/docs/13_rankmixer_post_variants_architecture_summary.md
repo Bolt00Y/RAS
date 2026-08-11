@@ -39,6 +39,37 @@ RankMixer
 
 因此，这些方法中有一部分是互补的，而不是互斥的。
 
+## 1.1 论文首次公开时间线
+
+下表按 **arXiv v1 首次提交时间（UTC）** 升序排列。这里的“提出时间”统一指论文第一次公开可检索的时间，不使用最新版本修订日、会议录出版日或生产部署日期。
+
+| 顺序 | 方法 | arXiv | v1 首次提交时间（UTC） | 相对 RankMixer 的主要演进方向 |
+|---:|---|---|---|---|
+| 1 | RankMixer | [2507.15551](https://arxiv.org/abs/2507.15551) | 2025-07-21 12:28:55 | 建立固定 Token Mixing + Per-token FFN 的硬件友好扩展基线 |
+| 2 | TokenMixer-Large | [2602.06563](https://arxiv.org/abs/2602.06563) | 2026-02-06 10:04:33 | 修复 residual 语义错位、深层优化和 MoE 稀疏化 |
+| 3 | MixFormer | [2602.14110](https://arxiv.org/abs/2602.14110) | 2026-02-15 11:53:30 | 将非序列 Query Mixer 与行为序列 Cross-Attention 统一到同一 backbone |
+| 4 | UniMixer | [2604.00590](https://arxiv.org/abs/2604.00590) | 2026-04-01 07:57:40 | 将固定规则 mixing 改为结构化可学习 global-local mixing |
+| 5 | RankUp | [2604.17878](https://arxiv.org/abs/2604.17878) | 2026-04-20 06:40:27 | 从 tokenization、多 embedding views 和多类型 tokens 提升 effective rank |
+| 6 | RankElastor | [2605.23191](https://arxiv.org/abs/2605.23191) | 2026-05-22 03:17:29 | 以 Parameterized Full Mixing 和 GLU-PFFN 直接重塑谱动态 |
+
+按时间观察，2026 年的演进顺序并不是“RankMixer → RankUp → TokenMixer-Large”。更准确的公开时间线是：
+
+```text
+2025-07-21  RankMixer
+    ↓
+2026-02-06  TokenMixer-Large
+    ↓
+2026-02-15  MixFormer
+    ↓
+2026-04-01  UniMixer
+    ↓
+2026-04-20  RankUp
+    ↓
+2026-05-22  RankElastor
+```
+
+这条时间线只表示首次公开顺序，不表示后一篇一定建立在前一篇全部组件之上。TokenMixer-Large、MixFormer、UniMixer、RankUp 与 RankElastor 分别沿 block、序列统一、mixing 参数化、输入高秩化和谱算子五条相对独立的方向展开。
+
 ---
 
 ## 2. 统一坐标系：RankMixer 原始架构到底固定了什么

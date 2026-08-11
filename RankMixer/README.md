@@ -34,12 +34,12 @@
 
 | 方法 | 主要解决的问题 | 相对 RankMixer 的关键变化 |
 |---|---|---|
-| RankMixer | 工业排序模型难以低延迟、高 MFU 地扩展 | 固定 Token Mixing + Per-token FFN |
-| TokenMixer-Large | residual 语义错位、深层训练和 MoE 不完整 | Mixing & Reverting、pSwiGLU、Pre-RMSNorm、SP-MoE |
-| RankUp | 参数增长没有转化为有效表示维度 | Random Split、Multi-embedding、Global/Cross/Task Tokens |
-| MixFormer | 非序列交互与行为序列彼此割裂 | Query Mixer + 每层 Cross-Attention + UI 解耦 |
-| UniMixer | 固定 mixing 不可学习且受 $H=T$ 约束 | Learnable global-local mixing + Lite 压缩与 Sinkhorn |
-| RankElastor | 固定 mixing 扩秩有限，普通 PFFN 反复缩秩 | Parameterized Full Mixing + GLU-improved P-FFN |
+| RankMixer（2025-07-21） | 工业排序模型难以低延迟、高 MFU 地扩展 | 固定 Token Mixing + Per-token FFN |
+| TokenMixer-Large（2026-02-06） | residual 语义错位、深层训练和 MoE 不完整 | Mixing & Reverting、pSwiGLU、Pre-RMSNorm、SP-MoE |
+| MixFormer（2026-02-15） | 非序列交互与行为序列彼此割裂 | Query Mixer + 每层 Cross-Attention + UI 解耦 |
+| UniMixer（2026-04-01） | 固定 mixing 不可学习且受 $H=T$ 约束 | Learnable global-local mixing + Lite 压缩与 Sinkhorn |
+| RankUp（2026-04-20） | 参数增长没有转化为有效表示维度 | Random Split、Multi-embedding、Global/Cross/Task Tokens |
+| RankElastor（2026-05-22） | 固定 mixing 扩秩有限，普通 PFFN 反复缩秩 | Parameterized Full Mixing + GLU-improved P-FFN |
 
 ## 当前业务研究文档
 
