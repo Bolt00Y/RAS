@@ -1,4 +1,4 @@
-# Read-only validation for GitHub Preview-compatible Markdown mathematics.
+# Read-only validation for GitHub Preview-compatible Markdown mathematics and method timelines.
 name: Markdown Math Preview
 
 on:
