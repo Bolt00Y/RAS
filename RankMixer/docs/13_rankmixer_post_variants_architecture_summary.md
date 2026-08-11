@@ -225,7 +225,7 @@ $$\operatorname{pSwiGLU}_t(\mathbf x)=\mathbf W_{t,\mathrm{down}}\!\left(\operat
 
 ### 4.2.5 Sparse-Pertoken MoE
 
-TokenMixer-Large 不再采用 RankMixer 的动态 ReLU 激活专家数，而是将已证明有效的 dense Per-token SwiGLU 先扩大，再切分成若干专家，使用固定 top-$k$ 稀疏路由：
+TokenMixer-Large 不再采用 RankMixer 的动态 ReLU 激活专家数，而是将已证明有效的 dense Per-token SwiGLU 先扩大，再切分成若干专家，使用固定 top-k 稀疏路由：
 
 ```text
 先扩大 dense pSwiGLU
