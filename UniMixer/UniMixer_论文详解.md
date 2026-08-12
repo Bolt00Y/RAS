@@ -95,11 +95,19 @@ $$
 
 这一步是全文的支点：既然 TokenMixer 等价于矩阵，就可以把固定的 0-1 元素放松成可学习权重，让模型自己学习“应该怎样重排和混合”。
 
+![论文图 3：不同方法的全局混合权重，以及 TokenMixer 的置换矩阵参数化与 Kronecker 分解](assets/unified-token-mixing.png)
+
+上半部分把 Self-Attention、异质 Attention、固定 TokenMixer 和 UniMixer 的混合权重并排展示；下半部分则把“手写重排”改写为置换矩阵，并说明大矩阵可由更小矩阵的 Kronecker 积表达。这张图正好连接了“规则操作”和后续“可学习结构化矩阵”两种表述。
+
 ### 4.3 为什么不能直接学习整个矩阵
 
 若直接学习 $TD\times TD$ 的矩阵，参数量和计算量均为 $O(T^2D^2)$，同时还会产生巨大的中间张量。因此需要结构化分解，而不是显式构造整个矩阵。
 
 ## 5. UniMixing：先局部、再全局
+
+![论文图 2：UniMixer 总体架构；左为完整 UniMixing，右为 UniMixing-Lite](assets/unimixer-architecture.png)
+
+从下往上看，异质特征先经过 embedding 和 token-specific 投影，随后进入若干 UniMixer Block；每个 Block 由 UniMixing、Pertoken SwiGLU、RMSNorm 和双流残差组成。图左右两侧放大了完整版与 Lite 版的局部/全局混合方式。
 
 ### 5.1 把长向量切成块
 
@@ -327,6 +335,8 @@ $$
 最值得关注的是 38.2M 的 4-block Lite：它的 AUC/UAUC 高于表中所有基线，同时参数少于 TokenMixer-Large 的一半，FLOPs 也略低于 TokenMixer-Large。另一方面，67.5M 的标准 UniMixer 虽然参数更少，但 FLOPs 高于 RankMixer；84.5M Lite 的最好绝对 AUC 则用了 4.24T FLOPs。因此，“更高效”需明确是参数效率、某个 Pareto 点，还是所有规模下的计算效率，不能一概而论。
 
 ### 9.3 Scaling 曲线
+
+![论文图 4：RankMixer、UniMixer 与 UniMixer-Lite 随稠密参数量和 FLOPs 增长的相对 AUC 曲线](assets/scaling-laws.png)
 
 作者将相对 AUC 增益拟合为幂律，报告的参数 Scaling 指数为：
 
