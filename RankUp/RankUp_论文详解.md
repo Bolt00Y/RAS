@@ -7,6 +7,7 @@
 > 状态：2026 年 arXiv/CoRR 预印本，尚未发现正式会议版本  
 > 官方页面：[arXiv 摘要](https://arxiv.org/abs/2604.17878v3) / [官方 HTML](https://arxiv.org/html/2604.17878v3) / [arXiv DOI](https://doi.org/10.48550/arXiv.2604.17878)  
 > 本地论文：[RankUp.pdf](./RankUp.pdf)  
+> 系列综述：[RankMixer 及其演进方法详细调研](../rankmixer/RankMixer及其演进方法详细调研.md)
 > 代码与数据：截至 2026-08-12，未发现公开实现；实验使用腾讯内部生产数据
 
 ## 0. 先确认论文身份

@@ -12,7 +12,7 @@
 
 RankMixer 的关键贡献，是把工业排序模型改造成适合 GPU 的 MetaFormer 式骨干：用**无参数的 Multi-head Token Mixing**完成跨 token 信息交换，用**彼此独立的 Per-token FFN**保留异质特征子空间，并通过大矩阵乘法、高 MFU 和稀疏 MoE 扩大稠密参数规模。它解决的是“传统特征交叉模块难以高效扩容”的问题，但也留下了五类后续问题：固定混合不可学习、残差前后 token 语义错位、深层训练不稳、序列与稠密特征仍彼此割裂、表示有效秩随深度收缩。
 
-当前目录中的后续方法并不是沿同一条线做小修小补，而是围绕这些瓶颈形成了五条互补路线：
+本仓库收录的后续方法并不是沿同一条线做小修小补，而是围绕这些瓶颈形成了五条互补路线：
 
 1. **TokenMixer-Large**：RankMixer 最直接的工程继任者。保留无参数混合的硬件优势，用 Mixing-Reverting、Pre-RMSNorm、层间残差、辅助损失、Pertoken-SwiGLU 和 Sparse-Pertoken MoE 修复深度、残差与稀疏训练问题，并把规模推进到离线 15B、在线 7B。
 2. **MixFormer**：把 RankMixer 的 HeadMixing 从“纯稠密特征交互骨干”扩展为统一的 Query Mixer，并在同一 block 中加入行为序列 Cross Attention，解决稠密模型与序列模型分别扩容时的预算竞争；再通过 User-Item Decoupling 降低请求级重复计算。
@@ -26,16 +26,16 @@ RankMixer 的关键贡献，是把工业排序模型改造成适合 GPU 的 Meta
 
 ## 1. 调研对象、谱系关系与读数口径
 
-### 1.1 当前目录中的有效资料
+### 1.1 本仓库中的有效资料
 
 | 对象 | 本地资料 | 与 RankMixer 的关系 | 本调研定位 |
 |---|---|---|---|
-| RankMixer | [论文 PDF](./RankMixer.pdf) | 基线 | 统一骨干与工业扩容起点 |
-| TokenMixer-Large | [论文 PDF](../tokenmixer/TokenMixer-Large.pdf) | **直接演进**；论文明确称原 TokenMixer 来自 RankMixer | 深度、残差、MoE 与系统工程升级 |
-| MixFormer | [论文 PDF](../mixformer/MixFormer.pdf) | **架构扩展**；Query Mixer 直接受 RankMixer 启发 | 稠密交互与行为序列统一建模 |
-| UniMixer | [论文 PDF](../UniMixer/UniMixer.pdf)；[现有详解](../UniMixer/UniMixer_论文详解.md) | **理论与结构泛化**；把固定 TokenMixer 参数化 | 可学习软置换、结构化压缩、深度扩展 |
-| RankUp | [论文 PDF](../RankUp/RankUp.pdf)；[现有详解](../RankUp/RankUp_论文详解.md) | **骨干保留、输入/读出增强**；主基线为 RankMixer | 高秩输入、全局/外部先验、多任务解耦 |
-| RankElastor | [论文 PDF](../RankElastor/RankElastor_paper.pdf)；[现有精读](../RankElastor/RankElastor_论文详解.md) | **机制替换**；直接诊断 RankMixer 的谱动态 | Full Mixing + GLU，缓解表示坍塌 |
+| RankMixer | [论文 PDF](./RankMixer.pdf)；[中文详解](./RankMixer_论文详解.md) | 基线 | 统一骨干与工业扩容起点 |
+| TokenMixer-Large | [论文 PDF](../tokenmixer/TokenMixer-Large.pdf)；[中文详解](../tokenmixer/TokenMixer-Large_论文详解.md) | **直接演进**；论文明确称原 TokenMixer 来自 RankMixer | 深度、残差、MoE 与系统工程升级 |
+| MixFormer | [论文 PDF](../mixformer/MixFormer.pdf)；[中文详解](../mixformer/MixFormer_论文详解.md) | **架构扩展**；Query Mixer 直接受 RankMixer 启发 | 稠密交互与行为序列统一建模 |
+| UniMixer | [论文 PDF](../UniMixer/UniMixer.pdf)；[中文详解](../UniMixer/UniMixer_论文详解.md) | **理论与结构泛化**；把固定 TokenMixer 参数化 | 可学习软置换、结构化压缩、深度扩展 |
+| RankUp | [论文 PDF](../RankUp/RankUp.pdf)；[中文详解](../RankUp/RankUp_论文详解.md) | **骨干保留、输入/读出增强**；主基线为 RankMixer | 高秩输入、全局/外部先验、多任务解耦 |
+| RankElastor | [论文 PDF](../RankElastor/RankElastor_paper.pdf)；[中文详解](../RankElastor/RankElastor_论文详解.md) | **机制替换**；直接诊断 RankMixer 的谱动态 | Full Mixing + GLU，缓解表示坍塌 |
 
 ### 1.2 演进关系图
 
@@ -71,7 +71,7 @@ FLOPs/Batch 也只能在同一论文内部比较：RankMixer 主表的 batch 是
 
 ## 2. RankMixer 基线：它解决了什么，又留下了什么
 
-来源定位：[RankMixer.pdf](./RankMixer.pdf) 第 3-7 页，重点为 Figure 1、Tables 1-6。
+来源定位：[RankMixer.pdf](./RankMixer.pdf) 第 3-7 页，重点为 Figure 1、Tables 1-6；可配合 [RankMixer 中文详解](./RankMixer_论文详解.md) 阅读。
 
 ### 2.1 设计动机：从“堆很多小算子”转向统一可扩展骨干
 
@@ -201,7 +201,7 @@ Sparse-MoE 曲线还显示，Dense-Training/Sparse-Inference + ReLU routing 在�
 
 ## 4. TokenMixer-Large：把 RankMixer 从“可扩”推进到“超大规模可训练、可服务”
 
-来源定位：[TokenMixer-Large.pdf](../tokenmixer/TokenMixer-Large.pdf) 第 3-8 页，重点为 Figures 1-5、Tables 2-7。
+来源定位：[TokenMixer-Large.pdf](../tokenmixer/TokenMixer-Large.pdf) 第 3-8 页，重点为 Figures 1-5、Tables 2-7；可配合 [TokenMixer-Large 中文详解](../tokenmixer/TokenMixer-Large_论文详解.md) 阅读。
 
 ### 4.1 与 RankMixer 的继承关系
 
@@ -341,7 +341,7 @@ TokenMixer-Large 是 RankMixer 路线中工业证据最完整、最强调训练-
 
 ## 5. MixFormer：从 RankMixer 的稠密交互扩展到“稠密 + 序列”共扩展
 
-来源定位：[MixFormer.pdf](../mixformer/MixFormer.pdf) 第 3-8 页，重点为 Figures 1-6、Tables 1-2。
+来源定位：[MixFormer.pdf](../mixformer/MixFormer.pdf) 第 3-8 页，重点为 Figures 1-6、Tables 1-2；可配合 [MixFormer 中文详解](../mixformer/MixFormer_论文详解.md) 阅读。
 
 ### 5.1 RankMixer 在序列建模上的结构性缺口
 
@@ -678,7 +678,7 @@ RankUp 在微信视频号、公众号、朋友圈广告中，以 20% 流量连�
 | 微信公众号 | +0.331% | +0.21% | +4.81% |
 | 微信朋友圈 | +0.269% | +0.87% | +2.12% |
 
-新广告首日 GMV 分别提升 `+5.83%/+9.67%/+2.84%`；Order 任务 GMV 分别为 `+5.18%/+7.18%/+4.79%`。这是当前目录中很强的生产证据，但线上模型同时扩容约 10 倍，且未提供等参数、等 FLOPs 的生产对照，不能把全部 GMV 增长只归因于高秩组件。
+新广告首日 GMV 分别提升 `+5.83%/+9.67%/+2.84%`；Order 任务 GMV 分别为 `+5.18%/+7.18%/+4.79%`。这是本仓库收录论文中很强的生产证据，但线上模型同时扩容约 10 倍，且未提供等参数、等 FLOPs 的生产对照，不能把全部 GMV 增长只归因于高秩组件。
 
 ### 7.4 评价
 
@@ -782,7 +782,7 @@ RankElastor 的谱分析很有启发性，但本地精读核验出几项重要�
 4. Full Mixing 只在小 $TD$ 上验证，没有线上 A/B 和大 token 服务成本；
 5. 主表虽是 10 次均值，却没有方差或显著性。
 
-其中第 1 点来自 [RankElastor_论文详解.md](../RankElastor/RankElastor_论文详解.md) 对作者公开代码的额外核验；本地目录本身没有该代码，本文未独立重跑脚本。即使改用熵型 effective rank，同一 $T\times D$ 矩阵的值仍不能超过代数秩，因此也不能自动解释图中超过 $\min(T,D)$ 的数值。理论部分还把普通 FFN写成对所有行共享的权重，而实际 RankMixer 的 P-FFN 对不同 token 使用独立参数，这进一步限制了“定理直接证明实际 P-FFN 必然缩秩”的力度。
+其中第 1 点来自 [RankElastor_论文详解.md](../RankElastor/RankElastor_论文详解.md) 对作者公开代码的额外核验；本仓库没有收录该代码，本文未独立重跑脚本。即使改用熵型 effective rank，同一 $T\times D$ 矩阵的值仍不能超过代数秩，因此也不能自动解释图中超过 $\min(T,D)$ 的数值。理论部分还把普通 FFN写成对所有行共享的权重，而实际 RankMixer 的 P-FFN 对不同 token 使用独立参数，这进一步限制了“定理直接证明实际 P-FFN 必然缩秩”的力度。
 
 因此，应相信“论文报告的相对趋势和离线指标”，但不应把有效秩曲线的绝对值或理论结论当作已被完全验证。
 
@@ -871,7 +871,7 @@ RankElastor 的最大价值是把 scaling 失败转化为可测的中间过程�
 
 ## 11. 方法之间是否可以组合
 
-从结构位置看，部分方法具有明显互补性，但以下组合都只是本调研基于架构做出的推断，当前目录论文没有完成联合实验。
+从结构位置看，部分方法具有明显互补性，但以下组合都只是本调研基于架构做出的推断，本仓库收录的论文没有完成联合实验。
 
 ### 11.1 较自然的组合
 
@@ -912,7 +912,7 @@ RankElastor 的最大价值是把 scaling 失败转化为可测的中间过程�
 
 ## 13. 综合结论
 
-RankMixer 建立了一个很强的工业推荐起点：**固定、便宜的跨 token 重排负责信息交换，独立、可扩的 Per-token FFN 负责容量，高 MFU 和稀疏化负责把参数转化为可服务的模型。** 当前目录中的后续工作分别指出，这个范式仍可能在优化、结构、表示和系统层面遇到瓶颈。
+RankMixer 建立了一个很强的工业推荐起点：**固定、便宜的跨 token 重排负责信息交换，独立、可扩的 Per-token FFN 负责容量，高 MFU 和稀疏化负责把参数转化为可服务的模型。** 本仓库收录的后续工作分别指出，这个范式仍可能在优化、结构、表示和系统层面遇到瓶颈。
 
 - TokenMixer-Large 证明，RankMixer 的固定 mixer 可以继续保留，真正的下一步是修正残差语义、深层梯度、MoE 训练和并行系统；
 - MixFormer 证明，RankMixer 若只处理压缩后的序列向量，就无法解决稠密与序列的全局共扩展，必须在每层统一建模；
@@ -954,9 +954,9 @@ $$
 
 ## 附录 B：本地参考资料
 
-1. Jie Zhu et al. **RankMixer: Scaling Up Ranking Models in Industrial Recommenders**. [本地 PDF](./RankMixer.pdf)。
-2. Yuchen Jiang et al. **TokenMixer-Large: Scaling Up Large Ranking Models in Industrial Recommenders**. [本地 PDF](../tokenmixer/TokenMixer-Large.pdf)。
-3. Xu Huang et al. **MixFormer: Co-Scaling Up Dense and Sequence in Industrial Recommenders**. [本地 PDF](../mixformer/MixFormer.pdf)。
-4. Mingming Ha et al. **UniMixer: A Unified Architecture for Scaling Laws in Recommendation Systems**. [本地 PDF](../UniMixer/UniMixer.pdf)；[本地详解](../UniMixer/UniMixer_论文详解.md)。
-5. Jin Chen et al. **RankUp: Towards High-rank Representations for Large Scale Advertising Recommender Systems**. [本地 PDF](../RankUp/RankUp.pdf)；[本地详解](../RankUp/RankUp_论文详解.md)。
-6. Guoming Li et al. **Expand More, Shrink Less: Shaping Effective-Rank Dynamics for Dense Scaling in Recommendation**. [本地 PDF](../RankElastor/RankElastor_paper.pdf)；[本地精读](../RankElastor/RankElastor_论文详解.md)。
+1. Jie Zhu et al. **RankMixer: Scaling Up Ranking Models in Industrial Recommenders**. [本地 PDF](./RankMixer.pdf)；[中文详解](./RankMixer_论文详解.md)。
+2. Yuchen Jiang et al. **TokenMixer-Large: Scaling Up Large Ranking Models in Industrial Recommenders**. [本地 PDF](../tokenmixer/TokenMixer-Large.pdf)；[中文详解](../tokenmixer/TokenMixer-Large_论文详解.md)。
+3. Xu Huang et al. **MixFormer: Co-Scaling Up Dense and Sequence in Industrial Recommenders**. [本地 PDF](../mixformer/MixFormer.pdf)；[中文详解](../mixformer/MixFormer_论文详解.md)。
+4. Mingming Ha et al. **UniMixer: A Unified Architecture for Scaling Laws in Recommendation Systems**. [本地 PDF](../UniMixer/UniMixer.pdf)；[中文详解](../UniMixer/UniMixer_论文详解.md)。
+5. Jin Chen et al. **RankUp: Towards High-rank Representations for Large Scale Advertising Recommender Systems**. [本地 PDF](../RankUp/RankUp.pdf)；[中文详解](../RankUp/RankUp_论文详解.md)。
+6. Guoming Li et al. **Expand More, Shrink Less: Shaping Effective-Rank Dynamics for Dense Scaling in Recommendation**. [本地 PDF](../RankElastor/RankElastor_paper.pdf)；[中文详解](../RankElastor/RankElastor_论文详解.md)。

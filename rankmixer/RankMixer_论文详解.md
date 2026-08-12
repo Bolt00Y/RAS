@@ -2,6 +2,8 @@
 
 > 原文：[RankMixer: Scaling Up Ranking Models in Industrial Recommenders](./RankMixer.pdf)
 >
+> 系列综述：[RankMixer 及其演进方法详细调研](./RankMixer及其演进方法详细调研.md)
+>
 > 阅读版本：arXiv:2507.15551v3，2025-07-26（PDF 页脚标识）
 >
 > 图片：本文中的图 1、图 2、图 3 和表 6 均由仓库内原 PDF 对应页面高分辨率裁剪而来，没有使用外部图片。

@@ -5,6 +5,7 @@
 > KDD 2026 Research Track，arXiv:2605.23191v1，16 页。  
 > DOI：[10.1145/3770855.3818049](https://doi.org/10.1145/3770855.3818049)；[arXiv](https://arxiv.org/abs/2605.23191)；[作者代码](https://github.com/vasile-paskardlgm/RankElastor)；[Zenodo 归档](https://doi.org/10.5281/zenodo.20252036)。  
 > 本地原文：[RankElastor_paper.pdf](./RankElastor_paper.pdf)；PDF SHA-256：`41666d90b79b6b0a4bc126cb04b9c9744922f3f74e76f2b0dce6b97ce3a192ef`。  
+> 系列综述：[RankMixer 及其演进方法详细调研](../rankmixer/RankMixer及其演进方法详细调研.md)。
 > 整理日期：2026-08-12。
 
 ## 0. 先说结论

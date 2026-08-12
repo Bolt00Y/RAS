@@ -2,6 +2,7 @@
 
 > 原文：[TokenMixer-Large: Scaling Up Large Ranking Models in Industrial Recommenders](./TokenMixer-Large.pdf)
 > 说明：文中的“论文事实”只复述原 PDF；“公式推导”和“工程解读”是为了帮助理解而添加的分析，不应视为作者原话。本文未使用网络资料补全未披露信息。
+> 系列综述：[RankMixer 及其演进方法详细调研](../rankmixer/RankMixer及其演进方法详细调研.md)
 
 ## 1. 一句话结论
 

@@ -11,6 +11,7 @@
 - DOI：`10.1145/3770855.3818447`
 - PDF 内的 arXiv 版本标记：`arXiv:2602.14110v2 [cs.IR] 2 Jul 2026`
 - 本地原文：[MixFormer.pdf](./MixFormer.pdf)
+- 系列综述：[RankMixer 及其演进方法详细调研](../rankmixer/RankMixer及其演进方法详细调研.md)
 
 本文档只依据该 PDF，没有使用网络资料补全。为避免把解读写成论文原话，下文采用两种标记：
 

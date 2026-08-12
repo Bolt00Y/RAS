@@ -4,8 +4,9 @@
 > 作者：Mingming Ha, Guanchen Wang, Linxun Chen, Xuan Rao, Yuexin Shi, Tianbao Ma, Zhaojie Liu, Yunqian Fan, Zilong Lu, Yanan Niu, Han Li, Kun Gai  
 > 机构：Kuaishou Technology  
 > 版本：arXiv:2604.00590v2，2026-04-02，共 17 页  
-> 官方页面：https://arxiv.org/abs/2604.00590  
-> 本地论文：`UniMixer.pdf`
+> 官方页面：[arXiv:2604.00590](https://arxiv.org/abs/2604.00590)
+> 本地论文：[UniMixer.pdf](./UniMixer.pdf)
+> 系列综述：[RankMixer 及其演进方法详细调研](../rankmixer/RankMixer及其演进方法详细调研.md)
 
 ## 0. 同名说明
 
