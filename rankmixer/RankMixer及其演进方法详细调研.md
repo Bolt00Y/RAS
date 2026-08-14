@@ -7,6 +7,8 @@
 > 基线：**RankMixer: Scaling Up Ranking Models in Industrial Recommenders**。
 >
 > 目标：说明每种后续方法究竟继承了 RankMixer 的什么、修复了什么、付出了什么代价，以及论文实际报告了怎样的改进效果。
+>
+> 面向 `cvr_bn_rankmixer_v1.py` 的全部改进方法精炼总览：[CVR_RankMixer_v1_改进方案汇总与选型指南.md](CVR_RankMixer_v1_改进方案汇总与选型指南.md)
 
 ## 摘要
 

@@ -1,6 +1,7 @@
 # CVR RankMixer 输入重构与 AUC 优化：四套可落地方案
 
 > 关联源码：commend_cvr.py、mlp_mixer_swiglu_fuse.py<br>
+> 全部改进方法的精炼选型总览：[CVR_RankMixer_v1_改进方案汇总与选型指南.md](CVR_RankMixer_v1_改进方案汇总与选型指南.md)<br>
 > 基线分析：[CVR_RankMixer_SwiGLU_源码分析与原版对比.md](CVR_RankMixer_SwiGLU_源码分析与原版对比.md)<br>
 > 结合 0.865 base 与 0.862 RankMixer v1 实验后的专项诊断：[CVR_RankMixer_v1_AUC差距诊断与改进路线.md](CVR_RankMixer_v1_AUC差距诊断与改进路线.md)<br>
 > 方案日期：2026-08-14<br>
