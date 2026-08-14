@@ -1,5 +1,6 @@
 # CVR RankMixer v1 改进方案汇总与选型指南
 
+> 按 RankMixer 模块分类的全量详细版：[CVR_RankMixer_全量改进方案_按模块分类.md](CVR_RankMixer_全量改进方案_按模块分类.md)<br>
 > 目标：把现有源码分析、AUC 差距诊断、四套设计方案和 RankMixer 演进方法压缩成一份可快速选型的总览。<br>
 > 对比基线：`code/cvr_bn_rankmixer_v1.py`。<br>
 > 实验背景：base AUC 约 0.865，RankMixer v1 AUC 约 0.862；日训练约 5.5 亿、日测试约 1.1 亿、训练约 10 天。<br>

@@ -5,6 +5,7 @@
 > 文档日期：2026-08-13<br>
 > 分析方法：以当前工作区源码的实际调用链为准；区分默认配置、可选分支和未接通代码。
 >
+> 按模块分类的全量改进指南：[CVR_RankMixer_全量改进方案_按模块分类.md](CVR_RankMixer_全量改进方案_按模块分类.md)<br>
 > 全部改进方法的精炼选型总览：[CVR_RankMixer_v1_改进方案汇总与选型指南.md](CVR_RankMixer_v1_改进方案汇总与选型指南.md)<br>
 > 配套改进设计：[CVR_RankMixer_四套改进方案设计.md](CVR_RankMixer_四套改进方案设计.md)<br>
 > 基于 base/RM-v1 实测 AUC 差距的专项诊断：[CVR_RankMixer_v1_AUC差距诊断与改进路线.md](CVR_RankMixer_v1_AUC差距诊断与改进路线.md)

@@ -1,5 +1,7 @@
 # RankMixer 及其演进方法详细调研
 
+> 面向 CVR RankMixer 的按模块全量改进指南：[CVR_RankMixer_全量改进方案_按模块分类.md](CVR_RankMixer_全量改进方案_按模块分类.md)
+>
 > 调研日期：2026-08-12
 >
 > 调研范围：仅依据仓库中的 6 篇论文 PDF 及其对应讲解整理。
