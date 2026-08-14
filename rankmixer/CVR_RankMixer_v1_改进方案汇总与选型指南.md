@@ -1,750 +1,659 @@
-# CVR RankMixer v1 改进方案汇总与选型指南
+# CVR RankMixer v1 改进方案汇总与选型指南：真实 Base 修正版
 
-> 按 RankMixer 模块分类的全量详细版：[CVR_RankMixer_全量改进方案_按模块分类.md](CVR_RankMixer_全量改进方案_按模块分类.md)<br>
-> 目标：把现有源码分析、AUC 差距诊断、四套设计方案和 RankMixer 演进方法压缩成一份可快速选型的总览。<br>
-> 对比基线：`code/cvr_bn_rankmixer_v1.py`。<br>
-> 实验背景：base AUC 约 0.865，RankMixer v1 AUC 约 0.862；日训练约 5.5 亿、日测试约 1.1 亿、训练约 10 天。<br>
-> 结论边界：下文“预期收益”是结构假设，不是 AUC 承诺；最终结论必须由同数据、同初始化条件的逐项消融给出。
+> 真实 Base：<code>code/cvr_bn_senet_dcnm.py</code>。<br>
+> 当前 RankMixer：<code>code/cvr_bn_rankmixer_v1.py</code>。<br>
+> 运行证据：Base 使用 <code>set-x.args.resolved.txt</code> / <code>0721args.txt</code>；RankMixer 使用 <code>code/set-xcal.txt</code>。<br>
+> 实验背景：Base AUC 约 0.865，RankMixer v1 AUC 约 0.862。<br>
+> 详细证据与全部方法卡：[全量改进方案](CVR_RankMixer_全量改进方案_按模块分类.md)；专项归因：[0.003 AUC 差距诊断](CVR_RankMixer_v1_AUC差距诊断与改进路线.md)。
+
+> 边界修正：<code>code/cvr_fst_last_norpy.py</code> 不是 Base，只是另一种训练尝试。它可以提供 DIN、dense、gattr、last 等研究实现，但不能用于解释本次 Base 与 RankMixer 的 AUC 差距。
 
 ---
 
 ## 1. 一页结论
 
-当前 v1 的问题不是单一的“RankMixer block 不够强”，而是一次实验同时改变了输入、监督、初始化、
-tokenizer、block 和 readout：
+真实运行图表明，Base 与 RankMixer v1 实际上具有相同的输入域和主任务：
 
-- base 使用 common/item/creative、dense、DIN、gattr、DCNM 和 first/last 双任务；
-- v1 只把 common/item/creative 拼成 20978 维长向量；
-- 长向量按 `[1311]×15+[1313]` 切成 16 段，所有内部边界都会切断 17 维字段；
-- 每段用一次独立 `Dense + bias + GELU` 投影到 768 维；
-- 两层 hybrid RankMixer 后只做 mean pooling，只训练 first_cvr；
-- 约 167.3M dense 参数中，大部分新增 per-token FFN 很可能只能随机初始化，精确加载范围仍需服务器日志确认。
+- 都只使用 Common/User、Item、Creative 三桶稀疏 embedding；
+- 都先对三桶分别做 BatchNorm；
+- 都使用 first CVR 单任务；
+- wide、multi-task、last CVR、delay train 在两次实际运行中都关闭；
+- optimizer、学习率、batch size、embedding size 和特征版本基本一致。
 
-因此推荐顺序是：
+因此，以下旧结论全部撤销：
 
-1. **先对齐**：恢复 base 输入、last 辅助任务和公平热启，修复 loss/shape/fused 正确性；
-2. **再改表示**：完整字段语义 token、条件 gate、Creative 侧塔和双读出；
-3. **再改主干**：语义对齐 residual、等参数 SwiGLU、DCNM Global/late branch；
-4. **再加序列与任务**：DIN、MixFormer 式深融合、Task Token、多任务；
-5. **最后研究扩展**：Soft-to-Hard、RankUp、UniMixer、RankElastor、Sparse MoE。
+| 旧判断 | 真实结论 |
+|---|---|
+| v1 删除了 Base 的 dense、DIN、gattr | 错；真实 Base 运行图也没有使用它们 |
+| v1 删除了 Base 的 last 辅助任务 | 错；真实 Base resolved 参数关闭 last |
+| 先恢复更多输入和多任务才能公平对比 | 错；这会引入 Base 没有的新变量 |
+| 0.003 主要来自任务/输入缺失 | 无证据；差异集中在门控、交叉、tokenizer、主干与读出 |
 
-最值得优先实现的不是最复杂方案，而是：
+当前最可信的差距来源是：
 
-```text
-RM-v2-Parity
-= 完整 base 输入与 first/last 监督
-+ 完整字段稳定 token
-+ mean + low-rank flatten
-+ Creative side tower
-+ raw-logit BCE
-```
+1. Base 实际开启了层级 SENet，v1 没有；
+2. v1 用等宽标量分段切断全部内部 17 维字段边界；
+3. Base 在 20978 维原空间做两层 DCNM 乘性交叉，v1 直接压成 16×768；
+4. v1 最终只做 mean pooling，主动抹掉 token 身份；
+5. v1 的 hybrid RankMixer block 不是严格论文结构，也不是成熟 SwiGLU 结构；
+6. v1 约 167.3M 参数，Base 约 90.3M；新增大主干的初始化和训练预算并不公平。
 
-它先回答“RankMixer 在公平条件下到底行不行”。在此基础上，再构建：
+首选实验顺序不是“一次堆满所有增强”，而是：
 
-```text
-RM-v3-Aligned
-= RM-v2-Parity
-+ identity-init User gate
-+ User-conditioned Item gate
-+ aligned-residual Pertoken SwiGLU
-+ DIN / 小型 DCNM cross branch
-+ base teacher distillation
-```
+~~~text
+E0 复现 Base 与 v1，多 seed
+ -> E1 v1 + 完全相同的 Base SENet
+ -> E2 E1 + 字段安全 tokenizer
+ -> E3 E2 + mean/分组池化 + 低秩 flatten 双读出
+ -> E4 E3 + 严格 RankMixer block
+ -> E5 E4 + 参数匹配（优先 k: 4 -> 2）
+ -> E6 Base 的 SENet+DCNM 不变，只用 RankMixer 替换 Base MLP
+ -> E7 再比较 aligned SwiGLU、蒸馏和研究扩展
+~~~
 
 ---
 
-## 2. v1 当前到底是什么结构
+## 2. 真实 Base 与 v1 的严格结构对照
 
-### 2.1 当前数据流
+### 2.1 实际运行配置
 
-```mermaid
-flowchart TD
-    A["Sparse lookup"] --> U["common: 6545"]
-    A --> I["item: 14195"]
-    A --> C["creative: 238"]
-    U --> BU["common BN"]
-    I --> BI["item BN"]
-    C --> BC["creative BN"]
-    BU --> V["concat: 20978"]
-    BI --> V
-    BC --> V
-    V --> S["标量等宽切分<br/>1311×15 + 1313"]
-    S --> T["16 个独立 Dense + bias + GELU<br/>每段投影到 768"]
-    T --> B["2 个 hybrid RankMixer block<br/>每层 3 次 LN"]
-    B --> M["Mean pooling<br/>16×768 -> 768"]
-    M --> H["768 -> 1"]
-    H --> L["仅 first_cvr 概率式 BCE"]
-```
+| 项目 | 真实 Base | RankMixer v1 | 差异 |
+|---|---:|---:|---|
+| 输入域 | Common + Item + Creative | Common + Item + Creative | 无 |
+| Embedding size | 17 | 17 | 无 |
+| Batch size | 2048 | 2048 | 无 |
+| Learning rate | 2e-5 | 2e-5 | 无 |
+| Optimizer | flood_adam | flood_adam | 无 |
+| Feature version | cvr_fea_v10_base_cold | cvr_fea_v10_base_cold | 无 |
+| 分域 BN | 开 | 开 | 无 |
+| 层级 SENet | 开，且 SENet BN 开 | 关 | 核心差异 |
+| 显式交叉 | 2×DCNM，bottleneck 500 | 无 | 核心差异 |
+| 压缩主干 | 2048→2048→256 MLP | 16×768，2×RankMixer | 核心差异 |
+| Readout | MLP 保留坐标后压缩 | 16 token mean | 核心差异 |
+| first CVR | 开 | 开 | 无 |
+| last / wide / MLT / delay | 全关 | 全关 | 无 |
 
-### 2.2 关键事实
+Base 的类默认值并不等于实际训练值。必须优先信任 resolved args，再沿已启用分支读源码。
 
-| 维度 | v1 当前实现 | 直接后果 |
-|---|---|---|
-| 输入 | common/item/creative | dense、DIN、gattr 信息缺失 |
-| Token 划分 | flatten 后按标量等宽切 16 段 | 切断字段并跨 common/item、item/creative 边界 |
-| Token 投影 | 每段一层 `fully_connected + GELU` | 是单层非线性投影，不是两层 MLP |
-| Token shape | `T=16, H=16, D=768` | 当前置换 shape 合法，但缺少显式 `T==H` 断言 |
-| Block | mixing residual + 双 Post-LN，额外增加 FFN Pre-LN | 既非严格原版，也非成熟公司 block |
-| PFFN | 每 token 独立 `768→3072→768` | 主干容量大，约 151.1M 参数 |
-| Readout | mean only | token 身份、小域强信号易被平均 |
-| 监督 | first_cvr only | 丢失 base 的 last_cvr 辅助正则 |
-| Loss | sigmoid 后 `tf.losses.log_loss`，logit 先 clip | 数值稳定性和极端样本梯度不如 raw-logit BCE |
-| 训练 | `grad_clip_value`、dropout、`use_rankmixer` 未真正生效 | 配置与实际图可能不一致 |
-| 热启 | RM scope 为新增参数 | 与成熟 base checkpoint 的公平性存疑 |
+### 2.2 两条端到端数据流
 
-### 2.3 为什么“一段 Dense+GELU”不是普通两层 MLP
+~~~mermaid
+flowchart LR
+    X["同一三桶稀疏 Embedding"] --> B1["三桶独立 BN"]
+    B1 --> S["层级 SENet<br/>Common→Item→Creative"]
+    S --> D["2×DCNM<br/>20978↔500"]
+    D --> M["MLP<br/>20978→2048→2048→256"]
+    M --> HB["first head"]
 
-第 $t$ 段执行：
+    X --> B2["三桶独立 BN"]
+    B2 --> C["concat 20978"]
+    C --> P["等宽标量分段<br/>1311×15+1313"]
+    P --> T["16×独立 Dense+GELU<br/>→16×768"]
+    T --> R["2×hybrid RankMixer"]
+    R --> A["mean pooling"]
+    A --> HR["first head"]
+~~~
+
+### 2.3 真实 Base 的层级 SENet
+
+三桶宽度分别是：
 
 $$
-x_t=\mathrm{GELU}(z_tW_t+b_t),
-\quad W_t\in\mathbb R^{d_t\times768},
-\quad b_t\in\mathbb R^{768}.
+d_U=385\times17=6545,
+\quad d_I=835\times17=14195,
+\quad d_C=14\times17=238.
 $$
 
-它只有一次仿射维度变化：
-
-```text
-[B,d_t] -> MatMul(W_t)+bias -> [B,768] -> GELU -> [B,768]
-```
-
-没有第二个 Dense、hidden bottleneck 或输出投影。因此严格名称是“带 GELU 的单层 Dense 投影”。
-成熟 `commend_cvr.py::embedding_to_tokens()` 在原子操作上也只是一次 Dense+GELU；成熟方案的优势主要来自
-**先按稳定业务语义分组**，而不是把投影层数从一层变成两层。
-
----
-
-## 3. 全部改进方法地图
-
-| 编号 | 方法 | 相对 v1 改变的层次 | 优先级 | 与其他方案关系 |
-|---|---|---|---:|---|
-| M0 | 公平对齐与正确性基线 | 输入、监督、loss、热启、断言 | P0 | 所有方案前置 |
-| M1 | 完整字段稳定语义 token | Tokenizer | P0 | 主线必做 |
-| M2 | 条件门控 | Tokenizer 前 | P1 | 可叠加 M1 |
-| M3 | Creative/Coupon 侧塔或提前交互 | 小域特征路径 | P1 | 可叠加 M1/M2 |
-| M4 | Mean + 低秩 Flatten/分组读出 | Readout | P1 | 可叠加全部主干 |
-| M5 | 语义对齐 residual + 等参数 SwiGLU | RankMixer block | P1 | 三种 block 互斥比较 |
-| M6 | 小型 DCNM Global Token/late branch | 显式特征交叉 | P1 | 两种接法互斥比较 |
-| M7 | 恢复 DIN，再升级 MixFormer 式融合 | 序列交互 | P0→P2 | 逐级升级 |
-| M8 | 多任务、Task Token、Pairwise、ESMM | 监督层 | P0→P2 | ESMM 有数据前提 |
-| M9 | 热启动、蒸馏、分组学习率 | 优化层 | P0/P1 | 可叠加主线 |
-| M10 | Soft-to-Hard 可学习分桶 | Tokenizer 研究线 | P2 | 与人工硬桶互斥比较 |
-| M11 | RankUp 表示扩展 | Token 表示 | P2 | 在 M1 稳定后做 |
-| M12 | UniMixer-Lite 可学习 mixing | Mixing | P3 | 替换固定 mixing |
-| M13 | RankElastor full mixing + rank-aware FFN | Mixing/PFFN | P3 | 与 M12 重叠较大 |
-| M14 | 参数压缩与 Sparse-Pertoken MoE | 容量/系统 | P2/P3 | 在 dense baseline 后做 |
-
-这里的 P0/P1/P2/P3 分别表示：正确性前置、近期收益候选、中期研究、长期研究。
-
----
-
-## 4. 推荐的整体结构
-
-不要把全部方法一次性打开。下面是一个可逐层启用的“容器架构”，其中可选分支由配置开关控制。
-
-```mermaid
-flowchart TD
-    A["完整 base 特征"] --> U["User / Item 完整字段"]
-    A --> S["原始行为序列 + mask"]
-    A --> D["Dense / gattr"]
-    A --> C["Creative / Coupon"]
-
-    U --> BN["分域 BN"]
-    BN --> G["identity User gate<br/>User-conditioned Item gate"]
-    G --> TOK["完整字段语义 tokenizer"]
-    S --> DIN["DIN 或 Sequence tokens"]
-    TOK --> X["固定 token budget"]
-    DIN --> X
-
-    X --> RM["Aligned RankMixer<br/>Pertoken GELU/SwiGLU"]
-    RM --> MEAN["Mean / grouped pooling"]
-    RM --> FLAT["Low-rank Flatten"]
-
-    D --> CROSS["小型 DCNM / context branch"]
-    C --> SIDE["Creative/Coupon side tower<br/>或轻量 FiLM"]
-    MEAN --> FUSE["Shared representation"]
-    FLAT --> FUSE
-    CROSS --> FUSE
-    SIDE --> FUSE
-
-    FUSE --> F["first_cvr head"]
-    FUSE --> L["last_cvr head"]
-    FUSE --> AUX["可选辅助任务 / task readout"]
-    TEACHER["base teacher logits"] --> KD["Distillation loss"]
-    F --> LOSS["raw-logit BCE + weighted auxiliaries"]
-    L --> LOSS
-    AUX --> LOSS
-    KD --> LOSS
-```
-
-### 4.1 Token budget 不变量
-
-成熟公司结构使用 `11 User + 18 Item + 2 Sequence + 1 DIN = 32`。如果加入 Context、Global 或 Task Token，
-必须做以下二选一：
-
-1. 在固定 32 个 token 内重新分配语义组；
-2. 同时修改 `T/H/D`，确保 `H=T` 且 `D % H == 0`。
-
-不能只 append token 后继续 reshape 为 `[B,32,512]`，也不能让 `zip()` 静默丢字段。
-
-### 4.2 总体伪代码
-
-```python
-parts = build_exact_base_inputs(features)  # user, item, creative, dense, gattr, sequence
-parts = domain_norm(parts)
-
-user = user * identity_gate(user)
-item = item * identity_gate(concat([user, item]))
-
-tokens = field_safe_semantic_tokenize(user, item, token_budget)
-tokens += build_sequence_tokens(sequence, candidate, token_budget)
-assert_token_contract(tokens, T, H, D)
-
-h = aligned_rankmixer(tokens, block_variant, parameter_budget)
-rm_repr = concat([
-    grouped_or_mean_pool(h),
-    low_rank_flatten(h),
-])
-
-cross_repr = optional_low_rank_dcn(dense, gattr, user, item)
-creative_repr = creative_side_or_film(creative)
-shared = fusion_head(rm_repr, cross_repr, creative_repr)
-
-logits = build_task_heads(shared)
-loss = raw_logit_multitask_loss(logits, labels)
-loss += optional_distillation(logits, teacher_logits)
-```
-
----
-
-## 5. M0：公平对齐与正确性基线
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 恢复 dense、DIN、gattr、last_cvr；统一日期、采样、优化器和 checkpoint 条件；使用 raw-logit BCE；补 shape、字段覆盖和 fused parity 测试 |
-| 为什么 | 当前 0.865 vs 0.862 同时改变了至少七项条件，不能归因 RankMixer backbone |
-| 预期好处 | 找回被删输入与辅助监督的贡献；建立可解释的 backbone 对照；尽早发现静默建图错误 |
-| 最常犯错误 | 一次恢复所有输入又同时改 block；base 热启、RM 冷启；只看最终 AUC 不看加载变量和收敛曲线 |
-
-结构变化：
-
-```text
-v1:   [U,I,C] -> RM -> first
-M0:   [U,I,C,Dense,DIN,gattr] -> RM/side -> first + 0.5*last
-```
-
-必做检查：
-
-- base 与 RM 使用相同训练/测试日期、label delay、过滤和正例率；
-- 记录每个 scope 的 loaded/random-init 参数量；
-- assert 字段无遗漏、无重复，`T==H`、`D%H==0`；
-- `sigmoid_cross_entropy_with_logits` 直接读取 raw logits；
-- 真正执行 global-norm gradient clipping；
-- fused/unfused forward、input gradient、各权重 gradient 和 checkpoint restore 一致。
-
----
-
-## 6. M1：完整字段稳定语义 token
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 删除 `[1311]×15+[1313]` 标量切分；只沿完整 17 维字段轴分组；优先使用业务语义桶 |
-| 为什么 | per-token FFN 需要 token 位置长期承担稳定职责；当前所有内部边界都切断字段，还跨域污染 |
-| 预期好处 | 提高 token 可解释性和参数专门化；减少异构字段互相干扰；checkpoint schema 更稳定 |
-| 最常犯错误 | 仍在 flatten 后切标量；每 batch 动态换桶；遗漏/重复字段；语义配置变更却复用旧 checkpoint |
-
-结构变化：
-
-```text
-v1: concat 20978 scalars -> equal-width scalar slices -> 16 tokens
-M1: field list -> versioned semantic groups -> per-group Dense+GELU -> T tokens
-```
-
-可选基线：
-
-- 低风险：`5 User + 10 Item + 1 Creative = 16`；
-- 工业增强：`5 User + 11 Item = 16`，Creative 走侧塔；
-- 成熟大塔：`11 User + 18 Item + 2 Sequence + 1 DIN = 32`。
-
-这里每组仍然可以只用一次 Dense+GELU。首轮不要额外增加两层 tokenizer MLP，否则无法区分“分桶正确”与“容量增加”。
-
----
-
-## 7. M2：identity-init 条件门控
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | Token 投影前增加 User self gate 和 User-conditioned Item gate |
-| 为什么 | 同一 Item 字段对不同用户的重要性不同；v1 对所有样本使用同一静态投影 |
-| 预期好处 | 动态选择当前用户相关的 Item 子空间；降低无关字段噪声；接近成熟公司 SENet 设计 |
-| 最常犯错误 | 普通 sigmoid 零初始化后初始缩放为 0.5；gate 饱和；把动态 gate 误当成动态 token 归属 |
-
-推荐：
+Base 先将每域恢复成字段矩阵，再沿 embedding 维求均值：
 
 $$
-g_U=2\sigma(MLP_U(U)),\qquad
-g_I=2\sigma(MLP_I([U,I])).
+s_U=\operatorname{Mean}(U,\text{axis}=17),
+\quad s_I=\operatorname{Mean}(I,\text{axis}=17),
+\quad s_C=\operatorname{Mean}(C,\text{axis}=17).
 $$
 
-最后一层 kernel/bias 零初始化，使初始 $g=1$。这样模型从恒等映射开始，而不是第一步就把 embedding 缩半。
-
-需要监控 gate 的均值、分位数、接近 0/2 的比例和各域梯度；先比较无 gate、User gate、User+Item gate 三组。
-
----
-
-## 8. M3：Creative/Coupon 侧塔或提前交互
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 不再让 238 维 Creative 混在包含 1075 维 Item 的最后 token；改为独立侧塔、正式 token 或 FiLM/gate |
-| 为什么 | Creative 是小而强的候选域，mean pooling 和跨域长切片都容易稀释它 |
-| 预期好处 | 保留创意局部强信号；减少大域压制；能控制在线增量成本 |
-| 最常犯错误 | Creative 只在极晚层拼接导致交互不足；同时走 token 和 side tower 却不做消融；Wide insert 层号无效 |
-
-推荐按成本递增比较：
-
-1. `creative -> BN -> 128 side tower -> final fusion`；
-2. Creative 生成 Item/token gate；
-3. Creative 作为一个完整 token；
-4. 每层后用轻量 FiLM 提前影响主干。
-
-Coupon 同理，但只有当线上确实存在该字段与稳定标签时才接入。
-
----
-
-## 9. M4：双读出、分组读出与 Task readout
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | `mean only` 改成 mean/grouped pooling + low-rank flatten；可选 weighted/attention pooling 或只在读出层使用 Task Token |
-| 为什么 | mean 对所有 token 等权，丢失 token 身份和小域峰值；完整 flatten 又会参数爆炸 |
-| 预期好处 | mean 保留全局统计，低秩 flatten 保留坐标身份；不同任务可读取不同信息 |
-| 最常犯错误 | 直接把 `[B,32,512]` 全量接大 MLP；把辅助 wide 分支增益误归主干；奇数层 mixed 坐标未经检查就 flatten |
-
-推荐首轮：
-
-```text
-h [B,T,D]
-├─ mean/grouped pool -> [B,D]
-└─ flatten [B,T*D] -> low-rank Dense -> [B,256]
-concat -> shared head
-```
-
-消融顺序：mean → mean+low-rank flatten → grouped pooling → weighted/attention pooling。不要第一轮就引入 attention。
-
----
-
-## 10. M5：语义对齐 residual 与等参数 SwiGLU
-
-### 10.1 四个需要严格区分的 block
-
-| Block | 结构 | 定位 |
-|---|---|---|
-| v1 hybrid | `LN(PX+X)`，再 `LN(LN(S)->PFFN + S)` | 当前基线，每层 3 LN |
-| 严格原版 | `LN(PX+X)`，再 `LN(PFFN(S)+S)` | 论文可归因基线 |
-| 公司 aligned | `M=PX; M+SwiGLU(LN(M))`，末尾 Final LN | 同一 mixed 坐标内 residual |
-| Mixing & Reverting | `P -> FFN -> P^-1 -> add X`，再 local FFN | 显式恢复原 token 坐标 |
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 删除未验证的额外 LN；或避免直接相加 `PX` 与 `X`；GELU PFFN 改 Pertoken SwiGLU、Pre-RMSNorm 和 small/zero-init down |
-| 为什么 | shape 相同不代表 token 语义相同；SwiGLU 增强通道门控，但必须控制参数和初始化 |
-| 预期好处 | 残差语义更清晰；深层训练更稳定；per-token 非线性容量更强 |
-| 最常犯错误 | 只换 SwiGLU 却增参 50%；依赖奇偶层隐式 revert；zero-init 后误判首步 gate/up 无梯度；train/export 两条实现不一致 |
-
-公平参数匹配：普通 GELU hidden 为 $4D$ 时，单 FFN SwiGLU hidden 约取 $8D/3$；如果一个
-Mixing & Reverting block 有两次 SwiGLU，还要再次下调 hidden，使总 PFFN 参数与 v1 接近。
-
-推荐实验顺序：v1 hybrid → strict original → company aligned → Mixing & Reverting；每一步固定输入、token、readout 和参数预算。
-
----
-
-## 11. M6：小型 DCNM Global Token 或 late branch
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 恢复低秩显式交叉，但不一定恢复完整 base DCNM；输出作为 Global Token 或 late-fusion representation |
-| 为什么 | v1 一次性删掉 base 的两层 DCNM；固定 token mixing 未必能在当前容量和训练窗内替代显式乘性交叉 |
-| 预期好处 | 快速补回全局条件交叉；为局部 token 提供全局摘要；可测 DCNM 的真实边际贡献 |
-| 最常犯错误 | 高维 DCNM 与 RM 同时无控制增参；同一输入重复走两条大塔；Global Token 占用 token budget 却不调整 T/H/D |
-
-两个互斥接法：
-
-```text
-A. all inputs -> low-rank DCNM -> Global Token -> RankMixer
-B. all inputs -> low-rank DCNM -> 256 -> late fusion with RM readout
-```
-
-建议先做 B：不改变 mixer token contract，更容易归因和回滚。若 B 有稳定收益，再试 A。
-
----
-
-## 12. M7：恢复 DIN，再升级序列深融合
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 先恢复 base candidate-aware DIN；再拆短期/长期序列 token；最后每个 block 用 query 对原始序列做 Cross Attention |
-| 为什么 | v1 lookup 了 sequence column，却没有把 sequence/DIN 表示送入主路径；CVR 对候选相关历史行为通常高度敏感 |
-| 预期好处 | 恢复用户意图、购买阶段和候选匹配信号；深融合允许序列与 dense token 共同演化 |
-| 最常犯错误 | sequence mask 错位；把未来行为或标签窗信息带入；没有原始 K/V 却伪造 MixFormer；candidate-dependent 用户塔破坏请求级复用 |
-
-升级阶梯：
-
-```text
-S0: 无序列（当前 v1）
-S1: base DIN -> late side
-S2: DIN -> 1 token
-S3: short/long -> 2 tokens + DIN
-S4: 每层 Query Mixer + Cross Attention + Output Fusion
-```
-
-只有 S1/S2 已证明序列是主要增益来源，才值得承担 S4 的训练、显存和在线延迟成本。
-
----
-
-## 13. M8：多任务、Task Token、Pairwise 与全空间建模
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | first-only 改 first+last；可增加 no-refund 等可靠标签、Task Token、pairwise AUC loss；有全曝光链路时再试 ESMM |
-| 为什么 | base 实际使用 first/last 联合监督；相关任务可正则共享表示；BCE 与 AUC 的优化目标并不完全一致 |
-| 预期好处 | 提高样本效率和共享表示；Task Token 缓解任务冲突；小权重 pairwise 可能改善排序 |
-| 最常犯错误 | 标签窗口/可观测性不一致；辅助权重过大产生负迁移；纯 pairwise 损害校准；无全曝光数据却套 ESMM |
-
-第一步只恢复：
+随后使用三级条件 gate：
 
 $$
-\mathcal L=\mathcal L_{first}+\lambda_{last}\mathcal L_{last},
-\quad \lambda_{last}\in\{0.1,0.2,0.5\}.
+g_U=2\sigma(W_{U2}\tanh(BN(W_{U1}s_U))),
 $$
 
-随后再分别测试：
+$$
+g_I=2\sigma(W_{I2}\tanh(BN(W_{I1}[s_U;s_I]))),
+$$
 
-- Task Token 或 task-specific readout；
-- `0.02-0.1` 小权重 query 内 pairwise softplus；
-- 业务标签包含关系的 monotonic/consistency loss；
-- 只有曝光→点击→转化定义完整时的 ESMM。
+$$
+g_C=2\sigma(W_{C2}\tanh(BN(W_{C1}[s_U;s_I;s_C]))).
+$$
 
-同时监控 AUC、LogLoss、COPC、ECE 和任务梯度 cosine，不能只追 AUC。
+最后将每个字段的标量 gate 广播回 17 维 embedding。Common 自条件、Item 由 Common+Item 条件化、Creative 由三域共同条件化。这是 v1 完全缺失的样本级字段选择能力。
+
+### 2.4 真实 Base 的 DCNM
+
+对拼接向量 $x_0\in\mathbb R^{20978}$，每层近似为：
+
+$$
+z_l=W_{down,l}x_l+b_{down,l}\in\mathbb R^{500},
+$$
+
+$$
+u_l=W_{up,l}z_l+b_{up,l}\in\mathbb R^{20978},
+$$
+
+$$
+x_{l+1}=LN(x_l+x_0\odot u_l).
+$$
+
+实际运行使用两层，且 cross activation 关闭。它不是普通 MLP：乘法项让每一坐标在压缩前就能被全局条件调制。
 
 ---
 
-## 14. M9：公平热启、蒸馏与分组学习率
+## 3. v1 Tokenizer 的精确拆解
 
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 显式记录加载范围；选择等冷启或等成熟度热启；用 base teacher logits 蒸馏；新旧参数使用不同 LR |
-| 为什么 | v1 约 167M 新 dense 参数可能以很小 LR 冷启，而 base 可复用已收敛 DCNM/MLP；固定 10 天会低估新大塔 |
-| 预期好处 | 公平比较收敛；利用 base 已学知识缩短追平时间；保护成熟 sparse embedding |
-| 最常犯错误 | skip/warm scope 写错；teacher 与 student 样本/标签定义不同；所有参数同 LR；只比相同天数不比相同样本/FLOPs |
+### 3.1 不是“两层 MLP”，而是单层投影
+
+第 $t$ 个分段执行：
+
+$$
+h_t=\operatorname{GELU}(x_tW_t+b_t),
+\quad W_t\in\mathbb R^{d_t\times768}.
+$$
+
+其维度变化只有一次：
+
+~~~text
+[B, d_t]
+ -> Dense(W_t, b_t)
+ -> [B, 768]
+ -> GELU
+ -> [B, 768]
+~~~
+
+因此它是“带 bias 和 GELU 的单层全连接投影”，不是具有 hidden layer 的两层 MLP。每段拥有独立矩阵，16 段输出堆叠成 16 个 token。
+
+### 3.2 “每桶”准确说法是什么
+
+当前 v1 中的“桶”不是业务字段桶，而是 flatten 后的等宽标量段：
+
+~~~text
+20978 = 1311×15 + 1313
+~~~
+
+由于 $1311\bmod17=2$，15 个内部边界全部落在 17 维字段内部。它还会产生两个跨域 token：
+
+- Common 结束位置 6545 落在第 5 段内部；
+- 最后一段包含约 1075 维 Item 尾部和全部 238 维 Creative。
+
+所以“每桶 Dense+GELU 压成一个 token”的严格含义是：
+
+> 每个等宽标量分段各用一套独立 Dense+bias 做一次维度投影，再过 GELU，得到一个 768 维 token；它不是语义桶，也不是两层 MLP。
+
+### 3.3 为什么会有不可逆的信息瓶颈
+
+Tokenizer 总输出宽度为：
+
+$$
+16\times768=12288.
+$$
+
+输入宽度为 20978，所以第一次进入 Mixer 前已经减少：
+
+$$
+20978-12288=8690,
+\quad \frac{8690}{20978}\approx41.4\%.
+$$
+
+这不意味着一定损失 41.4% 的有效信息，但说明 Base 在原空间完成 SENet+DCNM 后才压缩，而 v1 先完成一个强且不可逆的随机初始化压缩。
+
+---
+
+## 4. 改进模块地图
+
+| 编号 | 模块 | 修改位置 | 回答的问题 | 优先级 |
+|---|---|---|---|---:|
+| M0 | 运行与评估对齐 | 实验入口 | 0.003 是否稳定、配置是否同源 | P0 |
+| M1 | 精确 Base SENet | BN 后 | 缺少动态字段选择贡献多少 | P0 |
+| M2 | 字段安全 tokenizer | SENet 后 | 等宽切字段是否是主因 | P0 |
+| M3 | 双读出 | Mixer 后 | mean 是否抹掉关键信号 | P1 |
+| M4 | 严格 block 对照 | Mixer 内 | hybrid 拓扑是否拖累 | P1 |
+| M5 | 参数匹配 | Mixer 内 | 大参数冷启动是否不公平 | P1 |
+| M6 | 严格 backbone swap | DCNM 后 | RM 能否替代 Base MLP | P0/P1 |
+| M7 | aligned SwiGLU | Mixer 内 | 成熟块设计能否增益 | P2 |
+| M8 | 热启/蒸馏 | 优化层 | 新主干收敛是否不足 | P1/P2 |
+| M9 | DIN/序列 | 新输入分支 | 新能力能否超过 Base | P2 研究 |
+| M10 | 多任务/Task Token | 监督层 | 新监督能否继续提升 | P2 研究 |
+| M11 | Soft-to-Hard/MoE | Tokenizer/FFN | 长期结构搜索 | P3 研究 |
+
+P0 表示归因和正确性前置，P1 表示近期候选，P2/P3 是追回真实 Base 后再研究。
+
+---
+
+## 5. M0：先建立可信的公平基线
+
+修改前：只比较一次 Base 0.865 与 v1 0.862，容易把 seed、checkpoint restore 和训练预算混入架构结论。
+
+如何改：
+
+- 固定同一份 feature version、日期、采样、label delay 和过滤；
+- 归档两侧完整 resolved args，而非只保存手写启动脚本；
+- 至少 3 个 seed，报告均值、标准差和最差值；
+- 保存每个 scope 的 loaded、missing、random-init 参数数量；
+- 对齐 step 数、seen examples、wall-clock 和早停规则；
+- 同时报 AUC、GAUC、logloss、校准、分桶 AUC 和推理延迟；
+- Base 与 RM 共同的 loss/clip/grad 清理必须双边同时启用。
+
+收益：让后续每一个结构改动只回答一个问题。
+
+风险：若没有服务器 restore 日志，仅凭静态代码不能断言 checkpoint 实际加载比例。
+
+---
+
+## 6. M1：原样复制 Base SENet
+
+修改前：v1 在三桶 BN 后直接 concat。
+
+如何改：第一轮直接复用 Base 的 <code>senet_layer()</code>，保持 hidden=128、tanh、SENet BN、$2\sigma$、三级条件关系和 scope 命名完全一致。
+
+~~~python
+u = domain_bn(common)
+i = domain_bn(item)
+c = domain_bn(creative)
+
+u, i, c = exact_base_senet(u, i, c)
+x = concat([u, i, c])
+tokens = current_v1_tokenizer(x)
+~~~
+
+收益：这是最干净的 Base 差异消融，也可能复用历史 gate 权重。
+
+风险：identity-init SENet、RMSNorm 或换激活都属于后续改进，不能与“精确对齐 Base”混在同一实验。
+
+---
+
+## 7. M2：字段安全 Tokenizer
+
+修改前：20978 个 scalar 被切成 16 个近似等宽段，内部边界全部切字段，并跨域混合。
+
+如何改：
+
+1. 先 reshape 成 $[B,F,17]$；
+2. 仅沿字段轴分组，字段 17 维不可拆；
+3. 先保证 U/I/C 域不跨组；
+4. 用版本化配置记录每个 field id 到 token id 的映射；
+5. 每个语义组仍只做一次独立 Dense+GELU，避免同时增加网络深度；
+6. assert 每个字段恰好出现一次。
+
+一个 16-token 的起始方案：
+
+~~~text
+Common:   5 个完整字段组
+Item:    10 个完整字段组
+Creative: 1 个完整字段组
+总计:    16 tokens
+~~~
+
+~~~python
+def field_safe_tokenize(u_fields, i_fields, c_fields, groups):
+    all_ids = []
+    tokens = []
+    for group in groups:
+        assert group.domain in {"U", "I", "C"}
+        fields = gather_domain_fields(group.domain, group.field_ids)
+        flat = reshape(fields, [batch_size, -1])
+        tokens.append(gelu(dense(flat, 768, scope=group.name)))
+        all_ids.extend(group.global_field_ids)
+    assert sorted(all_ids) == list(range(1234))
+    assert len(set(all_ids)) == 1234
+    return stack(tokens, axis=1)
+~~~
+
+收益：token 位置拥有稳定业务职责，Per-token FFN 才能形成可靠专门化。
+
+风险：业务字段表变更必须升级 schema 版本；新旧 tokenizer checkpoint 不应静默混用。
+
+---
+
+## 8. M3：Mean + 身份保留读出
+
+修改前：
+
+$$
+r_{mean}=\frac1T\sum_{t=1}^Th_t.
+$$
+
+它对 token 置换近似不敏感，Creative 等小域信息会被 1/16 稀释。
+
+如何改：并行保留全局统计和 token 身份。
+
+~~~python
+mean_repr = reduce_mean(h, axis=1)            # [B, D]
+group_repr = concat([
+    reduce_mean(h[:, user_ids, :], axis=1),
+    reduce_mean(h[:, item_ids, :], axis=1),
+    h[:, creative_id, :],
+], axis=-1)
+flat_low_rank = dense(reshape(h, [B, T * D]), 256)
+repr = concat([mean_repr, group_repr, flat_low_rank], axis=-1)
+~~~
+
+收益：mean 提供稳健全局统计，group/flatten 分支保留域和位置身份。
+
+风险：直接将 16×768 flatten 接大 MLP 会再次造成参数爆炸；第一轮只用低秩 128/256 维投影。
+
+---
+
+## 9. M4：严格比较三种 RankMixer block
+
+当前 v1 是 hybrid：mixing residual 后 Post-LN，PFFN 前额外 Pre-LN，再在 residual 后 Post-LN。它既不是论文原版，也不是成熟 aligned SwiGLU。
+
+需要固定 tokenizer、D、L、k、readout，只替换 block：
+
+### 9.1 v1 hybrid
+
+~~~text
+s = LN(P(x) + x)
+y = LN(PFFN(LN(s)) + s)
+~~~
+
+### 9.2 严格论文式对照
+
+~~~text
+s = LN(P(x) + x)
+y = LN(PFFN(s) + s)
+~~~
+
+### 9.3 Mixing & Reverting
+
+~~~text
+m = P(x)
+m = PFFN(m)
+x = x + P^-1(m)
+y = x + LocalFFN(Norm(x))
+~~~
+
+收益：把“固定 mixing 本身”与“残差坐标、归一化拓扑”分开归因。
+
+风险：$P(x)$ 与 $x$ shape 相同不代表 token 语义相同；任何 permutation 改动都需要可逆性和奇偶层测试。
+
+---
+
+## 10. M5：参数匹配，而不是继续放大
+
+按主要可训练权重估算：
+
+| 模型 | 主要参数量 |
+|---|---:|
+| 真实 Base SENet | 约 0.52M |
+| 真实 Base 2×DCNM | 约 41.96M |
+| 真实 Base 2048→2048→256 MLP | 约 47.68M |
+| 真实 Base 合计 | 约 90.3M |
+| 当前 RM v1，k=4 | 约 167.3M |
+| RM v1，k=2 | 约 91.7M |
+
+最简单的公平版本保持 $T=H=16,D=768,L=2$，只把 PFFN expansion 从 $k=4$ 改成 $k=2$。
+
+收益：参数约为 Base 的 1.016 倍，可回答“结构优劣”而不是“容量和冷启动差异”。
+
+风险：参数相等不等于 FLOPs、显存、kernel 效率或收敛速度相等；这些仍需单独报告。
+
+---
+
+## 11. M6：最严格的 Backbone Swap
+
+这是整个路线中最有解释力的实验：Base 的输入、BN、SENet、DCNM、head、loss 和训练配置全部不变，只替换 DCNM 后面的 MLP。
+
+~~~mermaid
+flowchart LR
+    X["三桶输入"] --> BN["相同 BN"]
+    BN --> S["相同 Base SENet"]
+    S --> D["相同 2×DCNM"]
+    D --> A["Base 分支<br/>2048→2048→256 MLP"]
+    D --> B["实验分支<br/>字段安全 RM + 双读出"]
+    A --> H1["相同 first head/loss"]
+    B --> H2["相同 first head/loss"]
+~~~
+
+伪代码：
+
+~~~python
+x = exact_base_input_and_bn(features)
+x = exact_base_senet(x)
+x = exact_base_dcnm(x)
+
+if backbone == "base_mlp":
+    repr = base_mlp(x)
+elif backbone == "rankmixer":
+    tokens = field_safe_tokenize_after_dcnm(x)
+    h = parameter_matched_rankmixer(tokens)
+    repr = dual_readout(h)
+
+logit = identical_first_head(repr)
+loss = identical_first_loss(logit, label)
+~~~
+
+收益：上游显式交叉完全相同后，差异才能主要归因于 MLP 与 RankMixer 的表示能力。
+
+风险：DCNM 输出仍是 20978 维，后续字段分组必须保留与原字段坐标一致的切片协议。
+
+---
+
+## 12. M7：Aligned SwiGLU 作为后续增强
+
+SwiGLU：
+
+$$
+\operatorname{SwiGLU}(x)=
+W_d\left(\operatorname{SiLU}(W_gx+b_g)\odot(W_ux+b_u)\right)+b_d.
+$$
+
+它与普通两矩阵 GELU FFN 的联系是都做升维、非线性、降维；区别是 SwiGLU 多一条 gate 投影并进行逐元素乘法。要公平对比，不能直接保留相同 hidden size。
 
 建议：
 
-```text
-new tokenizer / RankMixer / head: 1.0 × lr_new
-warm shared side tower:           0.2-0.5 × lr_new
-warm sparse embeddings:           0.1 × lr_new 或保持 sparse optimizer
-```
+- 普通 GELU hidden 为 $4D$ 时，单次 SwiGLU hidden 先取约 $8D/3$；
+- 如果一个 block 含两次 SwiGLU，再下调 hidden 以匹配总参数；
+- FFN 输入使用 Pre-Norm；
+- residual 必须处于相同 token 坐标；
+- down projection small-init 或 zero-init 要单独消融；
+- fused 与 unfused 实现需要前向、输入梯度、三组权重梯度 parity 测试。
 
-蒸馏从 `temperature ∈ {1,2}`、首日 `alpha=0.5` 逐渐降至 0.1 开始。teacher logits 最好离线写入，
-避免训练时双模型前向。
+收益：更强的通道级门控和成熟工业 kernel 潜力。
 
----
-
-## 15. M10：Soft-to-Hard 可学习语义分桶
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 不再人工固定每个字段所属 token；训练一个全局字段归属矩阵，soft 阶段学习后冻结并 hard 化 |
-| 为什么 | 人工均分只保证字段完整，不保证语义相关；可学习分桶可能找到更适合 CVR 的字段组合 |
-| 预期好处 | 自动发现跨业务域的有效组合；hard 化后仍可使用固定、高效的 per-token FFN |
-| 最常犯错误 | 每样本动态分桶导致 token 身份漂移；所有字段塌缩到少数 token；soft 到 hard AUC 大跌；服务 schema 未版本化 |
-
-必须加入负载均衡、assignment entropy 和字段覆盖约束。流程必须是：
-
-```text
-固定 field identity -> soft assignment 训练 -> 稳定性审计
--> argmax / capacity-aware hardening -> 冻结映射 -> 重新训练/微调
-```
-
-它是 M1 人工硬桶的替代研究线，不应和 M1 在同一次实验同时改变。
+风险：同时换 activation、norm、residual、初始化和 fused kernel 会完全失去归因。
 
 ---
 
-## 16. M11：RankUp 式表示扩展
+## 13. M8：热启动与蒸馏
 
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 固定随机完整字段分片、多 embedding、预训练 Cross Embedding、Global Token、Task Token |
-| 为什么 | 增加 PFFN 参数不等于提高输入表示的有效秩；v1 的单份 embedding 和机械 token 相关性可能过高 |
-| 预期好处 | 给大 backbone 更丰富、较低相关的输入子空间；增强用户-商品匹配和任务特异性 |
-| 最常犯错误 | 在标量而非字段层随机；每 step 重新随机；多 embedding 参数爆炸；没有可靠预训练向量却制造 Cross Embedding |
+静态代码只能确认两侧都提供 checkpoint import/auto-load，不能证明实际加载数量。Base 的 SENet/DCNM/MLP scope 更可能匹配历史模型，RM 主干是新增 scope。
 
-推荐一次只加一个组件：
+实施顺序：
 
-1. 3 个固定 seed 的完整字段 permutation；
-2. Multi-Embedding；
-3. `Proj(e_user_pre * e_item_pre)` Cross Token；
-4. Global/Task Token。
+1. 从 restore 日志统计每个 scope 的 loaded/missing 参数；
+2. tokenizer projection 可用分桶内旧 embedding 统计做初始化；
+3. 对新 RM 主干使用较大学习率，对复用 embedding/gate 使用较小学习率；
+4. 先做结构对齐，再用真实 Base logits 做 teacher；
+5. temperature 1–2，蒸馏权重从 0.5 退火到 0.1；
+6. 同时保留 hard-label BCE，不能只拟合 teacher。
 
-同时看 token 相关性、effective rank、梯度和 AUC，不能只看总参数量。
+收益：减少 167M/92M 新主干在固定训练窗内的收敛劣势。
 
----
-
-## 17. M12：UniMixer-Lite 可学习 mixing
-
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 把固定无参置换 $P$ 替换为局部基 + 低秩全局矩阵，并用 Sinkhorn 约束成软置换 |
-| 为什么 | 固定 mixing 对所有样本、层和任务都相同，可能限制更复杂的 token 交互 |
-| 预期好处 | 在保持结构化效率的同时学习更合适的局部/全局交换模式 |
-| 最常犯错误 | 输入/任务尚未对齐就归因 mixing；Sinkhorn 温度不稳；矩阵看似低秩但真实 kernel/通信成本很高 |
-
-只有 M0/M1 和固定 mixing 基线已经稳定，且证据表明 mixing 是瓶颈后再做。验收必须包含吞吐、显存、
-P95/P99 延迟和温度/矩阵可视化，而不只是 AUC。
+风险：KD 能追回 teacher，不证明 RankMixer 结构本身优于 Base；必须保留无 KD 对照。
 
 ---
 
-## 18. M13：RankElastor 式 full mixing 与 rank-aware PFFN
+## 14. 三种主推方案
 
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 用 Parameterized Full Mixing 允许更完整的坐标交互；用 GLU-improved PFFN 减少有效秩反复收缩 |
-| 为什么 | v1 固定置换和扩张-收缩 FFN 可能产生表示秩振荡，容量没有转化为有效表示 |
-| 预期好处 | 提高通道与 token 的交互覆盖；改善 effective-rank 动态 |
-| 最常犯错误 | 直接复制论文私有任务配置；full mixing 成本不可服务；把 effective rank 上升等同于业务 AUC 上升 |
+### 14.1 方案 A：RM-GateParity
 
-它与 UniMixer 都是在替换 fixed mixing，重叠很大。应先选一个研究，不应同时启用；并用相同参数、FLOPs、
-训练预算比较 fixed mixing、UniMixer-Lite 和 full mixing。
+目标：用最小改动验证 Base SENet 的贡献。
 
----
+~~~mermaid
+flowchart LR
+    X["U/I/C"] --> BN["分域 BN"]
+    BN --> S["精确 Base SENet"]
+    S --> V["现有等宽 tokenizer"]
+    V --> R["现有 v1 RankMixer"]
+    R --> M["mean + first head"]
+~~~
 
-## 19. M14：参数效率、Student 与 Sparse-Pertoken MoE
+伪代码：
 
-| 问题 | 说明 |
-|---|---|
-| 相对 v1 改什么 | 降 D/k、低秩分解、token-group shared base + adapter、Student 蒸馏，或每 token 使用稀疏专家 |
-| 为什么 | v1 已约 167.3M，成熟 32×512×3 SwiGLU 主干更大；容量若无法训练/服务就没有实际价值 |
-| 预期好处 | 在接近 AUC 下提高吞吐、降低显存和延迟；MoE 可提高训练容量而保持稀疏推理 |
-| 最常犯错误 | 只算理论 FLOPs 不测 kernel；router 负载塌缩；专家通信抵消稀疏收益；Student 脚手架未闭环却宣称可用 |
+~~~python
+u, i, c = domain_bn(u, i, c)
+u, i, c = exact_base_senet(u, i, c)
+h = current_rankmixer(current_scalar_tokenizer(concat([u, i, c])))
+logit = first_head(reduce_mean(h, axis=1))
+~~~
 
-建议优先级：
+优点：改动最小、归因最强、可能直接复用 gate checkpoint。<br>
+缺点：字段切分、早期压缩和 mean readout 问题仍在。
 
-1. 参数匹配地降低 expansion；
-2. low-rank flatten 和低秩 FFN；
-3. group-shared base + token adapter；
-4. 完整 Teacher→Student 蒸馏；
-5. 系统支持成熟后再做 Sparse-Pertoken MoE。
+### 14.2 方案 B：RM-FieldSafe
 
----
+目标：构建不依赖 DCNM 的纯 RankMixer 公平版。
 
-## 20. 哪些能组合，哪些不能一起改
+~~~mermaid
+flowchart LR
+    X["U/I/C"] --> BN["分域 BN"]
+    BN --> S["精确 Base SENet"]
+    S --> F["16 个完整字段语义组"]
+    F --> R["严格 block<br/>k=2 参数匹配"]
+    R --> Q["mean + grouped + low-rank flatten"]
+    Q --> H["first head"]
+~~~
 
-### 20.1 自然组合
+伪代码：
 
-```text
-M0 公平基线
- -> M1 稳定语义 token
- -> M2 条件 gate
- -> M3 Creative side
- -> M4 双读出
- -> M5 aligned block
- -> M6/M7 显式交叉与序列
- -> M8 多任务
- -> M9 蒸馏
-```
+~~~python
+u, i, c = exact_base_frontend(features)
+tokens = field_safe_tokenize(u, i, c, groups_5_10_1)
+h = strict_rankmixer(tokens, layers=2, dim=768, expansion=2)
+repr = dual_readout(h)
+logit = first_head(repr)
+~~~
 
-这些模块处于不同数据流层次，但仍应逐项打开。
+优点：修复三个最明显的 RM 表示问题，参数接近 Base。<br>
+缺点：仍缺少 Base 压缩前的显式乘性交叉。
 
-### 20.2 互斥或高度重叠
+### 14.3 方案 C：RM-BackboneSwap
 
-| 选择组 | 为什么不能首轮一起改 |
-|---|---|
-| 人工硬桶 vs Soft-to-Hard vs RankUp 随机字段分片 | 都在改变字段到 token 的映射，无法归因 |
-| strict original vs company aligned vs Mixing & Reverting | 都是 block 拓扑替代 |
-| fixed mixing vs UniMixer-Lite vs RankElastor full mixing | 都在改变 token mixing |
-| Global Token vs DCNM late branch | 都在验证显式全局交叉，先选低风险 late branch |
-| mean+flat vs attention pooling vs Task Token readout | 都在改变输出信息通路 |
-| dense PFFN vs Sparse MoE | 必须先有相同输入的 dense 基线 |
+目标：在完全相同 Base 前端和 DCNM 上，只比较后端主干。
 
-### 20.3 有条件才能使用
+~~~mermaid
+flowchart LR
+    X["U/I/C"] --> B["Base BN+SENet+2×DCNM"]
+    B --> T["字段安全 tokenizer"]
+    T --> R["参数匹配 RankMixer"]
+    R --> D["双读出"]
+    D --> H["相同 first head/loss"]
+~~~
 
-- ESMM：必须有全曝光数据和曝光→点击→转化链；
-- Cross Embedding：必须有可靠、时间安全的预训练 user/item 表示；
-- MixFormer 深融合：必须保留原始序列 K/V、mask，并核算在线复用；
-- Sparse MoE：必须证明底层算子、通信和服务链真正支持稀疏执行。
-
----
-
-## 21. 三个推荐候选
-
-### 21.1 候选 A：RM-v2-Parity，先追回 base
-
-```text
-完整 base 输入 + first/last
--> 完整字段硬桶
--> strict RankMixer 或保留 v1 block 做单变量对照
--> mean + low-rank flatten
--> Creative side
--> raw-logit BCE
-```
-
-回答：输入、辅助监督和错误 tokenization 能解释多少 0.003 差距？
-
-### 21.2 候选 B：RM-v3-Aligned，近期上限候选
-
-```text
-候选 A
-+ identity User gate
-+ User-conditioned Item gate
-+ company-aligned、等参数 Pertoken SwiGLU
-+ DIN token
-+ 小型 DCNM late branch
-+ base teacher distillation
-```
-
-回答：在公平输入下，成熟公司 RankMixer 思路能否稳定超过 base？
-
-### 21.3 候选 C：RM-v4-Research，中长期研究
-
-从候选 B 复制固定 checkpoint，分别开独立支线：
-
-- C1：Mixing & Reverting；
-- C2：MixFormer 深序列；
-- C3：Soft-to-Hard 或 RankUp 表示扩展；
-- C4：UniMixer-Lite 或 RankElastor；
-- C5：Student / Sparse-Pertoken MoE。
-
-每条支线只能替换一个核心假设。
+优点：最严格、最能证明 RankMixer 是否优于 Base MLP。<br>
+缺点：算力较高，不能回答“纯 RM 能否替代 DCNM”。
 
 ---
 
-## 22. 推荐实验阶梯
+## 15. 推荐实验矩阵
 
-| 阶段 | 唯一主要变化 | 目的 |
+| 实验 | 唯一主要改动 | 关键问题 |
 |---|---|---|
-| E0 | 原样复现 base 与 v1 | 固定 0.865/0.862 参考与方差 |
-| E1 | v1 恢复 dense | dense 边际贡献 |
-| E2 | E1 恢复 DIN | 候选相关序列贡献 |
-| E3 | E2 恢复 gattr | 全局属性贡献 |
-| E4 | E3 恢复 last loss | 辅助监督贡献 |
-| E5 | E4 改完整字段 hard tokenizer | 错误标量切分损失 |
-| E6 | E5 + Creative side | 小域隔离收益 |
-| E7 | E6 + identity gates | 动态字段选择收益 |
-| E8 | E7 + low-rank flatten | token 身份读出收益 |
-| E9 | 固定 E8 比较四种 block | 拓扑与激活归因 |
-| E10 | 最佳 block + DCNM late | 显式交叉边际 |
-| E11 | E10 + distillation | 收敛与迁移收益 |
-| E12 | E11 + 多任务/Task readout | 监督增强收益 |
-| E13+ | Soft-to-Hard、RankUp、UniMixer 等独立支线 | 中长期上限 |
+| E0-B | 原样真实 Base，3+ seeds | Base 方差是多少 |
+| E0-R | 原样 v1，3+ seeds | 0.003 是否稳定 |
+| E1 | v1 + exact SENet | Base gate 贡献多少 |
+| E2 | E1 + 字段安全 tokenizer | 切字段代价多少 |
+| E3 | E2 + 双读出 | mean 信息损失多少 |
+| E4 | E3 + strict block | hybrid 拓扑影响多少 |
+| E5 | E4，k=4→2 | 参数匹配后是否更稳 |
+| E6 | Base DCNM 后 MLP→RM | RM 能否替代 Base MLP |
+| E7 | E6 + aligned SwiGLU | 成熟 FFN 是否增益 |
+| E8 | E6/E7 + warm/KD | 收敛迁移贡献多少 |
+| E9 | 加 DIN/sequence | 新能力是否超过 Base |
+| E10 | 加 multi-task | 新监督是否继续提升 |
 
-日样本量很大，可采用：1k-step 图验证 → 固定 1-2 日小窗 → 5 日中窗 → 最佳 1-2 个跑完整 10 日 →
-另一时间窗复测。大模型首日收敛慢，淘汰时要同时看相同样本、FLOPs 和 wall-clock 曲线。
+每个实验至少报告：
 
----
-
-## 23. 每个实验必须防止的错误
-
-### 23.1 数据与标签
-
-- 日期、过滤、采样、label delay 不一致；
-- sequence 或 dense 特征含未来信息；
-- first/last/no-refund 标签窗口和 head 名称映射错误；
-- ESMM 使用的不是全曝光样本。
-
-### 23.2 Shape 与字段
-
-- flatten 后按标量切分；
-- 字段遗漏、重复或跨 schema version 复用 checkpoint；
-- append Global/Task/Sequence token 后总数不等于 T；
-- `H!=T` 却仍做 mixing residual；
-- `D%H!=0`；
-- `zip()` 长度不一致后静默截断；
-- DIN 关闭时空 `concat`。
-
-### 23.3 优化与初始化
-
-- base 热启、RM 冷启；
-- down zero-init 后只看第一步 gate/up gradient；
-- gate 初始为 0.5 而非 1；
-- 新主干 LR 太小，10 天仍未进入平台期；
-- loss 前 clip logits；
-- 配置了 gradient clipping 但没有真正 apply。
-
-### 23.4 归因与指标
-
-- 同时改输入、token、block、任务和参数量；
-- SwiGLU 增参后把收益全归激活函数；
-- 只看 AUC，不看 LogLoss/COPC/ECE；
-- 只看总体，不看冷启动、长尾、行为长度等切片；
-- 用论文私有数据增益承诺当前业务收益；
-- 只算参数/FLOPs，不测 samples/s、显存和 P95/P99。
+- 多 seed AUC/GAUC 均值与标准差；
+- logloss、ECE/校准曲线；
+- 新老用户、热门/长尾 Item、Creative 分桶指标；
+- 参数量、FLOPs、峰值显存、step time、线上 p95；
+- loaded/random-init 参数量和训练前 10% 的收敛曲线。
 
 ---
 
-## 24. 最小验收清单
+## 16. 研究扩展与 Base 归因必须分开
 
-### 正确性
+以下方向可以提高未来模型，但真实 Base 本次运行没有它们：
 
-- [ ] 每个字段恰好进入一个预期桶；
-- [ ] token 数、宽度、head 数和 residual 坐标断言通过；
-- [ ] fused/unfused forward、gradient、restore parity 通过；
-- [ ] raw-logit loss 与预测 sigmoid 分离；
-- [ ] checkpoint 加载和随机初始化范围可审计。
+- DIN 与多路序列；
+- dense/gattr 侧路；
+- last CVR、多任务、Task Token；
+- ESMM、pairwise/RankUp loss；
+- Soft-to-Hard 分桶；
+- UniMixer、RankElastor、Sparse MoE；
+- Creative FiLM、Global Token 和更大 token budget。
 
-### 效果
-
-- [ ] first AUC/GAUC、PR-AUC、LogLoss、COPC、ECE 全部报告；
-- [ ] paired bootstrap 或多 seed 方向一致；
-- [ ] 关键用户、Item、Creative、序列长度切片无系统性退化；
-- [ ] 至少两个不重叠日期窗复测。
-
-### 成本
-
-- [ ] trainable dense params、FLOPs、samples/s、peak memory；
-- [ ] checkpoint 大小与恢复时长；
-- [ ] serving P50/P95/P99；
-- [ ] 新增序列、gate、mixer 或 MoE 的真实 kernel/通信成本。
+它们应在 E0–E6 完成后独立立项，不能把增益描述为“恢复 Base”。
 
 ---
 
-## 25. 源码落点
+## 17. 上线与回滚检查单
 
-| 改进 | 主要位置 |
+### 17.1 数据与结构
+
+- [ ] 唯一 Base 文件记录为 <code>cvr_bn_senet_dcnm.py</code>；
+- [ ] resolved args 与 commit SHA 一同归档；
+- [ ] 每个 17 维字段只进入一个 tokenizer group；
+- [ ] U/I/C 域不在单个 token 内混杂；
+- [ ] $T=H$、$D\bmod H=0$ 有显式断言；
+- [ ] token schema 变更时升级 checkpoint 版本；
+- [ ] first-only 是 parity，其他任务都有单独实验编号。
+
+### 17.2 训练与数值
+
+- [ ] 使用 raw logits 的稳定 BCE，或 Base/RM 同时保持旧 loss；
+- [ ] gradient clipping 确实接到 train op；
+- [ ] loaded/missing/random-init scope 有日志；
+- [ ] 参数匹配与 FLOPs 匹配分别报告；
+- [ ] fused/unfused 前向与梯度误差通过阈值；
+- [ ] 多 seed 收敛曲线无异常分叉。
+
+### 17.3 服务
+
+- [ ] 导出图与训练图使用相同 tokenizer/schema；
+- [ ] p50/p95/p99 延迟和峰值内存合格；
+- [ ] 灰度期间可按配置切回 Base；
+- [ ] 异常校准、长尾分桶和 Creative 分桶有监控；
+- [ ] checkpoint 与特征 schema 双重版本化。
+
+---
+
+## 18. 源码证据定位
+
+| 事实 | 源码/运行证据 |
 |---|---|
-| M0 输入/任务对齐 | `cvr_bn_rankmixer_v1.py:380-462,889-930`；参考 `cvr_fst_last_norpy.py:481-538,917-1141` |
-| M1 tokenizer | `cvr_bn_rankmixer_v1.py:774-799,938-962` |
-| M2 gate | 参考 `commend_cvr.py:2243-2323` |
-| M3/M4 side 与双读出 | 参考 `commend_cvr.py:2507-2564` |
-| M5 block | `cvr_bn_rankmixer_v1.py:801-862`；参考 `mlp_mixer_swiglu_fuse.py:137-304,339-386` |
-| M6 DCNM | 参考 `cvr_fst_last_norpy.py:772-817` |
-| M7 DIN/sequence | 参考 `cvr_fst_last_norpy.py:917-962`、`commend_cvr.py:2370-2500` |
-| M8 多任务 | 参考 `cvr_fst_last_norpy.py:481-538`、`commend_cvr.py:1414+` |
-| M9 warm/distill | `set-xcal.txt:168-191` 与两模型 warmup scope |
-| M10-M14 | 建议新增独立 scope，不覆盖现有 fused checkpoint scope |
-
-推荐新 scope：
-
-```text
-tokenizer_field_safe_v1/
-rankmixer_strict_v1/
-rankmixer_aligned_swiglu_v1/
-readout_dual_v1/
-cross_branch_v1/
-multitask_head_v1/
-```
+| Base resolved 参数 | <code>set-x.args.resolved.txt:27-76</code>、<code>0721args.txt</code> |
+| RM resolved 参数 | <code>code/set-xcal.txt:248-298</code> |
+| Base 只取三桶 | <code>cvr_bn_senet_dcnm.py:915-953</code> |
+| Base 三桶 BN 与 SENet | <code>cvr_bn_senet_dcnm.py:955-980</code> |
+| Base 层级 SENet | <code>cvr_bn_senet_dcnm.py:830-905</code> |
+| Base 两层 DCNM | <code>cvr_bn_senet_dcnm.py:783-828,982-983</code> |
+| Base MLP 与 head | <code>cvr_bn_senet_dcnm.py:988-1016,1097-1108</code> |
+| Base first loss | <code>cvr_bn_senet_dcnm.py:527-548</code> |
+| RM 三桶与 BN | <code>cvr_bn_rankmixer_v1.py:889-930</code> |
+| RM 投影函数与等宽分段 | <code>cvr_bn_rankmixer_v1.py:774-799,938-962</code> |
+| RM block 与 mean readout | <code>cvr_bn_rankmixer_v1.py:801-866,964-980</code> |
 
 ---
 
-## 26. 延伸文档
+## 19. 最终选型建议
 
-- AUC 差距与七套详细路线：[CVR_RankMixer_v1_AUC差距诊断与改进路线.md](CVR_RankMixer_v1_AUC差距诊断与改进路线.md)
-- 四套输入/监督方案与完整伪代码：[CVR_RankMixer_四套改进方案设计.md](CVR_RankMixer_四套改进方案设计.md)
-- 成熟公司源码与 SwiGLU 严格对比：[CVR_RankMixer_SwiGLU_源码分析与原版对比.md](CVR_RankMixer_SwiGLU_源码分析与原版对比.md)
-- RankMixer 及演进论文调研：[RankMixer及其演进方法详细调研.md](RankMixer及其演进方法详细调研.md)
-- RankMixer 原论文详解：[RankMixer_论文详解.md](RankMixer_论文详解.md)
+若目标是最快定位 0.003：先做 E1 exact SENet，再做 E2 字段安全 tokenizer 和 E3 双读出。
 
-最终原则只有两条：
+若目标是证明 RankMixer 主干价值：做 E6 Backbone Swap；它比把大量新输入、任务和结构一次性加入更有解释力。
 
-1. **先让比较公平且 token 语义正确，再讨论更强 mixer。**
-2. **每次只替换一个核心假设，并同时报告效果、校准、收敛和系统成本。**
+若目标是构建可上线版本：以 RM-FieldSafe 为低成本候选，以 RM-BackboneSwap 为高置信候选，二者都使用参数匹配、版本化 tokenizer、严格 restore 日志和多 seed 验证。
+
+一句话总结：
+
+> 真实 Base 的优势不是更多输入或更多任务，而是压缩前的层级字段门控与全局乘性交叉；RankMixer 应先补齐这些可验证差异、修复字段切分和读出，再证明自身主干是否更强。

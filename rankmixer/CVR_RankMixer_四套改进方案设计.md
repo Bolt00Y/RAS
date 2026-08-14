@@ -1,5 +1,6 @@
 # CVR RankMixer 输入重构与 AUC 优化：四套可落地方案
 
+> 基线边界修正：0.865 的真实 Base 是 <code>code/cvr_bn_senet_dcnm.py</code>，其实际运行路径为三桶输入、分域 BN、层级 SENet、两层 DCNM、MLP 和 first-only head。<code>commend_cvr.py</code> 是成熟 RankMixer Teacher 参考，不是该 Base；本文的序列、多任务、Task Token 等均属于后续增强方案，不能用于解释现有 0.003 差距。<br>
 > 关联源码：commend_cvr.py、mlp_mixer_swiglu_fuse.py<br>
 > 按模块分类的全量改进指南：[CVR_RankMixer_全量改进方案_按模块分类.md](CVR_RankMixer_全量改进方案_按模块分类.md)<br>
 > 全部改进方法的精炼选型总览：[CVR_RankMixer_v1_改进方案汇总与选型指南.md](CVR_RankMixer_v1_改进方案汇总与选型指南.md)<br>
@@ -84,23 +85,24 @@ $$
 X_{flat}\in\mathbb{R}^{B\times20978}
 $$
 
-再近似等宽切成 16 段，段长只能是：
+当前 v1 源码使用 <code>base=total//T</code>，前 15 段取 <code>base</code>，余数全部放入最后一段，因此实际段长是：
 
 $$
-20978=2\times1312+14\times1311
+20978=15\times1311+1313
 $$
 
-但是：
-
-$$
-1312\bmod17=3
-$$
+其中：
 
 $$
 1311\bmod17=2
 $$
 
-这意味着切分边界落在字段内部，而不是字段之间。结果至少有三类问题：
+$$
+1313\bmod17=4
+$$
+
+15 个内部边界都是 $1311$ 的倍数；因为 $\gcd(1311,17)=1$，且边界序号仅为 1–15，
+所以没有任何内部边界与 17 维字段边界重合。结果至少有三类问题：
 
 1. 同一个字段的 17 维被拆到相邻 token；
 2. 某个 token 会同时含有 User 尾部和 Item 头部；

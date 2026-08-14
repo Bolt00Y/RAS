@@ -1,5 +1,6 @@
 # CVR RankMixer-SwiGLU 模型源码分析与原版 RankMixer 严格对比
 
+> 范围边界：本文严格比较的是 <code>commend_cvr.py</code> / <code>mlp_mixer_swiglu_fuse.py</code> 与论文原版 RankMixer。它不是 0.865 真实 Base 的结构说明；该 Base 为 <code>cvr_bn_senet_dcnm.py</code>，其专项对照见 [0.003 AUC 差距诊断](CVR_RankMixer_v1_AUC差距诊断与改进路线.md)。<br>
 > 分析对象：`code/commend_cvr.py`、`code/mlp_mixer_swiglu_fuse.py`<br>
 > 对照论文：`rankmixer/RankMixer.pdf`<br>
 > 文档日期：2026-08-13<br>
