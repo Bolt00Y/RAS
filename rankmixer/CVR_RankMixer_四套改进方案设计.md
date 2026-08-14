@@ -2,6 +2,7 @@
 
 > 关联源码：commend_cvr.py、mlp_mixer_swiglu_fuse.py<br>
 > 基线分析：[CVR_RankMixer_SwiGLU_源码分析与原版对比.md](CVR_RankMixer_SwiGLU_源码分析与原版对比.md)<br>
+> 结合 0.865 base 与 0.862 RankMixer v1 实验后的专项诊断：[CVR_RankMixer_v1_AUC差距诊断与改进路线.md](CVR_RankMixer_v1_AUC差距诊断与改进路线.md)<br>
 > 方案日期：2026-08-14<br>
 > 文档性质：架构设计与实验规范，不表示四套方案已经在生产代码中实现。
 
