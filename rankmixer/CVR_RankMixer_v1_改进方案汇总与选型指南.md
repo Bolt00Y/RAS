@@ -96,7 +96,7 @@ flowchart TD
 第 $t$ 段执行：
 
 $$
-x_t=\operatorname{GELU}(z_tW_t+b_t),
+x_t=\mathrm{GELU}(z_tW_t+b_t),
 \quad W_t\in\mathbb R^{d_t\times768},
 \quad b_t\in\mathbb R^{768}.
 $$
