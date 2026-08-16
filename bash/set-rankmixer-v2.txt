@@ -191,7 +191,7 @@ elif [ "$change_fea" == "xfar_v2" ]; then
     skip_tensors="ema_show_means"
     warm_up_tensors=""
 elif [ "$change_fea" == "cold" ]; then
-    # 冷启动：dense 全部随机初始化，sparse embedding 从 v3 + item_embedding 热启动
+    # 冷启动：dense 全部随机初始化，sparse embedding 从 v10_fst_v3 + item_embedding 热启动
     ignore_dense_checkpoint="True"
     enable_dense_warmup="false"
     ignore_miss_feature=false
@@ -265,7 +265,7 @@ json='{
             \"rm_head_num\":16,
             \"rm_ffn_act\":\"gelu_2\",
             \"rm_proj_ln\":false,
-            \"rm_token_proj_act\":\"identity\",
+            \"rm_token_proj_act\":\"gelu_2\",
             \"rm_bucket_token_counts\":[5,10,1],
             \"rm_use_gated_pool\":true,
             \"rm_use_bucket_cross\":true,

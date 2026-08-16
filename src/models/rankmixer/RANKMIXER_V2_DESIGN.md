@@ -137,7 +137,7 @@ v1 用 Python 循环创建 `L * T * 2 = 64` 个独立 FC 运算。论文的高 M
 | item | 10 | `[84,84,84,84,84,83,83,83,83,83]` |
 | creative | 1 | `[14]` |
 
-每个 token 只由同一桶中的完整字段组成，随后线性投影到 `D=768`。默认不用投影前 GELU，避免在第一次跨 token 交互前损失负值和幅度信息。
+每个 token 只由同一桶中的完整字段组成，随后使用与 v1 一致的 `gelu_2` 非线性投影到 `D=768`。v2 的变化集中在按桶、按完整字段构造语义 token，而不是改变 token 投影激活。
 
 ### 3.3 字段重要性门控
 
@@ -191,7 +191,7 @@ models.rankmixer.cvr_bn_rankmixer_v2.MLPModel
   "rm_hidden_dim": 768,
   "rm_layer_num": 2,
   "rm_ffn_expand": 2,
-  "rm_token_proj_act": "identity",
+  "rm_token_proj_act": "gelu_2",
   "rm_proj_ln": false,
   "rm_use_gated_pool": true,
   "rm_use_bucket_cross": true,

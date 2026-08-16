@@ -151,7 +151,7 @@ class MLPModel(ModelBase):
         self.rm_head_num = _kwargs.get('rm_head_num', self.rm_token_num)
         self.rm_ffn_act = _kwargs.get('rm_ffn_act', 'gelu_2')
         self.rm_proj_ln = _kwargs.get('rm_proj_ln', False)
-        self.rm_token_proj_act = _kwargs.get('rm_token_proj_act', 'identity')
+        self.rm_token_proj_act = _kwargs.get('rm_token_proj_act', 'gelu_2')
         self.rm_use_gated_pool = bool(_kwargs.get('rm_use_gated_pool', True))
         self.rm_use_bucket_cross = bool(_kwargs.get('rm_use_bucket_cross', True))
         self.rm_cross_gate_init = float(_kwargs.get('rm_cross_gate_init', -2.0))
