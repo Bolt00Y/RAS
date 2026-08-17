@@ -16,6 +16,19 @@
 
 阅读边界：当前工作区没有生产样本、标签 SQL、平台展开后的完整任务配置、v3 训练日志和线上延迟数据，也没有生产 Flood/Cayman 运行时。reference 导入的部分模块来自部署包路径，本地同名副本未必与线上版本完全一致。因此，本文会区分“源码可确定事实”“高可信业务推断”和“必须通过实验验证的方案”。
 
+### 已确认的本轮业务决策
+
+以下业务约束已经由业务方确认，优先级高于本文后续仍保留的通用候选建议：
+
+1. **样本空间固定为点击后 CVR**。本轮模型学习的是
+   $P(Y_{fst}=1\mid click=1,u,q,i,c)$，不尝试 ESMM，也不扩展到曝光空间联合建模；
+2. **保持纯单任务 `fst_cvr`**。训练只使用 `fst_cvr_label` 的 BCE，不增加 last、delay、行为辅助头，也不增加 pairwise/listwise 排序损失；
+3. **本轮唯一新增的建模模块是定向 Query–Item Cross**。不同时修改 Token 数、语义分组、SENet、RankMixer 层数、池化和输出头；
+4. **`search_id` 只用于请求内离线评价**，不进入特征、Embedding、Cross 或 loss。它是请求标识，不是可泛化的业务信号；
+5. 当前 1,234 个字段、17 维稀疏 Embedding、16×768 Token 和两层 RankMixer 主干全部保持不变。
+
+因此，本轮候选版本统一命名为 **RankMixer v4**。后文关于多任务、序列、DCNM、任务 Head 等内容只保留为背景分析，不属于 v4 的提交范围。
+
 ---
 
 ## 0. 结论先行
@@ -24,7 +37,7 @@
 
 当前 v3 是**电商搜索/推广搜索候选排序中的首次转化率预估模型**。它回答的问题近似是：
 
-> 在用户发起当前搜索请求、看到候选商品或广告的条件下，这个候选发生 `fst` 口径转化的概率是多少？
+> 在用户发起当前搜索请求、并点击候选商品或广告的条件下，这个候选发生 `fst` 口径转化的概率是多少？
 
 reference 则更像**推荐/展示流量中的候选商品多目标 CVR 精排模型**。它回答的问题近似是：
 
@@ -47,7 +60,7 @@ reference 则更像**推荐/展示流量中的候选商品多目标 CVR 精排�
 数学上，两边学习的是不同条件分布：
 
 $$
-P_{search}(Y_{fst}=1\mid u,q,i,a,c)
+P_{search}(Y_{fst}=1\mid click=1,u,q,i,a,c)
 \neq
 P_{display}(Y=1\mid u,i,a,c,h),
 $$
@@ -60,33 +73,34 @@ $$
 
 但从源码看，影响 `fst_AUC` 的高价值问题更可能是：
 
-1. **评估协议和标签成熟度尚未被本地证据锁定**，日期区间、延迟转化和样本空间应先核查；
-2. **只训练一个 `fst_cvr_label`**，没有利用仓库中已有的 last、delay 和较密集行为标签；
-3. **搜索特有的 query-item 交互仍较粗**：query 相关信号被压进大组，桶交叉又先对整个桶求均值；
+1. **请求内评价协议尚未落地**：`search_id` 已被保留，但当前源码只计算全局 AUC/COPC；
+2. **搜索特有的 query-item 交互仍较粗**：query 相关信号被压进大组，桶交叉又先对整个桶求均值；
+3. **点击样本空间中的有效请求覆盖率未知**：很多 `search_id` 可能只有一个点击商品，或组内标签全相同，无法计算请求内 AUC；
 4. **若干大组包含 102～136 个字段，却各压成一个 Token**，组内信息可能被过早汇总；
-5. **池化后只有一个线性输出头**，缺少轻量的主任务适配层；
-6. **L2、梯度裁剪和多个配置项在当前文件中没有真正进入优化路径**；
-7. **当前 cold 配置明确删除 sequence、DIN、dense 和 gattr**，无法像 reference 一样做候选相关历史兴趣建模。
+5. **L2、梯度裁剪和多个配置项在当前文件中没有真正进入优化路径**；
+6. **当前 cold 配置明确删除 sequence、DIN、dense 和 gattr**，但这些能力不在本轮单任务 QICross 的修改范围内。
+
+“只训练一个 `fst_cvr_label`”在本轮是明确的产品约束，不再视为模型缺陷。是否使用 delay 标签修正样本成熟度仍可作为数据审计问题，但不能通过新增辅助任务解决。
 
 ### 0.4 推荐优先级
 
-最推荐的顺序不是先加深 Mixer，而是：
+本轮实际执行顺序收敛为：
 
 ```text
-P0  固化标签、样本空间、时间切分和真实 v3 入口
+P0  固化点击后 fst 标签、时间切分和真实 v3 入口
  ↓
-P0  修复/核查配置与优化器中“写了但未生效”的项目
+P0  导出 search_id/example_id/label/pred，建立请求内评价基线
  ↓
-P1  投影归一化、近恒等 SENet、轻量任务 Head
+P1  只增加 q→item_text 定向 Cross
  ↓
-P1  数据驱动地调整 16 个语义组，并增加定向 query-item Cross
+P1  单独验证 q→item_identity，再验证二者组合
  ↓
-P1  利用已存在且有效的 delay/last/行为标签做受控多任务
+P1  比较“保留 Bucket Cross”与“由 QICross 替代 Bucket Cross”
  ↓
-P2  新增 query-aware 行为序列或 DIN Token
- ↓
-P3  只有诊断证明 Mixer 欠表达时，才试 SwiGLU、可学习 Mixing 或更深结构
+P2  胜出结构做第二时间窗/第二 seed 复验和线上延迟评估
 ```
+
+本轮不把 Projection LN、任务 Head、重新分组、多任务、pairwise loss 或序列与 QICross 同时提交，避免无法归因增益。
 
 任何一项都只能被称为“有机制依据的候选方案”，不能在真实训练前宣称一定提高 AUC。仓库中没有 v3 的训练日志和最终 `fst_AUC`，所以本文不会虚构 v3 基准或预计增益。
 
@@ -102,18 +116,25 @@ $$
 \hat p=\sigma(z).
 $$
 
-源码能够确认这是 `fst_cvr_label` 的二分类概率；但源码中没有标签生产 SQL，因此以下内容必须向数据同学确认：
+本轮已确认样本空间是点击后样本，因此模型的统计目标应写为：
+
+$$
+\hat p_{fst}=P(Y_{fst}=1\mid click=1,u,q,i,a,c).
+$$
+
+这不是曝光后联合转化率 $P(click=1,Y_{fst}=1\mid exposure)$，也不是点击率。若排序公式同时使用 pCTR，典型组合关系是由 pCTR 负责“是否点击”，本模型负责“点击后是否发生 fst 转化”；具体线上公式仍以业务配置为准。
+
+源码能够确认输出是 `fst_cvr_label` 的二分类概率；但源码中没有标签生产 SQL，因此以下内容仍必须向数据同学确认：
 
 - `fst` 是否严格表示 first-touch attribution；
 - 转化事件是下单、支付还是其他行为；
 - 归因窗口是几小时、几天；
 - 退款订单是否仍算正样本；
-- 样本是在曝光空间、点击空间还是其他过滤空间构建；
 - 尚未等到归因窗口结束的样本如何处理。
 
-在这些定义明确前，更严谨的描述是：
+因此当前最严谨的描述是：
 
-> v3 预测上游数据产出的 `fst_cvr_label`，而不是由模型代码自己定义“首次转化”。
+> v3 在点击样本空间预测上游数据产出的 `fst_cvr_label`；模型代码本身不定义“首次转化”的事件和归因窗口。
 
 ### 1.2 当前训练目标
 
@@ -143,7 +164,9 @@ $$
 - COPC、分桶误差或 ECE：校准；
 - 搜索请求内 GAUC/Pairwise AUC：同一个 query 请求内的候选排序能力。
 
-只优化全局 AUC 可能让头部 query 主导结果；只优化 pairwise 排序又可能损伤概率校准。搜索 CVR 通常需要两者共同监控。
+只优化全局 AUC 可能让高频样本主导结果。本轮不增加 pairwise 训练损失，但会把同一 `search_id` 内正负点击商品组成的 pair 作为**评价单位**，同时监控全局概率质量和请求内排序。
+
+需要特别区分：点击样本空间上的 SearchGAUC 只衡量“同一请求中多个已点击商品之间”的转化排序。它看不到未点击候选，不能代表完整曝光候选列表的排序效果。有效请求覆盖率必须与指标一起报告。
 
 ---
 
@@ -177,7 +200,7 @@ flowchart TB
 | 维度 | 当前推广搜 RankMixer v3 | reference 推荐/展示 CVR | 对建模的影响 |
 |---|---|---|---|
 | 当前意图 | query、检索词、召回上下文很强 | 画像、近期兴趣、上下文更强 | 搜索应优先建模 query-item 匹配 |
-| 样本粒度 | 很可能是 `search_id × candidate` | 更像 `user/request × displayed candidate` | 搜索天然有请求内候选组 |
+| 样本粒度 | 已确认是点击样本，以 `search_id × clicked candidate` 组织 | 更像 `user/request × displayed candidate` | 只有多点击且标签有正有负的搜索请求可计算请求内 AUC |
 | 候选来源 | 搜索/广告召回、文本与图关系、排序上下文 | 推荐 recall type、trigger、多路兴趣召回 | 负样本难度和分布不同 |
 | 主要目标 | 一个 `fst_cvr_label` | fst/lst × all/nrfnd 四个主目标 | reference 的标签头不能原样照搬 |
 | 辅助目标 | 当前 v3 未使用 | 相似点击、收藏，可选停留/多行为 | 搜索侧可借鉴“共享表示”，但任务应重选 |
@@ -423,7 +446,10 @@ context[768] → Linear(1) → clip[-50,50] → sigmoid
 - bucket error；
 - sample count。
 
-`search_id` 被保留，但当前模型损失并不利用请求内分组。脚本虽然设置 `enable_gauc=True`，最终 GAUC 是否由外部 validator 正确产出，仍应以平台日志为准。
+`search_id` 已在 `parse_examples` 中单独保留，`test()` 在开启 `save_predict_result` 后也会写出
+`search_id / example_id / label / pred`。但当前源码没有按 `search_id` 聚合指标，v3 脚本还设置了
+`save_predict_result=false`。脚本虽然设置 `enable_gauc=True`，外部 validator 究竟按 user、query 还是
+`search_id` 分组无法由本地源码证明，因此 v4 必须建立独立、可复现的离线请求评价器。
 
 ---
 
@@ -494,8 +520,8 @@ reference 的 per-token SwiGLU、32 Token、3 层、扩张 4 带来很大的参�
 
 | 项目 | 当前实现 | 可能的限制 |
 |---|---|---|
-| 单目标 | 只取 `fst_cvr_label` | 转化稀疏，共享主干缺少密集监督 |
-| 延迟反馈 | v3 不使用 `delay_2d_fst_cvr_label` | 新近正样本可能被误标为负样本 |
+| 单目标 | 只取 `fst_cvr_label` | 本轮有意保持纯单任务，不视为待修复问题 |
+| 延迟反馈 | v3 不使用 `delay_2d_fst_cvr_label` | 只做标签成熟度审计，不增加 delay 辅助头 |
 | 过粗 query 交互 | query 85 字段为单 Token；bucket cross 对整桶均值 | query×标题/类目/价格关系可能被稀释 |
 | 大组压缩 | 最大组 136 字段压成 1×768 | 组内多个子语义共享一个投影和一个 Token 身份 |
 | 投影未归一化 | `rm_proj_ln=false` | 不同覆盖率和输入宽度的 Token 尺度可能不一致 |
@@ -518,25 +544,30 @@ reference 的 per-token SwiGLU、32 Token、3 层、扩张 4 带来很大的参�
 
 ---
 
-## 6. 第一优先级：先从数据和标签提升 `fst_AUC`
+## 6. 数据与标签审计背景：本轮固定任务口径
 
-结构升级之前，标签和样本质量通常是 CVR 增益最大的来源。
+结构升级之前，标签和样本质量通常是 CVR 增益最大的来源。本节除 6.1 的已确认口径外均作为数据审计
+背景；v4 不改变标签、样本权重或负例构造。
 
 ### 6.1 固化样本空间：到底预测曝光后 CVR 还是点击后 CVR
 
-必须先回答：
+本轮已经确认：训练与离线验证都限定在**点击后样本空间**，主目标是：
+
+$$
+P(Y_{fst}=1\mid click=1,u,q,i,c).
+$$
+
+因此本轮明确不实施 ESMM，不把未点击候选补为 CVR 负例，也不增加 CTR 子任务。为了保证不同实验可比，必须固化：
 
 ```text
-训练样本 = 所有被排序候选？
-        还是所有曝光候选？
-        还是只有点击后的候选？
-
-线上打分空间 = 与训练空间相同吗？
+样本过滤条件 = click == 1
+标签            = fst_cvr_label
+负例            = 已点击但未发生 fst 转化
+主损失          = 单任务 BCE
+请求评价分组    = sample_date + search_id
 ```
 
-如果只用点击样本训练 pCVR，却对所有曝光候选打分，会存在样本选择偏差。只有在确认该条件成立、并且有曝光/点击标签时，才考虑 ESMM 一类 entire-space 方案。
-
-[ESMM 原论文](https://arxiv.org/abs/1804.07931)利用“曝光→点击→转化”的概率关系缓解点击空间训练、曝光空间推断带来的选择偏差和 CVR 稀疏；它不是一个看到 CVR 就应自动套用的通用模块。
+仍需记录线上模型在哪个阶段调用。如果 pCVR 被用于曝光前排序，这是一个已知的点击选择偏差边界，但不在 v4 的解决范围内，不能在本轮实验中悄悄改变样本定义。
 
 ### 6.2 审计延迟转化
 
@@ -616,7 +647,9 @@ $$
 - 多次出现的同一商品去重；
 - hard negative 比例，避免训练分布过度偏难。
 
-建议先用 hard negative 改善 BCE 训练样本，再考虑 pairwise loss。
+在已确认的点击样本空间中，合法负例只能是已点击但未发生 fst 转化的商品；未点击、未曝光候选都不能
+直接补成 CVR 负例。本轮保持原样本分布，不实施 hard-negative 重采样，也不增加 pairwise loss。本节仅
+说明若未来另开数据实验，应优先在相同 `search_id` 的合法点击负例内进行，并单独评估概率偏移。
 
 ### 6.7 用数据而不是组名判断特征价值
 
@@ -636,9 +669,9 @@ drop-group retrain ΔAUC（只对重点组）
 
 ---
 
-## 7. 第二优先级：低风险代码和训练改进
+## 7. 其他低风险代码和训练候选：不与本轮 QICross 同改
 
-这些方案不要求增加线上特征，适合作为 v3.1 的首轮消融。
+这些方案不要求增加线上特征，但均应另开单变量实验；v4 本轮不同时修改它们。
 
 ### 7.1 修复稀疏创建概率键
 
@@ -778,7 +811,7 @@ search_id, example_id, label, prediction, date, source
 
 ## 8. 第三优先级：搜索特有的表示和交互升级
 
-### 8.1 先优化 16 个组，再增加 Token 数
+### 8.1 分组与 Token 数背景：不在本轮修改
 
 当前最大五个组是：
 
@@ -813,37 +846,172 @@ item_static_quality         98 fields
 
 ### 8.2 增加定向 query-item Cross
 
-当前 bucket cross 使用整个 common/item 桶均值。更符合搜索归纳偏置的做法是，从语义 Token 中明确取：
+#### 8.2.1 本轮采用哪三个 Token
+
+v3 的 16 个 Token 顺序由 `_build_semantic_feature_groups()` 固定。Cross 必须读取 **Mixer 之前的
+`input_tokens`**，因为两层 RankMixer 的 fixed token mixing 之后，某个位置已经不再是纯 query 或纯 item
+语义。当前稳定映射为：
+
+| 角色 | 语义组名 | 全局 Token 索引 | Shape | 本轮用途 |
+|---|---|---:|---|---|
+| Query | `common_query_intent_retrieval` | 3 | `[B,768]` | 唯一 Cross source |
+| Item identity | `item_static_identity_quality` | 5 | `[B,768]` | 候选身份、类目、店铺和静态质量 |
+| Item text | `item_text_relevance` | 6 | `[B,768]` | 标题、query 词、NER 和相关性 |
+
+实现时不能直接散落 `3/5/6` 三个魔法数字。初始化阶段应由语义组顺序构造
+`semantic_token_index_by_name`，并断言三个组存在且索引唯一。这样后续调整分组顺序时不会静默拿错 Token。
+
+`item_text_relevance` 中已经包含 `norm_query_hash_x_cat`、`query_term_hit_title`、
+`query_word_x_goods`、`title_word_x_query_hash` 等人工 query-item 交叉。新分支的定位不是重复原始字段
+Cross，而是在 71 个文本/相关字段被压成表示后，学习“当前 query 表示应该如何条件化候选文本表示”。
+是否仍有增量必须由消融实验回答。
+
+同时，`common_query_intent_retrieval` 并不是纯文本 Query Encoder，它混合了当前 query、意图、用户查询
+历史和召回上下文。因此更精确的叫法是“query/request → item 的定向语义 Cross”。本轮为保持 16 Token
+和归因纯净不再拆组；若 E1/E2 无增益，首先检查这个 source 是否过于混杂，而不是立刻增加更多 Cross 边。
+
+#### 8.2.2 推荐的 QICross-Lite 结构
+
+为控制额外成本，先把 768 维 Token 投影到低秩空间 $r=128$。Query 投影在两个目标之间共享，Item
+投影和交互层按目标独立：
+
+$$
+q=\operatorname{LN}(T_{query}),\qquad i_k=\operatorname{LN}(T_k),
+$$
+
+$$
+\tilde q=W_q q,\qquad \tilde i_k=W_{i,k}i_k,\qquad k\in\{text,id\},
+$$
+
+$$
+m_k=[\tilde q,\tilde i_k,\tilde q\odot\tilde i_k,\tilde q-\tilde i_k],
+$$
+
+$$
+h_k=\operatorname{GELU}(W_{h,k}m_k+b_{h,k}),
+$$
+
+$$
+g_k=\sigma\left(w_{g,k}^{T}
+[\tilde q,\tilde i_k,\tilde q\odot\tilde i_k]+b_{g,k}\right),
+$$
+
+$$
+r_k=g_k\cdot(W_{o,k}h_k+b_{o,k}),\qquad
+z_{qi}=r_{text}+r_{id}.
+$$
+
+这里使用有符号的 $\tilde q-\tilde i_k$，而不是只有 $|\tilde q-\tilde i_k|$，从算子上保留
+“query 条件化 item”的方向性。方向性还来自共享的 Query source 和只允许的两条边：
 
 ```text
-q = query/intent Token
-i_text = item text/relevance Token
-i_id = item identity/quality Token
-i_price = price/offer 或 price/preference Token
-i_ctx = item session/context Token
+query → item_text
+query → item_identity
 ```
 
-对每一对构造一个有界的小交叉：
+不构造 item→query，不做 16×16 全连接 Cross，也不把 price、session、creative 一次性加入。
+
+#### 8.2.3 与现有 RankMixer 的融合
+
+Cross 与 RankMixer 主干并行，保持原 16 个 Token 和两层 Mixer 完全不变：
+
+```mermaid
+flowchart LR
+    A["16×768 input_tokens"] --> M["2×RankMixer"]
+    M --> P["Gated Pool"]
+    A --> B["原 Bucket Cross"]
+    A --> Q["QICross-Lite: q→text/id"]
+    P --> F["一次 Residual Fusion + LN"]
+    B --> F
+    Q --> F
+    F --> O["原 rm_out_v2 Linear fst Head"]
+```
+
+融合公式为：
 
 $$
-\phi(q,i)=\operatorname{MLP}([q,i,q\odot i,|q-i|]).
+z=\operatorname{LN}(z_{pool}+z_{bucket}+z_{qi}),
 $$
 
-再使用按样本 gate：
+然后继续使用原来的 `rm_out_v2: 768→1`。本轮不增加 Dense256 Head，也不改变 `fst` 输出 scope。
+实现时应把现有 `rm_fusion_norm` 保持为一次 LayerNorm，避免先融合 Bucket Cross、再融合 QICross
+而额外引入第二个归一化变量。
 
-$$
-g(q,i)=\sigma(\operatorname{MLP}([q,i])),
-$$
+对应到当前 `model_fn` 的伪代码是：
 
-$$
-z_{cross}=\sum_i g(q,i)\phi(q,i).
-$$
+```python
+input_tokens = self._semantic_tokenize(bucket_field_maps, export)  # [B,16,768]
+hidden_tokens = self._rm_stack(input_tokens, self.rm_layer_num, export, mode)
+pooled_context = self._pool_tokens(hidden_tokens)                   # [B,768]
 
-输出投影用零初始化，使新分支开始时对旧模型近似无影响。这个模块直接回答“当前 query 与哪个候选子空间匹配”，比把整个 common 和 item 均值相乘更精确。
+residuals = []
+if self.rm_use_bucket_cross:
+    residuals.append(self._bucket_cross_residual(input_tokens, export))
+if self.rm_use_query_item_cross:
+    residuals.append(self._query_item_cross_residual(input_tokens, export))
 
-首个实验只选择 `q×i_text` 和 `q×i_id`；若有效，再逐项加 price/context。不要一次构造所有 Token 对。
+context = pooled_context
+if residuals:
+    context = layer_norm(context + tf.add_n(residuals), name="rm_fusion_norm/ln")
 
-### 8.3 与 Base 同构 DCNM 做强对照
+logits = self._existing_rm_out_v2(context)
+loss = fst_bce(labels, sigmoid(logits))
+```
+
+该伪代码强调两个约束：QICross 从 `input_tokens` 取纯语义表示；所有残差只做一次融合归一化。
+
+`W_{o,k}` 和 `b_{o,k}` 零初始化，gate kernel 零初始化、gate bias 初始化为 `-2`。因此新分支建图后的
+第 0 步严格输出 0，加载旧 v3 checkpoint 时主路径预测保持一致；训练后再逐步学出残差。零初始化会使
+第一步主要更新 output projection，随后梯度再进入低秩交互层，这是可接受的稳定 warm-start 行为。
+
+按 $D=768,r=128$、两个 target 估算，新增参数约 **0.626M**，约占当前 95.81M dense 参数的
+**0.65%**；新增乘加量约 **1.25M FLOPs/样本**，远小于当前约 192.55M FLOPs。该数字不含极小的
+LayerNorm、bias 和 sigmoid 开销，最终以建图变量统计为准。
+
+#### 8.2.4 配置和变量 scope
+
+建议只增加以下配置：
+
+```json
+{
+  "rm_use_query_item_cross": true,
+  "rm_qi_cross_dim": 128,
+  "rm_qi_cross_targets": [
+    "item_text_relevance",
+    "item_static_identity_quality"
+  ],
+  "rm_qi_cross_gate_init": -2.0,
+  "rm_qi_cross_zero_init": true
+}
+```
+
+所有新增变量放在 `Cvr-task-part/rm_query_item_cross/` 下，子 scope 使用稳定语义名：
+
+```text
+query_projection
+q_to_item_text_relevance
+q_to_item_static_identity_quality
+```
+
+首次从严格 v3 checkpoint 热启时，只允许这一新 scope 缺失/初始化；原语义投影、Mixer、Pool、Bucket
+Cross、BN、SENet 和 `rm_out_v2` 都必须成功恢复。提交脚本需把新 scope 纳入对应的 warm-start
+allowlist/skip 配置，并通过加载日志核对，不能因为新增一个分支而把整个 dense tower 冷启。
+
+#### 8.2.5 明确不做的事情
+
+- 不把 `search_id` 作为特征；
+- 不改变 `fst_cvr_label`、点击样本过滤或 BCE；
+- 不增加 pairwise/listwise loss；
+- 不增加辅助任务；
+- 不把 Cross 回写到 sparse Embedding 表；
+- 不同时开启 Projection LN、任务 Head、重新分组或更多 Mixer 层；
+- 不在第一版加入 `q×price`、`q×session`、`q×creative` 或全 Token Cross。
+
+训练日志新增 `q_text_gate_mean`、`q_id_gate_mean`、`qi_residual_norm`、
+`qi_to_pool_norm_ratio` 即可。若残差长期接近 0，说明分支没有被使用；若残差很快远大于 pooled context，
+说明 gate/学习率或归一化存在风险。
+
+### 8.3 后续候选：与 Base 同构 DCNM 做强对照
 
 同一三桶数据上的 base 使用两层 `20,978→500→20,978` DCNM 显式交叉。可以在 SENet 后、语义 Token 化前恢复相同 Cross，作为强本地对照：
 
@@ -862,7 +1030,7 @@ $$
 
 若 DCNM 有增益但成本过高，再尝试 bottleneck 500→256 或只对高 utility 组做 Cross。
 
-### 8.4 让池化显式感知 query
+### 8.4 后续候选：让池化显式感知 query
 
 当前 gated pool 的 score 只读每个已经混合后的 Token：
 
@@ -886,7 +1054,7 @@ $$
 
 只有出现池化塌缩且 AUC 受损时，才加很小的 entropy regularization；不要为了让权重“看起来平均”而强行约束有效的稀疏选择。
 
-### 8.5 把全局 Bucket Gate 改为实例条件 Gate
+### 8.5 后续候选：把全局 Bucket Gate 改为实例条件 Gate
 
 当前 bucket cross 的 `gate_logit` 是一个标量，对所有样本相同。可替换为：
 
@@ -898,7 +1066,7 @@ $$
 
 这项和“定向 query-item Cross”功能重叠，先分别实验；如果定向 Cross 已充分提升，不必再让 bucket gate 复杂化。
 
-### 8.6 增加 query-aware 行为序列
+### 8.6 后续候选：增加 query-aware 行为序列
 
 当前完整 v10 配置中存在 seq/DIN 定义，但 cold 配置清空它们，v3 又显式拒绝非空 extra buckets。要加序列，必须同时修改：
 
@@ -925,7 +1093,7 @@ $$
 - 尾部 query 但用户历史充分；
 - 同 query 下多个相似候选需要细分。
 
-### 8.7 为 query/item 多模态向量保留独立 Token
+### 8.7 后续候选：为 query/item 多模态向量保留独立 Token
 
 当前 item 中虽有 58 个 multimodal 字段，但都按普通 17 维 sparse field 进入一个组；cold 配置还删除了 64 维预训练/序列相关输入。
 
@@ -940,82 +1108,118 @@ $$
 
 ---
 
-## 9. 第四优先级：多任务与排序损失
+## 9. 本轮训练目标与 `search_id` 请求内评价
 
-### 9.1 当前仓库中已经有哪些候选标签
+### 9.1 训练目标保持纯单任务
 
-`FeatureConfigBase` 至少注册了：
+v4 不修改 `parse_examples` 和 `build_loss_op` 的任务口径：
+
+$$
+\mathcal L=\mathcal L_{fst\_BCE}
+=-\frac{1}{N}\sum_n
+\left[y_n\log p_n+(1-y_n)\log(1-p_n)\right].
+$$
+
+训练图中不读取 `search_id`，不增加 auxiliary loss、pairwise loss、listwise loss 或请求权重。这样 Cross
+实验只回答一个问题：在相同点击样本和相同 `fst` 监督下，定向 query-item 表示是否提高预测和排序能力。
+
+### 9.2 为什么请求指标必须离线全量计算
+
+当前 `test()` 已能在 `save_predict_result=true` 时写出：
 
 ```text
-fst_cvr_label
-last_cvr_label
-wide_sim_noquery_fst_label
-delay_2d_fst_cvr_label
-rpy_fst_cvr_label / rpy_last_cvr_label
-label_is_clk_buy_all
-label_is_cnslt
-label_is_clk_rev
-label_gpage_stay_time
-label_gpage_clk_cnt
+search_id    example_id    fst_cvr_label    prediction
 ```
 
-“schema 中存在”不代表当前三路 HDFS 数据都填充了有效值。加入任何辅助头前，先统计真实覆盖率、默认值、正例率、成熟窗口和与 fst 的相关性。
+当前 `parse_examples` 直接读取 `features["search_id"].values` 和 `example_ids.values`，隐含假设每条样本
+恰好各有一个非空 ID。正式评价前必须统计并断言这一条件；若存在缺失或多值，稀疏 Tensor 的 `.values`
+会丢掉行位置，可能让 ID 与 label/pred 错位，应按 sparse indices 恢复逐行值后再导出。
 
-### 9.2 推荐的多任务顺序
+但测试样本分散在多个 worker、文件和 batch；同一个 `search_id` 不保证落在同一 batch 或同一 worker。
+因此不能在单个 TensorFlow batch 内计算 GAUC，也不能对每个 worker 的 GAUC 再简单求平均。正确流程是：
 
-首轮不要复制 reference 的七个头。建议：
+1. v3 baseline 和 QICross 使用完全相同的 held-out 文件；
+2. 开启 `save_predict_result=true`，收齐所有 worker 输出；
+3. 若一次验证包含多个日期，按 `sample_date + search_id` 组成请求键；当前输出没有日期时，应逐日评价，
+   或由离线读取任务从分区路径补上日期；
+4. 以 `sample_date + search_id + example_id` 去重，标签冲突的重复样本单独报警，不静默取平均；
+5. 聚合完成后再计算 exact 全局指标和请求内指标。
 
-1. **主头始终为 fst**；
-2. 先选一个与 fst 最接近、覆盖可靠的 auxiliary，例如 mature delay fst 或 last CVR；
-3. 共享 RankMixer backbone，使用独立的 256 维 task head；
-4. 辅助权重从较小值开始；
-5. 记录主/辅任务在共享层上的 gradient cosine 和 norm；
-6. 只有单辅助头有效，再加入第二个任务。
+`search_id` 只出现在评价产物，不进入 export serving signature。
 
-总损失可以写成：
+### 9.3 有效请求定义
 
-$$
-\mathcal L
-=\mathcal L_{fst}
-+\lambda_{aux}\mathcal L_{aux}.
-$$
-
-多任务的目标不是让总 loss 更低，而是让 held-out `fst_AUC`、Logloss 和关键切片变好。
-
-### 9.3 防止负迁移
-
-辅助任务可能与 fst 冲突。例如 noquery 相似点击可能强化推荐兴趣，却削弱搜索 query 条件；last attribution 也可能与 first attribution 不同。
-
-简单防护顺序：
-
-1. 静态小权重；
-2. 只共享到某一层，task head 分开；
-3. 监控 gradient cosine；
-4. 冲突明显时才使用 GradNorm 或 PCGrad。
-
-[GradNorm](https://arxiv.org/abs/1711.02257)通过平衡任务梯度幅度调节 loss weight；[PCGrad](https://arxiv.org/abs/2001.06782)在任务梯度冲突时做投影。它们是出现负迁移后的工具，不是多任务的默认必选项。
-
-### 9.4 BCE 之外增加请求内 pairwise 辅助损失
-
-当前全局 BCE 不知道哪些候选属于同一个 search request。若数据管道能保持请求分组，可对同一 `search_id` 内的正负候选增加：
+对请求 $g$，令点击样本数为 $n_g$，正例数为 $P_g$，负例数为 $N_g$。只有同时满足以下条件的请求
+才有请求内排序信息：
 
 $$
-\mathcal L_{pair}
-=\log(1+\exp(-(s^+-s^-))).
+n_g\ge2,\qquad P_g\ge1,\qquad N_g\ge1.
 $$
 
-总目标保持：
+请求内 exact AUC 定义为：
 
 $$
-\mathcal L
-=\mathcal L_{BCE}+\lambda_{pair}\mathcal L_{pair}.
+AUC_g=\frac{
+\sum_{p\in g^+}\sum_{n\in g^-}
+\left[\mathbb I(s_p>s_n)+0.5\mathbb I(s_p=s_n)\right]
+}{P_gN_g}.
 $$
 
-这样 BCE 继续保证概率质量，pairwise 项直接鼓励同请求中正样本高于 hard negative。[RankNet 原论文](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/08/icml_ranking.pdf)提供了 query 内 pairwise 概率损失的经典依据。
+所有单样本请求、全正请求和全负请求都不能人为记为 0.5；它们应从 GAUC 分母排除，同时进入覆盖率
+统计。必须输出：
 
-注意：当前 dataset 在训练时 shuffle，batch 不保证完整请求。要做 pairwise，必须上游按 request 组 batch，或在 batch 内按 `search_id` 安全配对；不能把不同 query 的候选随意配成搜索排序对。
+```text
+total_request_count
+valid_request_count
+valid_request_ratio
+valid_sample_count / total_sample_count
+group_size p50/p90/p99
+positive_count 与 negative_count 分布
+```
 
-pairwise loss 可能提升 GAUC/请求内排序而不提升全局 AUC，也可能损伤校准，所以它属于后续实验，不应替代主 BCE。
+点击后 CVR 很可能只有少量多点击且正负混合的请求。若有效覆盖率很低，SearchGAUC 只能代表“多点击
+请求”这一偏置切片，不能替代全局 fst_AUC。
+
+### 9.4 三个不混淆的请求指标
+
+建议同时输出并使用明确名称，避免平台上的笼统 `GAUC` 含义不明：
+
+$$
+SearchAUC_{macro}=\frac{1}{|G_v|}\sum_{g\in G_v}AUC_g,
+$$
+
+$$
+SearchGAUC_{click}=\frac{\sum_{g\in G_v}n_gAUC_g}{\sum_{g\in G_v}n_g},
+$$
+
+$$
+SearchPairAUC=\frac{\sum_{g\in G_v}P_gN_gAUC_g}{\sum_{g\in G_v}P_gN_g}.
+$$
+
+- `SearchAUC_macro`：每个有效请求权重相同，更敏感于小请求；
+- `SearchGAUC_click`：按点击样本数加权，适合作为本轮主请求指标；
+- `SearchPairAUC`：每个正负 pair 权重相同，更容易被大请求主导。
+
+模型晋级时以 `SearchGAUC_click` 为主请求指标，以 exact 全局 `fst_AUC`、Logloss、COPC/ECE 为概率
+质量护栏，同时报告另外两个请求指标。最终主指标名称和权重若团队已有统一规范，应映射到统一规范，
+但公式必须在实验记录中固定。
+
+### 9.5 显著性与公平比较
+
+baseline 与 QICross 必须在相同去重后的请求交集上做 paired comparison。置信区间以
+`sample_date + search_id` 为 cluster 做 paired bootstrap，不能按独立样本 bootstrap。每次重采样完整请求，
+计算：
+
+```text
+Δ exact_fst_AUC
+Δ SearchGAUC_click
+Δ SearchAUC_macro
+Δ SearchPairAUC
+Δ Logloss / COPC / ECE
+```
+
+还应检查增益是否集中在文本弱相关、query 尾部、同类目相似商品等符合 QICross 机制的切片。若全局
+AUC 上升但 `SearchGAUC_click` 稳定下降，则不能把该版本解释为搜索请求内排序改进。
 
 ---
 
@@ -1065,50 +1269,56 @@ $$
 
 ---
 
-## 11. 建议的 v3.1 / v3.2 / v3.3 路线
+## 11. RankMixer v4 最终结构
 
-### 11.1 v3.1：不增加任何线上输入
+### 11.1 训练与前向图
 
 ```mermaid
 flowchart LR
-    A["现有三桶 1,234 字段"] --> B["BN"]
-    B --> C["近恒等分层 SENet"]
-    C --> D["数据验证后的 16 组"]
-    D --> E["Projection + LN"]
-    E --> F["2×RankMixer"]
-    F --> G["Query-conditioned Pool"]
-    E --> X["定向 Query×Item Cross"]
-    G --> H["Fusion"]
-    X --> H
-    H --> I["Dense256 fst Head"]
-    I --> J["fst_CVR"]
+    A["点击后样本：fst_cvr_label"] --> B["现有 1,234 字段 lookup"]
+    B --> C["现有 BN + SENet"]
+    C --> D["现有 16×768 语义 Token"]
+    D --> M["现有 2×RankMixer + Gated Pool"]
+    D --> BC["现有 Bucket Cross"]
+    D --> QC["新增 QICross-Lite\nq→text / q→identity"]
+    M --> F["一次 Fusion + LN"]
+    BC --> F
+    QC --> F
+    F --> H["现有 Linear fst Head"]
+    H --> P["fst_CVR"]
+    P --> L["单任务 BCE"]
 ```
 
-这个版本的候选模块都使用现有字段，适合验证架构是否更好利用当前数据。实际实验仍要逐项加入，不能一次提交完整图。
+与 strict-v3 相比只有 `QICross-Lite` 是新增表示模块；字段、Embedding、Token、Mixer、Pool、Head 和 loss
+均保持一致。`search_id` 不进入上图，它只跟随测试预测进入离线评价。
 
-### 11.2 v3.2：增加已有标签监督
+### 11.2 代码开关与回退
 
-在最佳 v3.1 上：
+`rm_use_query_item_cross=false` 时必须恢复 strict-v3 的完全相同计算图行为和预测。上线包保留该开关，
+可在异常时关闭 Cross 分支；关闭后不应改变输入 schema 或 sparse checkpoint。
+
+模型 checkpoint 兼容关系为：
 
 ```text
-fst 主头
- + 一个经审计的 delay/last 辅助头
- + 可选请求内 pairwise 辅助损失
+strict-v3 checkpoint
+  ├─ 恢复全部旧 dense/sparse 变量
+  └─ 仅初始化 rm_query_item_cross 新变量
+
+v4 checkpoint
+  ├─ 可继续热启 QICross
+  └─ 关闭 QICross 时旧主路径仍可导出
 ```
 
-先证明共享监督能改善 fst，再考虑更复杂的多任务权重或梯度处理。
+### 11.3 本轮结束条件
 
-### 11.3 v3.3：增加搜索相关行为序列
+本轮只回答三件事：
 
-在前两阶段稳定后，增加 1～2 个 query-aware sequence Token，重点验证：
+1. `q→item_text` 是否提高全局 fst 预测与请求内排序；
+2. `q→item_identity` 是否有独立增量；
+3. QICross 与原 Bucket Cross 是互补还是重复。
 
-- 尾部 query；
-- 新/老用户；
-- 当前会话意图变化；
-- 同 query 下高相似候选；
-- 在线 p95/p99 延迟。
-
-如果序列只提升老用户而显著伤害新用户，应保留无序列 fallback 或用 sequence-presence gate。
+多任务、delay 辅助头、pairwise loss、任务 Head、序列、DCNM、更多 Token 和更深 Mixer 均不进入本轮
+commit。即使它们在背景分析中有价值，也必须另开实验方案，不能混入 QICross 的效果归因。
 
 ---
 
@@ -1132,18 +1342,15 @@ fst 主头
 | 阶段 | 实验 | 相对上一基准的唯一变化 | 主要回答 |
 |---:|---|---|---|
 | E0 | strict-v3 | 固化当前 v3 | 得到可信 baseline |
-| E1 | senet-zero-out | SENet 输出矩阵零初始化 | cold 初期扰动是否是问题 |
-| E2 | projection-ln | 只开 `rm_proj_ln` | Token 尺度是否限制 mixing |
-| E3 | task-head | 只加 Dense256 fst Head | 线性读出是否欠拟合 |
-| E4 | regroup-16 | 只改变经 utility 验证的组边界 | 手写分组是否可优化 |
-| E5 | query-item-cross | 只加两组定向 Cross | 搜索特有交互是否不足 |
-| E6 | base-dcnm | 从最佳 E4 另支只加 2×DCNM500 | 全字段显式 Cross 是否仍有增量 |
-| E7 | one-aux-task | 只加一个可靠 auxiliary | 稀疏监督是否是瓶颈 |
-| E8 | delay-correction | 只改变标签成熟/校正方式 | false negative 是否是主因 |
-| E9 | query-aware-seq | 只增加 1 个序列 Token | 瞬时兴趣是否带来增量 |
-| E10 | pairwise-aux | BCE 上增加小权重 pairwise | 请求内排序是否可进一步改善 |
+| V0 | eval-replay | 不训练；E0 预测重放两次 | 离线 exact/SearchGAUC 是否确定可复现 |
+| E1 | qi-text | E0 只开启 `q→item_text` | 文本/NER/相关表示是否需要 query 条件化 |
+| E2 | qi-id | E0 只开启 `q→item_identity` | 商品/类目/店铺身份是否有独立 Cross 增量 |
+| E3 | qi-text-id | E0 同时开启两条边 | 两类定向 Cross 是否互补 |
+| E4 | qi-text-id-no-bucket | E3 只关闭原 Bucket Cross | 定向 Cross 能否替代粗粒度桶交叉 |
+| R1 | winner-reseed | 最优结构只换第二 seed/时间窗 | 增益是否稳定而非初始化或日期偶然 |
 
-E1、E2、E3 的先后可以按诊断调整，但每次只改变一个机制。E8 是否前移取决于标签审计：如果 recent negative 翻转率很高，延迟反馈应在所有结构实验之前解决。
+E1 与 E2 都直接对 E0；E3 对 E0 和单边最优版本同时比较；E4 只相对 E3 关闭一个模块。这样可以回答
+每条边的边际价值及与 Bucket Cross 的重叠程度。
 
 ### 12.3 资源只够六次完整训练时
 
@@ -1151,14 +1358,15 @@ E1、E2、E3 的先后可以按诊断调整，但每次只改变一个机制。E
 
 ```text
 1. E0：严格时间隔离的当前 v3
-2. E2：Projection LayerNorm
-3. E3：Dense256 fst Head
-4. E4：utility-guided 16 组
-5. E5：定向 query-item Cross
-6. E8 或 E7：依据标签审计，优先 delay correction，否则单辅助头
+2. V0：不训练，先验证 search_id 评价链路可复现
+3. E1：只做 q→item_text
+4. E2：只做 q→item_identity
+5. E3：两条边组合
+6. R1：最优版本第二 seed 或相邻时间窗复验
 ```
 
-SENet 零初始化可在小规模冷启筛选中先看稳定性；若训练初期已有明显 gate/gradient 异常，再占用一次完整训练。
+若 E3 明显优于 E1/E2 且还有一次资源，再用 E4 检查是否应保留 Bucket Cross；否则优先复验，不继续扩展
+到 price/context。
 
 ### 12.4 每次实验必须保存的结果
 
@@ -1169,11 +1377,14 @@ train_files / test_files / source_mix
 checkpoint_source / dense_cold_or_warm
 samples_seen / optimizer_steps / wall_time
 exact_fst_auc / pr_auc / logloss / copc / ece
-search_gauc / query-head-tail auc
+search_auc_macro / search_gauc_click / search_pair_auc
+total_request_count / valid_request_count / valid_request_ratio
+request_group_size_distribution / query-head-tail auc
 new-old user/item auc
 gradient_norm / token_norm / pool_entropy
+q_text_gate_mean / q_id_gate_mean / qi_to_pool_norm_ratio
 params / FLOPs / p50-p95-p99 latency
-paired_delta_auc / 95% CI
+request-cluster paired delta / 95% CI
 ```
 
 ---
@@ -1197,23 +1408,24 @@ paired_delta_auc / 95% CI
 
 一个候选只有同时满足以下条件才晋级：
 
-1. exact `fst_AUC` 在至少两个 seed 或相邻时间窗稳定为正；
-2. paired bootstrap CI 支持该增益不是请求组成变化；
-3. Logloss 不显著恶化；
-4. COPC/ECE 在业务允许区间；
-5. 关键 query 尾部、新用户、新商品切片无不可接受退化；
-6. 增益与预设机制相符，例如 query-item Cross 主要改善相关性困难切片；
-7. 训练成本和线上延迟满足预算。
+1. exact `fst_AUC` 相对 E0 在至少两个 seed 或相邻时间窗稳定不退化，并达到团队预设增益门槛；
+2. `SearchGAUC_click` 在相同有效请求交集上稳定提升，同时披露有效请求/样本覆盖率；
+3. request-cluster paired bootstrap CI 支持增益不是请求组成变化；
+4. Logloss 不显著恶化；
+5. COPC/ECE 在业务允许区间；
+6. 关键 query 尾部、新用户、新商品切片无不可接受退化；
+7. 增益与预设机制相符，例如 query-item Cross 主要改善相关性困难切片；
+8. 训练成本和线上延迟满足预算。
 
 不能因为训练 AUC 更高、gate 更“有区分度”、effective rank 更高或 loss 更低就直接上线。
 
 ### 13.3 停止条件
 
 - 同一个模块两次严格 paired 实验均无稳定增益，停止扩参；
-- 只提升全局 AUC、显著损伤 search GAUC，重新审视目标；
+- 只提升全局 AUC、显著损伤 `SearchGAUC_click`，重新审视 Cross 结构；
 - AUC 提升来自疑似未来统计或日期重叠，立即停止并审计数据；
-- 多任务总 loss 下降但 fst 梯度冲突、fst_AUC 不升，移除辅助头；
-- 序列增益只来自线上不可实时获得的字段，不进入生产候选；
+- QICross 残差快速压过 pooled context 且 Logloss/COPC 恶化，降低 gate 或检查归一化；
+- 有效请求覆盖率过低时，不用请求指标替代全局 fst 指标，也不宣称完整候选排序提升；
 - 结构增益小于 exact/approx AUC 的测量误差，不做结论。
 
 ---
@@ -1222,28 +1434,27 @@ paired_delta_auc / 95% CI
 
 | 目标 | 文件/方法 | 修改点 |
 |---|---|---|
-| 修复创建概率 | v3 `get_features_conf`，约 624～627 行 | click 值写入 `create_click_prob` |
-| 校验/增加标签 | `parse_examples`，约 735～761 行 | 取出 last/delay/辅助标签，处理 mask |
-| 总损失 | `build_loss_op`，约 770～775 行 | 主 BCE、aux、pairwise、明确的 L2 |
-| 梯度监控/裁剪 | `build_optimizer_op`，约 793～823 行 | 按 dense scope 记录 norm，必要时 clip |
-| SENet 恒等初始化 | `senet_layer`，约 1141～1238 行 | 三个 output matrix 零初始化 |
-| Token LN | `_project_semantic_group`，约 1240～1277 行 | 开启/比较 projection LN |
-| 语义组 | `_build_semantic_feature_groups`，约 282～532 行 | registry+utility 驱动的 split/merge |
-| Token 数 | `__init__` 与 `_semantic_tokenize` | 同步 T/H/D、组数和 checkpoint |
-| 定向 Cross | `_bucket_cross_residual` 附近新增 | query×item token cross，零初始化残差 |
-| Query Pool | `_pool_tokens`，约 1365～1381 行 | 显式读取 query token，保持均匀初始 |
-| 任务 Head | `model_fn`，约 1528～1547 行 | context 后加 Dense256，再输出 fst |
-| 序列/DIN | FeatureConfig + `model_fn` | 放开指定桶、lookup/mask/token/export |
-| 训练入口 | `bash/set-rankmixer-v3.txt` | 固化日期、commit、cold/warm 和展开参数 |
+| 新增参数 | `cvr_bn_rankmixer_v4.py` 的 `__init__` | 注册 QICross enable、低秩维度、targets 和 gate init；output projection 固定零初始化 |
+| Token 名称索引 | `_validate_semantic_feature_groups` 后 | 从稳定语义组名生成 index map，断言 query/text/id 均存在且唯一 |
+| 定向 Cross | `_bucket_cross_residual` 后新增 `_query_item_cross_residual` | 读取 Mixer 前 Token 3/5/6，执行两条低秩有向 Cross |
+| 一次融合 | `model_fn`，约 1528～1534 行 | `pool + bucket_residual + qi_residual` 后只做一次 `rm_fusion_norm` |
+| Cross 监控 | QICross 方法 / `build_summary` | 记录两路 gate、残差范数及相对 pooled context 范数 |
+| 输出与损失 | `rm_out_v2`、`build_loss_op` | 保持原 Linear fst Head 和单任务 BCE，不修改 |
+| 请求明细 | `parse_examples` / `test()`，约 735～760、920～1008 行 | 断言每样本恰有一个 search/example ID；保留四列输出；开启保存并固定目录 |
+| 请求评价器 | 新增独立离线工具 | 汇总所有 worker，按日期+search_id 去重/分组，输出三个请求指标和覆盖率 |
+| 训练入口 | `bash/set-rankmixer-v4.txt` | 增加 QICross 参数；warm-start 作用域包含新分支；记录 commit 和预测路径 |
+| 已知独立 bug | `get_features_conf`，约 624～627 行 | `create_click_prob` 被写入错误键；应单独修复，不计入 QICross 增益 |
 
-建议为每个新模块增加建图断言和日志：输入 shape、字段数、Token 顺序、变量 scope、train/export 是否一致。搜索排序模型最怕“训练图有效，导出图少了一个条件分支”。
+本轮明确不改 `parse_examples` 的 label、`build_loss_op`、SENet、Projection LN、Token 分组、Pool、
+`rm_out_v2` 或 FeatureConfig。为新模块增加建图断言和日志：输入 shape、语义组名/索引、变量 scope、
+train/test/export 三图是否一致。搜索排序模型最怕“训练图有效，导出图少了一个条件分支”。
 
 ---
 
 ## 15. 作为实习生，最应该向团队追问的 15 个问题
 
 1. `fst_cvr_label` 的业务定义、归因规则和窗口是什么？
-2. 一条样本是排序候选、曝光候选还是点击候选？
+2. 已确认是点击样本；上游精确的 `click==1` 过滤字段和去重规则是什么？
 3. 模型线上在哪个漏斗阶段调用，打分所有候选还是点击后候选？
 4. `fst_CVR` 最终怎样与 pCTR、出价、商品价格或 GMV 组合？
 5. 三路 HDFS 数据分别是什么流量，如何 join 和去重？
@@ -1251,7 +1462,7 @@ paired_delta_auc / 95% CI
 7. 2026-07-02:07 的 train 与 03:08 的 test 在平台上是逐日滚动还是全量加载？
 8. delay 2d 标签与 fst 标签的翻转率是多少？
 9. 1,234 个字段的 owner、业务解释、时间截断和线上可用性在哪里查？
-10. 当前 v3 的真实 exact AUC、Logloss、GAUC 和主要切片结果是多少？
+10. 当前 v3 的真实 exact AUC、Logloss、`SearchGAUC_click`、有效请求覆盖率和主要切片结果是多少？
 11. base/v1/v2/v3 是否使用完全相同的样本数、日期和 checkpoint 策略？
 12. 平台是否自动把 `REGULARIZATION_LOSSES` 加入总 loss？
 13. `enable_gauc=True` 最终按 user、query 还是 search_id 聚合？
@@ -1279,29 +1490,31 @@ paired_delta_auc / 95% CI
    用于理解“历史兴趣表示应随当前候选变化”；搜索迁移时还应加入 query 条件。
 
 5. [Entire Space Multi-Task Model](https://arxiv.org/abs/1804.07931)  
-   用于理解 post-click CVR 的样本选择偏差和稀疏监督；只在训练/推断空间符合时使用。
+   仅用于理解 post-click CVR 的样本选择偏差；本轮已明确不采用 ESMM。
 
 6. [A Feedback Shift Correction in Predicting Conversion Rates under Delayed Feedback](https://arxiv.org/abs/2002.02068) 与 [Unbiased Delayed Feedback Label Correction](https://arxiv.org/abs/2307.12756)  
    用于理解 recent negative 中的延迟正样本和标签校正。
 
 7. [Learning to Rank using Gradient Descent](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/08/icml_ranking.pdf)  
-   用于理解同 query 内的 pairwise 排序损失。
+   用于理解请求内正负 pair 的排序含义；本轮只评价 pair，不把 pairwise loss 加入训练。
 
 8. [GradNorm](https://arxiv.org/abs/1711.02257) 与 [PCGrad](https://arxiv.org/abs/2001.06782)  
-   用于多任务出现梯度幅度失衡或冲突后的诊断与修复。
+   属于多任务背景阅读；本轮纯单任务方案不使用。
 
 ---
 
 ## 17. 最终建议
 
-如果目标是尽快提高 `fst_AUC`，最值得先押注的不是更大的 Mixer，而是三条主线：
+本轮方案已经收敛为三条明确主线：
 
-1. **标签主线**：严格时间隔离，确认样本空间，处理 delayed conversion 和采样偏差；
-2. **搜索主线**：给 query 独立容量，做定向 query-item Cross，并以 search_id 评估请求内排序；
-3. **稳定训练主线**：让 SENet/新残差近恒等起步，统一 Token 尺度，增加轻量 fst Head，真正接入梯度与正则诊断。
+1. **任务主线**：严格使用点击后 `fst_cvr_label`，保持单任务 BCE，不增加任何辅助头或排序损失；
+2. **搜索主线**：在 Mixer 前语义 Token 上增加低秩 `q→item_text`、`q→item_identity` Cross；
+3. **评价主线**：汇总全量 worker 预测，以日期+`search_id` 做 exact 请求内评价，同时保留全局 AUC、Logloss 和校准护栏。
 
-reference 最值得借鉴的是“稳定语义分组、候选条件兴趣、多任务监督和工程化训练”，而不是它的字段清单和模型规模。对当前 v3，一个可信的改进结论必须是：
+reference 最值得借鉴的是“稳定语义分组、候选条件交互和工程化训练”，而不是它的字段清单、模型规模或多任务头。对当前 v4，一个可信的改进结论必须是：
 
-> 在完全相同的搜索样本、标签、日期、checkpoint 和计算预算下，只改变一个明确机制，exact `fst_AUC` 与 Logloss 在多个时间窗稳定改善，并且增益出现在与该机制一致的业务切片上。
+> 在完全相同的点击样本、`fst` 标签、日期、checkpoint 和计算预算下，只增加定向 QICross，
+> exact `fst_AUC` 与 `SearchGAUC_click` 在多个时间窗稳定改善，Logloss/COPC 不发生不可接受退化，
+> 且增益主要出现在 query-item 相关性困难切片。
 
 这才是可以从离线实验走向线上 A/B 的方案。
