@@ -8,8 +8,7 @@ sample_date="${cal_time:0:4}-${cal_time:4:2}-${cal_time:6:2}"
 
 
 model_name='cvr_bn_rankmixer_v4_hzf'
-checkpoint_import_dir="hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v9_fst_delay_v1/pt=2026-07-21-base/checkpoint"
-
+checkpoint_import_dir="hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint"
 
 train_dates=2026-07-02:2026-07-07
 data_dir="hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/search_rank_cvr_seq_fea_exp_shuffle_nebula/pt=%s+hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/chitu_bsearch_cvr_delta_shuffle_sample_v4/pt=%s+hdfs://pdd-data-ns/apps/nothive/warehouse/dist2/bsearch_cvr_shuffle_v4_label/pt=%s"
