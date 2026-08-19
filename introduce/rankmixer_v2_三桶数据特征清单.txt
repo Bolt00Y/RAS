@@ -1,0 +1,1278 @@
+========================================================================================================================
+RankMixer v2 运行时三桶数据特征清单
+========================================================================================================================
+
+【提取依据】
+1. 运行脚本：bash/set-rankmixer-v2.txt
+2. 运行时 feature_version：data.cvr.cvr_fea_v10_base_cold
+3. 三桶定义：src/data/cvr/cvr_fea_v10_base.py 中的 user_features / item_features / creative_features；
+   cvr_fea_v10_base_cold.py 完整继承这三桶，同时清空 dense / sequence / gattr / din。
+4. 模型使用方式：src/models/rankmixer/cvr_bn_rankmixer_v2.py 按 common_fea_map / item_fea_map /
+   creative_fea_map 将 lookup 得到的字段 embedding 分入 common / item / creative 三桶。
+5. 字段语义来源：docs/数据特征清单/USER_COM.txt，按特征 ID 精确匹配。
+
+【范围与校验结果】
+- common：385 个字段
+- item：835 个字段
+- creative：14 个字段
+- 合计：1,234 个模型输入字段；1,234 个均在 USER_COM.txt 中精确匹配，无缺失、无重复。
+- 本清单只包含上述三桶输入，不包含 label、extra、dense、sequence、gattr、din 或 coupon。
+- bash 中 assign_fea_shard_num / assign_fea_span_num 是 PS 显式分片覆盖配置，不是特征选择清单：
+  其中共有 124 个 ID，110 个属于本次三桶输入，14 个不属于本次三桶输入；后者未收入本清单。
+- 各桶字段顺序严格保留 FeatureConfig 中的声明顺序，便于下一步做稳定、可复现的语义分割。
+
+【记录格式】
+桶内序号<TAB>特征ID<TAB>USER_COM分区<TAB>USER_COM行号<TAB>字段名、构造语义与类型（去除原始行首ID）
+
+------------------------------------------------------------------------------------------------------------------------
+【common 桶】共 385 个字段
+------------------------------------------------------------------------------------------------------------------------
+桶内序号	特征ID	USER_COM分区	USER_COM行号	字段语义
+0001	1001	USER_COMMON	2	"user_id" key(i64(user_id)) Categorical
+0002	1006	USER_COMMON	3	"city_level" key(i64(city_level)) Categorical
+0003	1014	USER_COMMON	4	"reg_mtime" value2key_i(round(i64(reg_mtime))) Categorical
+0004	10231	USER_COMMON	249	"u_pay_ord_cnt_dis" u_pay_ord_cnt_dis Categorical
+0005	10232	USER_COMMON	253	"rfsn_time_gap_dis" rfsn_time_gap_dis Categorical
+0006	10233	USER_COMMON	258	"u_rfsn_ratio_dis" u_rfsn_ratio_dis Categorical
+0007	1034	USER_COMMON	5	"avlb_app_codes" key(hash(avlb_app_codes)) Categorical
+0008	1035	USER_COMMON	6	"dflt_rcv_prov_name" key(hash(dflt_rcv_prov_name)) Categorical
+0009	1036	USER_COMMON	7	"dflt_rcv_city_name" key(hash(dflt_rcv_city_name)) Categorical
+0010	1041	USER_COMMON	8	"rcv_prvn_id_list" key(i64(rcv_prvn_id_list)) Categorical
+0011	1042	USER_COMMON	9	"rcv_city_id_list" key(i64(rcv_city_id_list)) Categorical
+0012	1043	USER_COMMON	10	"rcv_dist_id_list" key(i64(rcv_dist_id_list)) Categorical
+0013	10442	USER_COMMON	265	"goods_buy_seq_90d_dedup" list_dedup(i64(goods_buy_seq_90d)) dup_cnt=1 Categorical
+0014	10522	USER_COMMON	311	"disc_ordr_count_avg" disc_ordr_count_avg_d Categorical
+0015	10600	USER_COMMON	314	"new_brand_rate" key(new_brand_rate_dis) Categorical
+0016	10601	USER_COMMON	315	"new_ordr_cnt" value2key_i(i64(new_ordr_cnt)) Categorical
+0017	1063	USER_COMMON	29	"top_action_cat" mergekey(cat_merge_1,cat_merge_2) Categorical
+0018	1064	USER_COMMON	30	"top_action_cat1" mergekey(cat1_merge_1,cat1_merge_2) Categorical
+0019	1065	USER_COMMON	31	"top_action_cat2" mergekey(cat2_merge_1,cat2_merge_2) Categorical
+0020	1070	USER_COMMON	32	"page_el_sn_7d" key(i64(page_el_sn_7d)) Categorical
+0021	1104	USER_COMMON	33	"top_ordr_buy_mall" key(i64(top_ordr_buy_mall)) Categorical
+0022	1106	USER_COMMON	34	"top_ordr_buy_goods" key(i64(top_ordr_buy_goods)) Categorical
+0023	1121	USER_COMMON	393	"clk_brand_size" value2key_i(i64(USER_COMMON.clk_brand_size)) Categorical
+0024	12209	USER_CONTEXT	2476	"query_seg_add" key(u_query_seg_info_list_add) Categorical
+0025	12235	USER_CONTEXT	2465	"u_noclk_mall_lastview_qc_30m" key(impr_mall_lastview_qc30m_uniq) Categorical
+0026	12402	USER_CONTEXT	2466	"u_hq_cnt" default_key_i(value2key_i(key_size(i64(user_history_query)))) Categorical
+0027	12403	USER_CONTEXT	2478	"u_hq_itst_cnt" default_key_i(value2key_i(key_size(u_hq_itst_list))) Categorical
+0028	12438	USER_CONTEXT	2468	"u_clk_s1_c_sz" value2key_i(key_size(key_distinct(value2key_i(u_clk_c_s1)))) Categorical
+0029	13037	CONTEXT	1239	"goods_clk_unclk_cnt" concat_typed(clk_goods_distinct_size,unclk_goods_distinct_size) Categorical
+0030	13038	CONTEXT	1240	"mall_clk_unclk_cnt" concat_typed(clk_mall_distinct_size,noclk_mall_distinct_size) Categorical
+0031	13039	CONTEXT	1241	"cat_clk_unclk_cnt" concat_typed(clk_cat_distinct_size,noclk_cat_distinct_size) Categorical
+0032	131480	USER_CONTEXT	3265	"long_view_sprice_log" history_buy_price_log_ Categorical
+0033	15000	QUERY	5478	"query_ner_list_term" hash(ner_term_list) Categorical
+0034	15002	QUERY	5477	"query_length_dis" value2key_i(key_size(hash(seg_word))) Categorical
+0035	1501	USER_COMMON	43	"user_phone_info" concat_typed(phone_info1,phone_info2) Categorical
+0036	1502	USER_COMMON	47	"u_active_level" concat_typed(user_active_1,user_active_2,user_level_buypower) Categorical
+0037	1504	USER_COMMON	50	"user_age_gndr_info" concat_typed(user_gndr_info,user_age_info) Categorical
+0038	1505	USER_COMMON	53	"nwk_all_info" concat_typed(nwk_opr_info,nwk_info) Categorical
+0039	1509	USER_COMMON	124	"u_goods_action_sum_30d" concat_typed(goods_30d_sum_dis_concat1,goods_30d_sum_dis_concat2) Categorical
+0040	1512	USER_COMMON	132	"u_goods_cnt_30d" concat_typed(view_goods_30d_size_dis,goods_30d_cnt_dis_concat2,goods_30d_cnt_dis_concat3) Categorical
+0041	1521	USER_COMMON	167	"u_c_action_cnt_30d" concat_typed(cate_30d_cnt_dis_concat1,cate_30d_cnt_dis_concat2,cate_30d_cnt_dis_concat3) Categorical
+0042	1524	USER_COMMON	170	"u_m_action_cnt_30d" concat_typed(view_mall_30d_size_dis,mall_30d_cnt_dis_concat2,mall_30d_cnt_dis_concat3) Categorical
+0043	1527	USER_COMMON	57	"user_all_score" concat_typed(user_scr_1,user_scr_2,user_scr_3) Categorical
+0044	16725	USER_COMMON	320	"goods_clk_before_buy_sum" concat_typed(tmp_low_price_clk_before_buy,tmp_cheap_price_clk_before_buy,tmp_mid_price_clk_before_buy,tmp_high_price_clk_before_buy) Categorical
+0045	16727	USER_COMMON	327	"goods_mid_clk_before_buy_sum" concat_typed(tmp_low_price_mid_clk_before_buy,tmp_cheap_price_mid_clk_before_buy,tmp_mid_price_mid_clk_before_buy,tmp_high_price_mid_clk_before_buy) Categorical
+0046	16731	USER_COMMON	335	"cate_clk_before_buy_sum" concat_typed(tmp_cate_clk_before_buy, tmp_cate_low_price_clk_before_buy, tmp_cate_cheap_price_clk_before_buy, tmp_cate_mid_price_clk_before_buy, tmp_cate_high_price_clk_before_buy) Categorical
+0047	16733	USER_COMMON	341	"cate_mid_clk_before_buy_sum" concat_typed(tmp_cate_mid_clk_before_buy, tmp_cate_low_price_mid_clk_before_buy, tmp_cate_cheap_price_mid_clk_before_buy, tmp_cate_mid_price_mid_clk_before_buy, tmp_cate_high_price_mid_clk_before_buy) Categorical
+0048	16735	USER_COMMON	346	"cate_scene_clk_before_buy_sum" tmp_cate_scene_clk_before_buy_sum Categorical
+0049	16737	USER_COMMON	352	"cate_action_timegap_before_buy" tmp_cate_action_timegap_before_buy Categorical
+0050	16739	USER_COMMON	358	"cate1_clk_before_buy_sum" concat_typed(tmp_cate1_clk_before_buy, tmp_cate1_low_price_clk_before_buy, tmp_cate1_cheap_price_clk_before_buy, tmp_cate1_mid_price_clk_before_buy, tmp_cate1_high_price_clk_before_buy) Categorical
+0051	16743	USER_COMMON	370	"cate1_scene_clk_before_buy_sum" concat_typed(tmp_cate1_search_clk_before_buy,tmp_cate1_weak_clk_before_buy,tmp_cate1_rec_clk_before_buy) Categorical
+0052	16744	USER_COMMON	374	"cate1_scene_mid_clk_before_buy_sum" concat_typed(tmp_cate1_search_mid_clk_before_buy,tmp_cate1_weak_mid_clk_before_buy,tmp_cate1_rec_mid_clk_before_buy) Categorical
+0053	18021	USER_CONTEXT	2820	"user_top_view_mall_180d" topk(user_view_mall_180d_map) max_len=100 with_key_sorted=1 Categorical
+0054	18073	USER_CONTEXT	2842	"user_impr_top_goods_10002" topk(user_impr_goods_3d_map_10002) max_len=50 with_key_sorted=1 Categorical
+0055	18078	USER_CONTEXT	2843	"user_impr_top_cat_10002" topk(user_impr_cat_3d_map_10002) max_len=20 with_key_sorted=1 Categorical
+0056	18083	USER_CONTEXT	2845	"user_impr_top_mall_10002" topk(user_impr_mall_3d_map_10002) max_len=30 with_key_sorted=1 Categorical
+0057	18094	USER_CONTEXT	2869	"user_view_top_goods_10014" topk(user_view_goods_180d_map_10014) max_len=50 with_key_sorted=1 Categorical
+0058	18098	USER_CONTEXT	2871	"user_view_top_cat_10002" topk(user_view_cat_180d_map_10002) max_len=20 with_key_sorted=1 Categorical
+0059	18100	USER_CONTEXT	2872	"user_view_top_cat_10015" topk(user_view_cat_180d_map_10015) max_len=20 with_key_sorted=1 Categorical
+0060	18105	USER_CONTEXT	2873	"user_view_top_mall_10015" topk(user_view_mall_180d_map_10015) max_len=30 with_key_sorted=1 Categorical
+0061	18214	USER_CONTEXT	2879	"user_view_xxx_180d_cnt_concat" concat_typed(user_view_goods_180d_cnt,user_view_cat_180d_cnt,user_view_mall_180d_cnt) Categorical
+0062	19013	USER_COMMON	402	"gpage_lead_ordr_pay_ordr_cnt" concat_typed(gpage_lead_ordr_pay_ordr_cnt_log_map_) Categorical
+0063	19016	USER_COMMON	406	"ordr_shp_sku_cnt" concat_typed(ordr_shp_sku_cnt_log_map_) Categorical
+0064	19024	USER_COMMON	410	"srpg_page_view_cnt" concat_typed(srpg_page_view_cnt_log_map_) Categorical
+0065	200124	USER_CONTEXT	3787	"user_view_tg1_cut200" user_view_tg1_cut200_ Categorical
+0066	200200	USER_CONTEXT	3793	"top200_price_dis" dnn_top200_vprice_dis_ Categorical
+0067	200214	USER_CONTEXT	3803	"top200_price_log2" ranklist_top200_vprice_log2_ Categorical
+0068	200300	USER_CONTEXT	3309	"user_history_buy_time_hour_uniq" user_history_buy_time_hour_uniq_ Categorical
+0069	200302	USER_CONTEXT	3317	"user_history_buy_goods_dup_time_gap_dis" dis2xf3_i(user_history_buy_goods_dup_time_gap_) discrete_key=buy_goods_dup_time_gap Categorical
+0070	200303	USER_CONTEXT	3323	"user_buy_time_price_less10" default_key_i(user_buy_time_price_less10_) Categorical default_key=-1
+0071	200304	USER_CONTEXT	3326	"user_buy_time_price_less100" default_key_i(user_buy_time_price_less100_) Categorical default_key=-1
+0072	200305	USER_CONTEXT	3330	"user_view_uniq_goods_pagesn_x_time_hour" concat_typed(user_view_goods_all_uniq_pagesn_,user_view_goods_all_uniq_time_hour_) Categorical
+0073	200306	USER_CONTEXT	3331	"user_history_buy_mall_cnt" value2key_i(log_v2(count_v_fix_i(user_history_buy_mall))) Categorical
+0074	200318	USER_CONTEXT	3335	"long_view_time_gap_uniq" long_view_time_gap_uniq_ Categorical
+0075	200319	USER_CONTEXT	3339	"long_fav_time_gap_uniq" long_fav_time_gap_uniq_ Categorical
+0076	200320	USER_CONTEXT	3343	"long_buy_time_gap_uniq" long_buy_time_gap_uniq_ Categorical
+0077	200413	USER_CONTEXT	3721	"long_impr_tg0_cut30" list_index_typed(long_impr_tg0_cut200_, const_idx_cut30_) Categorical
+0078	200714	USER_CONTEXT	3129	"u_gd_slct_type_cut3" hash(str(u_gd_slct_type_cut3_)) strict=0 Categorical
+0079	200715	USER_CONTEXT	3130	"u_gd_slct_type_cut10" hash(str(u_gd_slct_type_cut10_)) strict=0 Categorical
+0080	200752	USER_CONTEXT	3362	"user_noclk_goods_all_" key(user_noclk_goods_all_) max_length=100 Categorical
+0081	200758	USER_CONTEXT	3377	"q2i_hit_impr_pagesn_3d" key(q2i_hit_impr_pagesn_3d_uniq_) Categorical
+0082	200762	USER_CONTEXT	3389	"gd_4264980_c_gids_map_cnt" key_size_v3(gd_4264980_c_gids_map_) Categorical
+0083	200764	USER_CONTEXT	3390	"gd_96601_c_gids_map_cnt" key_size_v3(gd_96601_c_gids_map_) Categorical
+0084	201702	USER_COMMON	423	"hbdist_x_tg_key" default_key_i(hbdist_x_tg_map_) Categorical default_key=-1
+0085	201704	USER_COMMON	431	"cate_ordr_cba_cnt" default_key_i(cate_ordr_cba_cnt_v4_) Categorical default_key=-1
+0086	201720	USER_CONTEXT	3412	"gdoff_3m_acty_tpgsn" default_key_i(hash(str(gdoff_3m_acty_tpgsn_))) strict=0 default_key=-1 Categorical
+0087	201756	USER_COMMON	429	"hist_buy_price_x_daygap_key" default_key_i(hist_buy_price_x_hourgap_map_) Categorical default_key=-1
+0088	201757	USER_COMMON	665	"hist_buy_price_x_hourgap_c200" key(hist_buy_price_x_hourgap_) Categorical max_length=200
+0089	201900	USER_COMMON	667	"user_cate2_impr_2y_top400" topk(user_cate2_impr_2y_) Categorical max_len=400 with_key_sorted=1
+0090	201905	USER_COMMON	448	"user_cate_clk_2y_top400" user_cate_clk_2y_top400_ Categorical
+0091	201906	USER_COMMON	449	"user_cate1_clk_2y_top400" user_cate1_clk_2y_top400_ Categorical
+0092	201909	USER_COMMON	451	"user_cate2_clk_2y_x_cnt" concat_typed(user_cate2_clk_2y_,user_cate2_clk_2y_dis_) Categorical
+0093	201914	USER_COMMON	460	"user_cate1_ordr_2y_top400" user_cate1_ordr_2y_top400_ Categorical
+0094	201915	USER_COMMON	461	"user_cate2_ordr_2y_top400" user_cate2_ordr_2y_top400_ Categorical
+0095	201930	USER_COMMON	473	"c2b_3d_impr_cnts_seq_log" default_key_i(c2b_3d_impr_cnts_seq_log_) Categorical default_key=-1
+0096	201931	USER_COMMON	474	"c2b_3d_clk_cnts_seq_log" default_key_i(c2b_3d_clk_cnts_seq_log_) Categorical default_key=-1
+0097	201932	USER_COMMON	475	"c2b_3d_clk_fav_cnts_seq_log" default_key_i(c2b_3d_clk_fav_cnts_seq_log_) Categorical default_key=-1
+0098	201937	USER_COMMON	467	"c2b_3d_c2b_timegaps_seq_log" default_key_i(c2b_3d_c2b_timegaps_seq_log_) Categorical default_key=-1
+0099	201939	USER_COMMON	476	"rfsn_timegaps" default_key_i(value2key_i(div_num(k2v_f(i64(USER_COMMON.rfsn_timegaps_fix))))) Categorical divisor=3600 default_key=-1
+0100	202144	USER_CONTEXT	3811	"user_gd_acty_type_tq2c_30d_c3" hash(str(user_gd_acty_type_tq2c_30d_c3_)) strict=0 Categorical
+0101	202218	USER_CONTEXT	3694	"long_buy_elapsed_180d_min" key(value2key_i(div_num(long_buy_elapsed_180d))) divisor=60000 max_length=100 Categorical
+0102	202223	USER_CONTEXT	3695	"user_impr_goods_2k" key(value2key_i(user_impr_goods_all)) max_length=2000 Categorical
+0103	202330	USER_CONTEXT	3662	"long_impr_time_1h_off_2_4_diff" default_key_i(long_impr_time_1h_off_2_4_diff_concat_) default_key=-1 Categorical
+0104	202333	USER_CONTEXT	3018	"impr_ravg" concat_typed(lrn_impr_rcvr_avg_,rn_impr_rcvr_avg_) Categorical
+0105	202334	USER_CONTEXT	3019	"impr_rmod" concat_typed(lrn_impr_rcvr_mod_,rn_impr_rcvr_mod_) Categorical
+0106	202425	USER_CONTEXT	3690	"user_impr_pagesn_timegap_sum_all_hour" concat_typed(count_key(user_impr_pagesn_time_gap_all_hour)) Categorical
+0107	202426	USER_CONTEXT	3691	"user_view_pagesn_timegap_sum_all_hour" concat_typed(count_key(user_view_pagesn_time_gap_all_hour)) Categorical
+0108	20517	USER_COMMON	280	"nfk_ordr_pay_ordr_amt_lvl_30d" key(i64(nfk_ordr_pay_ordr_amt_lvl_30d)) Categorical
+0109	20518	USER_COMMON	281	"search_index_nfk_ordr_pay_ordr_amt_lvl_30d" key(i64(search_index_nfk_ordr_pay_ordr_amt_lvl_30d)) Categorical
+0110	20521	USER_COMMON	283	"nfk_ordr_pay_ordr_aop_lvl_30d" key(i64(nfk_ordr_pay_ordr_aop_lvl_30d)) Categorical
+0111	2066	USER_CONTEXT	2332	"leafcat_buy_seq_3d" key(i64(leafcat_buy_seq_3d)) Categorical
+0112	2073	USER_CONTEXT	2254	"u2m_clk_cnt_id" key(filter_mall_clk_count_3d_1) Categorical
+0113	2100	CONTEXT	1154	"u_impr_clk_srch_disp_2min" concat_typed(concat_typed(u_clk_cnt_srch_2min,u_clk_cnt_disp_2min),concat_typed(u_impr_cnt_srch_2min,u_impr_cnt_disp_2min)) Categorical
+0114	210000	USER_CONTEXT	4441	"coupon_dto_discount_type" key_distinct(i64(USER_CONTEXT.coupon_dto_discount_type)) Categorical
+0115	210001	USER_CONTEXT	4442	"coupon_dto_min_amount" key_distinct(i64(USER_CONTEXT.coupon_dto_min_amount)) Categorical
+0116	210015	USER_CONTEXT	3220	"gd_type5_idx" gd_type5_idx_ Categorical
+0117	210042	USER_CONTEXT	3221	"gd_type8_idx" gd_type8_idx_ Categorical
+0118	2101	CONTEXT	1155	"u_impr_clk_srch_disp_5min" concat_typed(concat_typed(u_clk_cnt_srch_5min,u_clk_cnt_disp_5min),concat_typed(u_impr_cnt_srch_5min,u_impr_cnt_disp_5min)) Categorical
+0119	21010	USER_CONTEXT	2410	"qc_clk_cnt_rt_dis" concat_typed(concat_typed(d_rt_qc_clk_1h,d_rt_qc_clk_1d),d_rt_qc_clk_3d) Categorical
+0120	21012	USER_CONTEXT	2423	"qc_fav_cnt_rt_dis" concat_typed(concat_typed(d_rt_qc_fav_1h,d_rt_qc_fav_1d),d_rt_qc_fav_3d) Categorical
+0121	21013	USER_CONTEXT	2436	"qc_stay_sum_rt_dis" concat_typed(concat_typed(d_rt_qc_stay_1h,d_rt_qc_stay_1d),concat_typed(d_rt_qc_stay_3d,d_rt_qc_stay_7d)) Categorical
+0122	2102	CONTEXT	1156	"u_impr_clk_srch_disp_10min" concat_typed(concat_typed(u_clk_cnt_srch_10min,u_clk_cnt_disp_10min),concat_typed(u_impr_cnt_srch_10min,u_impr_cnt_disp_10min)) Categorical
+0123	2103	CONTEXT	1157	"u_impr_clk_srch_disp_30min" concat_typed(concat_typed(u_clk_cnt_srch_30min,u_clk_cnt_disp_30min),concat_typed(u_impr_cnt_srch_30min,u_impr_cnt_disp_30min)) Categorical
+0124	21030	USER_CONTEXT	2441	"user_impr_pagesn_timegap_sum" concat_typed(count_key(user_impr_pagesn_time_gap)) Categorical
+0125	21031	USER_CONTEXT	2442	"user_view_pagesn_timegap_sum" concat_typed(count_key(user_view_pagesn_time_gap)) Categorical
+0126	21032	USER_CONTEXT	2445	"user_impr_pagesn_timegap_sum_qc" concat_typed(count_key(user_impr_pagesn_time_gap_qc)) Categorical
+0127	21033	USER_CONTEXT	2446	"user_view_pagesn_timegap_sum_qc" concat_typed(count_key(user_view_pagesn_time_gap_qc)) Categorical
+0128	2104	CONTEXT	1158	"u_clk_queries" key(i64(searchClickQueries)) Categorical
+0129	21055	USER_CONTEXT	2635	"long_view_nproduct_180d_qc_dis_size" dis2xf3_i(key_size(long_view_nproduct_180d_qc_map)) discrete_key=view_nproduct_180d_qc_dis_size Categorical
+0130	211121	USER_CONTEXT	3999	"user_query_q2i_hit_ctr_top200_goods_sum" dis2xf3_i(sum_value(user_query_q2i_kv_hit_ctr_top200_goods_)) discrete_key=user_query_q2i_hit_ctr_top200_goods_sum Categorical
+0131	2112	CONTEXT	1191	"u_clk_srch_cnt" value2key_i(key_size(i64(searchClickQueries))) Categorical
+0132	2123	CONTEXT	1200	"u_session_rcomment" key_distinct(i64(SessionRCommentGoodsIds)) Categorical
+0133	21233	USER_CONTEXT	2618	"long_view_mall_qc_top" long_view_mall_qc_top Categorical
+0134	21238	USER_CONTEXT	2636	"ViewGoodsSize" dis2xf3_i(i64(ViewGoodsSize)) discrete_key=view_goods_180d_size Categorical
+0135	21239	USER_CONTEXT	2637	"viewGoodsMapSize" dis2xf3_i(i64(viewGoodsMapSize)) discrete_key=view_goods_180d_dis_size Categorical
+0136	21240	USER_CONTEXT	2638	"viewCatMapSize" dis2xf3_i(i64(viewCatMapSize)) discrete_key=view_cate_180d_dis_size Categorical
+0137	21246	USER_CONTEXT	2641	"long_view_goods_180d_qc_dis_size" dis2xf3_i(key_size(long_view_goods_180d_qc_map)) discrete_key=view_goods_180d_qc_dis_size Categorical
+0138	21257	USER_CONTEXT	2642	"long_view_goods_180d_qc" key(value2key_i(long_view_goods_180d_qc:IntList)) max_length=128 Categorical
+0139	21258	USER_CONTEXT	2643	"long_view_cate_180d_qc" key(value2key_i(long_view_cate_180d_qc:IntList)) max_length=128 Categorical
+0140	21260	USER_CONTEXT	2644	"long_view_brand_180d_qc" key(value2key_i(long_view_brand_180d_qc:IntList)) max_length=128 Categorical
+0141	21264	USER_CONTEXT	2645	"long_buy_brand_180d_qc" key(value2key_i(long_buy_brand_180d_qc:IntList)) max_length=128 Categorical
+0142	21303	USER_CONTEXT	2955	"rn_page_1_stay_dis_x_page" concat_typed(rn_page_1_stay_d_,i64(CONTEXT.page)) Categorical
+0143	21307	USER_CONTEXT	2957	"rn_page_stay_d_x_pos" lconcatp_typed(rn_page_stay_d_) Categorical
+0144	21340	USER_CONTEXT	2960	"rn_page_stay_d" ngram(rn_page_stay_d_) n=3 Categorical
+0145	21351	USER_CONTEXT	2965	"rn_impr_rcvr_avg_" rn_impr_rcvr_avg_ Categorical
+0146	21355	USER_CONTEXT	2967	"rn_click_rcvr_avg_" rn_click_rcvr_avg_ Categorical
+0147	21359	USER_CONTEXT	2971	"rn_impr_rcvr_mod_" rn_impr_rcvr_mod_ Categorical
+0148	21402	USER_COMMON	412	"fst_page_cvr_dis" fst_page_cvr_dis Categorical
+0149	21403	USER_COMMON	414	"fst_page_ordr_ratio_dis" fst_page_ordr_ratio_dis Categorical
+0150	21404	USER_COMMON	416	"avg_ordr_page_dis" avg_ordr_page_dis Categorical
+0151	215311	USER_CONTEXT	4241	"brtavg_impr_seq_x_prc_" uniq_typed(brtavg_impr_seq_x_prc_) Categorical
+0152	215312	USER_CONTEXT	4244	"brtavg_impr_seq_x_prc_" uniq_typed(list_index_v2_typed(brtavg_impr_seq_x_prc_, impr_seq_1h_index_)) Categorical
+0153	215343	USER_CONTEXT	4319	"impr_v2_1d_dur_hpd_" uniq_typed(impr_v2_1d_dur_hpd_) Categorical
+0154	215373	USER_CONTEXT	4348	"impr_v2_1d_dur_hpd_idx_idx_idx_shift2_" impr_v2_1d_dur_hpd_idx_idx_idx_shift2_ Categorical
+0155	215401	USER_CONTEXT	4371	"q2c_hit_impr_v2_1d_0to2_dur_hpd_idx_idx_" q2c_hit_impr_v2_1d_0to2_dur_hpd_idx_idx_ Categorical
+0156	21602	USER_CONTEXT	2973	"rn_click_time_gap" rn_click_tg_ Categorical
+0157	21610	USER_CONTEXT	2984	"last_rn_stay_time" last_rn_stay_time_d Categorical
+0158	21663	USER_CONTEXT	3009	"impr_pred_price_avg_dis" mergekey(lrn_impr_pred_price_avg_dis_,rn_impr_pred_price_avg_dis_) Categorical
+0159	21749	USER_CONTEXT	3059	"long_view_sprice_log" long_view_sprice_log_ Categorical
+0160	21750	USER_CONTEXT	3060	"long_buy_sprice_log_" long_buy_sprice_log_ Categorical
+0161	231056	USER_COMMON	529	"user_order_goods_qc" key(value2key_i(user_order_goods_qc_map:IntList)) max_length=128 Categorical
+0162	231065	USER_COMMON	531	"ordnobuy_cate_map_top" topk(ordnobuy_cate_map) max_len=100 with_key_sorted=1 Categorical
+0163	231383	USER_COMMON	525	value2key_i(log_with_base(sum_value(k2v_f(list_index_typed(user_life_clk_staytime_, u_lifeclk_hit_v8_idx_))))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0164	231384	USER_COMMON	526	value2key_i(log_with_base(list_index_typed(user_life_clk_timediff_hour_, u_lifeclk_hit_v8_idx_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0165	231484	QUERY	5685	value2key_i(log_with_base(list_index_typed(uc_lifeclk_timediff_hour_, uc_lifeclk_hit_v8_idx_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0166	24082402	QUERY	5623	"acv2_uniq_6m_tgdf_x_page_sn_x_elsn" default_key_i(concat_typed(acv2_uniq_6m_tgdf_log_, acv2_uniq_6m_page_sn_x_elsn_)) Categorical default_key=-1
+0167	24082411	QUERY	5638	"ordrv3_2y_dc_pay_to_shp_tg_logv0" default_key_i(ordrv3_2y_dc_pay_to_shp_tg_logv0_) Categorical default_key=-1
+0168	24082412	QUERY	5643	"ordrv3_2y_dc_tg_x_plat_types" default_key_i(concat_typed(ordrv3_2y_tg_log_,ordrv3_2y_dc_plat_types_)) Categorical default_key=-1
+0169	24082413	QUERY	5655	"ordrv3_2y_dc_ots_m_x_ordr_x_pay_app" default_key_i(concat_typed(ordrv3_2y_ots_m_,ordrv3_2y_dc_ordr_x_pay_app_)) Categorical default_key=-1
+0170	246003	QUERY	5694	"rc_impr_top200_goods" rc_impr_top200_goods_ Categorical
+0171	25000	USER_COMMON	288	"user_buypw" user_buypw Categorical
+0172	25001	USER_COMMON	291	"use_cpn_freq_30d_dis" concat_typed(use_cpn_ordr_freq_30d_dis, use_cpn_goods_freq_30d_dis) Categorical
+0173	25002	USER_COMMON	296	"user_level_dis_concat" concat_typed(cfm_ordr_cnt_level_dis, cfm_ordr_amt_level_dis, disc_snstv_level_dis, cust_usr_layer_dis) Categorical
+0174	25003	USER_COMMON	297	"cust_usr_layer_desc" key(hash(cust_usr_layer_desc)) Categorical
+0175	25006	USER_COMMON	305	"" user_order_cnt_all_dis Categorical
+0176	2503	USER_CONTEXT	2313	"u_buy_cnt_rt_dis" concat_typed(concat_typed(u_buy_cnt_1h_dis,u_buy_cnt_1d_dis),concat_typed(u_buy_cnt_3d_dis,u_buy_cnt_7d_dis)) Categorical
+0177	2504	USER_CONTEXT	2317	"u_fav_cnt_rt_dis" concat_typed(u_fav_cnt_1h_dis,u_fav_cnt_1d_dis,u_fav_cnt_3d_dis) Categorical
+0178	25044	USER_CONTEXT	2646	"user_bg_6m" topk(long_buy_goods_180d_map) max_len=100 with_key_sorted=1 Categorical
+0179	25045	USER_CONTEXT	2647	"user_fm_6m" topk(long_fav_mall_180d_map) max_len=30 with_key_sorted=1 Categorical
+0180	25046	USER_CONTEXT	2648	"user_fg_6m" topk(long_fav_goods_180d_map) max_len=100 with_key_sorted=1 Categorical
+0181	25049	USER_CONTEXT	2659	"ug_6h_p_info" concat_typed(user_ig_6h_dis, user_vg_6h_cnt) Categorical
+0182	2505	USER_CONTEXT	2321	"u_impr_cnt_rt_dis" concat_typed(u_impr_cnt_1h_dis,u_impr_cnt_1d_dis,u_impr_cnt_3d_dis) Categorical
+0183	2506	USER_CONTEXT	2326	"u_stay_rt_dis" concat_typed(concat_typed(u_stay_1h_dis,u_stay_1d_dis),concat_typed(u_stay_3d_dis,u_stay_7d_dis)) Categorical
+0184	2507	USER_CONTEXT	2331	"u_clk_cnt_rt_dis" concat_typed(concat_typed(u_clk_cnt_1h_dis,u_clk_cnt_1d_dis),concat_typed(u_clk_cnt_3d_dis,u_clk_cnt_7d_dis)) Categorical
+0185	2509	USER_CONTEXT	2256	"goods_clk_stay_id" get(goods_clk_stay_7d) Categorical
+0186	25136	USER_CONTEXT	2896	"pre_norm_query_ner_kstringset" default_key_i(key(hash(click_goods_ner_kstringset))) Categorical
+0187	25138	USER_CONTEXT	2897	"ngram2user_history_query" default_key_i(ngram(value2key_i(user_history_query))) n=2 Categorical
+0188	25700	USER_CONTEXT	3081	"lp_gd_ordr_cnt_log_" lp_gd_ordr_cnt_log_ Categorical
+0189	25702	USER_CONTEXT	3082	"lp_gd_sku_cnt_log_" lp_gd_sku_cnt_log_ Categorical
+0190	25703	USER_CONTEXT	3083	"lp_gd_cmnt_cnt_log_" lp_gd_cmnt_cnt_log_ Categorical
+0191	26017	USER_CONTEXT	2713	"user_buy_goods_730d_top" topk(user_buy_goods_730d_map) max_len=100 with_key_sorted=1 Categorical
+0192	26021	USER_CONTEXT	2714	"user_buy_mall_730d_top" topk(user_buy_mall_730d_map) max_len=100 with_key_sorted=1 Categorical
+0193	26025	USER_CONTEXT	2715	"user_buy_cat_730d_top" topk(user_buy_cat_730d_map) max_len=100 with_key_sorted=1 Categorical
+0194	26035	USER_CONTEXT	2716	"user_fav_cat_730d_top" topk(user_fav_cat_730d_map) max_len=100 with_key_sorted=1 Categorical
+0195	26107	USER_CONTEXT	2722	"buy_price_730d_top" topk(user_buy_price_730d_map) max_len=50 with_key_sorted=1 Categorical
+0196	27516	QUERY	5492	"query_avg_price" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(query_avg_price_))) Categorical
+0197	300000	CONTEXT	1283	"fltr" hash(fltr) Categorical
+0198	3001	CONTEXT	1205	"context_search_met" key(hash(context_search_met)) Categorical
+0199	3003	CONTEXT	1206	"app_version" key(hash(app_version)) Categorical
+0200	3004	CONTEXT	1207	"user_agent" key(hash(user_agent)) Categorical
+0201	3006	CONTEXT	1209	"query_size" key(query_size) Categorical
+0202	3007	CONTEXT	1210	"norm_query_hash" key(i64(norm_query_hash)) Categorical
+0203	3008	CONTEXT	1211	"query_word" key(i64(query_seg_ner_word)) Categorical
+0204	3009	CONTEXT	1212	"query_tag" key(hash(query_seg_ner_tag)) Categorical
+0205	3014	CONTEXT	1216	"noclk_mallid" key(key_distinct(i64(noclk_mallid))) max_length=100 Categorical
+0206	3015	CONTEXT	1217	"noclk_itemid" key(key_distinct(i64(noclk_itemid))) max_length=100 Categorical
+0207	3016	CONTEXT	1218	"noclk_catid" key(key_distinct(i64(noclk_catid))) max_length=100 Categorical
+0208	3020	CONTEXT	1219	"refer_page_sn_fix" key(i64(refer_page_sn_fix)) Categorical
+0209	3102	CONTEXT	1242	"page" key(i64(page)) Categorical
+0210	3103	CONTEXT	1243	"sort_type" key(hash(sort_type)) Categorical
+0211	4500	USER_COMMON	63	"clk_cat_fea" key(merge_view_cat_30d) max_length=100 Categorical
+0212	4501	USER_COMMON	64	"clk_cat1_fea" key(merge_view_cat1_30d) max_length=100 Categorical
+0213	4502	USER_COMMON	65	"clk_cat2_fea" key(merge_view_cat2_30d) max_length=100 Categorical
+0214	4503	USER_COMMON	66	"clk_goods_fea" key(merge_view_item_30d) max_length=100 Categorical
+0215	4504	USER_COMMON	67	"clk_mid_fea" key(merge_view_mid_30d) max_length=100 Categorical
+0216	33600031	USER_CONTEXT	4957	"clk_v4_td_seq_fgin_" topk(count_v_fix_i(k2v_i(clk_v4_td_seq_fgin_))) max_len=200 with_key_sorted=1 Categorical
+0217	600154	USER_COMMON	851	"q2p_hit_gpage_1y_cnt" key_size_v3(q2p_hit_gpage_1y_idx_ori_) Categorical
+0218	6900	USER_COMMON	259	"only_fst_rate_dis" dis2xf3_i(i64(only_fst_rate)) discrete_key=only_fst_rate Categorical
+0219	6910	USER_COMMON	238	"u_buy_sku_ner_word_30d_top10" key(hash(u_buy_sku_ner_word_30d_top10)) Categorical
+0220	6911	USER_COMMON	239	"u_buy_sku_ner_word_30d_top30" key(hash(u_buy_sku_ner_word_30d_top30)) Categorical
+0221	6912	USER_COMMON	240	"u_buy_sku_ner_word_30d_top100" key(hash(u_buy_sku_ner_word_30d_top100)) Categorical
+0222	7007737	USER_COMMON	620	"gpage_1y_cba_page_sn_x_el_sns_x_st_countkey_top500" topk(gpage_1y_cba_page_sn_x_el_sns_x_st_countkey_) max_len=500 with_key_sorted=1 Categorical
+0223	7007741	USER_COMMON	607	"gpage_1y_view_tgdf_x_act_top500" topk(gpage_1y_view_tgdf_x_act_count_) max_len=500 with_key_sorted=1 Categorical
+0224	7007746	USER_COMMON	618	"gpage_1y_pstgt_st_top500" topk(gpage_1y_pstgt_st_count_) max_len=500 with_key_sorted=1 Categorical
+0225	7007755	USER_COMMON	616	"gpage_1y_pstgt_actions_top500" hash(str(topk(gpage_1y_pstgt_actions_countkey_))) max_len=500 with_key_sorted=1 strict=0 Categorical
+0226	790220	USER_COMMON	535	"qryimp_log_90d_" default_key_i(qryimp_log_90d_) Categorical default_key=-1
+0227	790221	USER_COMMON	539	"qryordrg_log_90d_" default_key_i(qryordrg_log_90d_) Categorical default_key=-1
+0228	790222	USER_COMMON	540	"qryordrg_amt_log_90d_" default_key_i(qryordrg_amt_log_90d_) Categorical default_key=-1
+0229	790230	USER_COMMON	542	"term_90d_gordr_cnt" default_key_i(term_90d_gordr_cnt_) Categorical default_key=-1
+0230	790249	USER_COMMON	549	"hb_dist_freq_top1_tg_" default_key_i(list_key_diff(reverse_typed(hb_dist_freq_top1_tg_))) Categorical default_key=-1
+0231	790250	USER_COMMON	552	"hb_dist_freq_not_top1_tg_" default_key_i(hb_dist_freq_not_top1_tg_) Categorical default_key=-1
+0232	790251	USER_COMMON	554	"hbordr_st_" default_key_i(hbordr_st_) Categorical default_key=-1
+0233	794014	QUERY	5523	"top200_goods_ctr_trigger_user_uniq_view_1y_timediff" default_key_i(value2key_i(log_with_base(v2v_f(top200_goods_ctr_trigger_user_uniq_view_1y_timediff_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0234	794015	QUERY	5526	"clk_buy_all_goods_6m_extend_hit_top200_goods_ctr_adjacent" default_key_i(slice_v3_typed{start=0,end=500}(clk_buy_all_goods_6m_extend_hit_top200_goods_ctr_adjacent_)) Categorical default_key=-1
+0235	794030	QUERY	5534	"top200_goods_cvr_trigger_user_uniq_view_1y_timediff" default_key_i(value2key_i(log_with_base(v2v_f(top200_goods_cvr_trigger_user_uniq_view_1y_timediff_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0236	794031	QUERY	5537	"clk_buy_all_goods_6m_extend_hit_top200_goods_cvr_adjacent" default_key_i(slice_v3_typed{start=0,end=500}(clk_buy_all_goods_6m_extend_hit_top200_goods_cvr_adjacent_)) Categorical default_key=-1
+0237	794164	QUERY	5504	"recall_goods" value2key_i(USER_CONTEXT.dnn_goods:IntList) Categorical
+0238	794178	QUERY	5513	"recall_goods_trigger_user_uniq_view_1y_timediff" default_key_i(value2key_i(log_with_base(v2v_f(recall_goods_trigger_user_uniq_view_1y_timediff_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0239	794179	QUERY	5516	"clk_buy_all_goods_6m_extend_hit_recall_goods_adjacent" default_key_i(slice_v3_typed{start=0,end=500}(clk_buy_all_goods_6m_extend_hit_recall_goods_adjacent_)) Categorical default_key=-1
+0240	794200	QUERY	5708	"top200_score_goods" top200_recall_goods_ Categorical
+0241	794208	QUERY	5716	"top20_goods" key(top200_recall_goods_) max_length=20 Categorical
+0242	794209	QUERY	5717	"top50_goods" key(top200_recall_goods_) max_length=50 Categorical
+0243	794210	QUERY	5718	"top100_goods" key(top200_recall_goods_) max_length=100 Categorical
+0244	794214	QUERY	5732	"top200_recall_goods_trigger_user_uniq_view_1y_timediff" default_key_i(value2key_i(log_with_base(v2v_f(top200_recall_goods_trigger_user_uniq_view_1y_timediff_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0245	794215	QUERY	5735	"clk_buy_all_goods_6m_extend_hit_top200_recall_goods_adjacent" default_key_i(slice_v3_typed{start=0,end=500}(clk_buy_all_goods_6m_extend_hit_top200_recall_goods_adjacent_)) Categorical default_key=-1
+0246	794734	QUERY	5563	"query_term_match_ratio_recent_5" query_term_match_ratio_recent_5 Categorical
+0247	794768	QUERY	5589	"query_fav_term_match_ratio_recent_5" query_fav_term_match_ratio_recent_5 Categorical
+0248	794802	QUERY	5615	"query_buy_term_match_ratio_recent_5" query_buy_term_match_ratio_recent_5 Categorical
+0249	860023	USER_CONTEXT	3147	"ipvdetailcode_5min" concat_typed(is_type0_user_gd_acty_type_5min_, is_type1_user_gd_acty_type_5min_, is_type2_user_gd_acty_type_5min_, is_type3_user_gd_acty_type_5min_, is_type4_user_gd_acty_type_5min_, is_type5_user_gd_acty_type_5min_, is_type6_user_gd_acty_type_5min_, is_type7_user_gd_acty_type_5min_, is_type8_user_gd_acty_type_5min_, is_type9_user_gd_acty_type_5min_, is_type10_user_gd_acty_type_5min_) Categorical
+0250	860031	USER_CONTEXT	3157	"type2_log_timediff_user_gd_cut1_" value2key_i(round(multi_const_v2(i64(log_with_base(type2_timediff_user_gd_cut1_))))) lwb_base=2.0 lwb_offset=1.0 multiplier=100 Categorical
+0251	860034	USER_CONTEXT	3158	"type5_log_timediff_user_gd_cut1_" value2key_i(round(multi_const_v2(i64(log_with_base(type5_timediff_user_gd_cut1_))))) lwb_base=2.0 lwb_offset=1.0 multiplier=100 Categorical
+0252	860037	USER_CONTEXT	3159	"type8_log_timediff_user_gd_cut1_" value2key_i(round(multi_const_v2(i64(log_with_base(type8_timediff_user_gd_cut1_))))) lwb_base=2.0 lwb_offset=1.0 multiplier=100 Categorical
+0253	860042	USER_CONTEXT	3198	"long_staytime_avg_user_gd_log_timegap" value2key_i(round(multi_const_v2(i64(log_with_base(long_staytime_avg_user_gd_timegap_))))) lwb_base=2.0 lwb_offset=1.0 multiplier=10 Categorical
+0254	860045	USER_CONTEXT	3203	"long_staytime_thr_user_gd_log_timegap" value2key_i(round(multi_const_v2(i64(log_with_base(long_staytime_thr_user_gd_timegap_))))) lwb_base=2.0 lwb_offset=1.0 multiplier=10 Categorical
+0255	861818	USER_CONTEXT	3783	"user_view_qsess_inner_timediff_1h" value2key_i(log_with_base(user_view_qsess_inner_timediff_1h_)) lwb_base=1.1 lwb_offset=1.0 Categorical
+0256	862311	USER_CONTEXT	3878	"last_view_impr_goods_his_act" key(lconcatp_typed(last_view_impr_goods_history_action_)) max_length=400 Categorical
+0257	862355	USER_CONTEXT	3882	"user_view_after_last_buy_tg" value2key_i(log_with_base(k2v_f(list_key_diff{default_val=0}(user_view_after_last_buy_time_min_)))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0258	862376	USER_CONTEXT	3885	"user_gd_after_last_buy_type_merged" key(lconcatp_typed(user_gd_after_last_buy_type_merged_)) max_length=400 Categorical
+0259	863014	USER_CONTEXT	3705	"lt_user_view_cate1_top_100" concat_typed(_lt_user_view_cate1_top_100,value2key_i(_lt_user_view_cate1_top_100)) Categorical
+0260	863018	USER_CONTEXT	3707	"afstypeseq" afstypeseq Categorical
+0261	863024	USER_COMMON	489	"user_impr_page_el_sn_map_30d_key_val" concat_typed(i64(USER_COMMON.user_impr_page_el_sn_map_30d),user_impr_page_el_sn_map_30d_remake_) Categorical
+0262	863030	USER_COMMON	491	"page_el_sns_all_clk_6m_uniq_seq" page_el_sns_all_clk_6m_uniq_seq_ Categorical
+0263	863044	USER_COMMON	503	"user_clk_term_map_1y_prefer_key" user_clk_term_map_1y_prefer_ Categorical
+0264	863046	USER_COMMON	505	"user_buy_term_map_2y_prefer_key" user_buy_term_map_2y_prefer_ Categorical
+0265	863141	USER_COMMON	500	"user_life_clk_staytime_top500_id" user_life_clk_staytime_top500_id_ Categorical
+0266	863712	USER_CONTEXT	3933	"user_view_g_ordr_crt_usr_ratio_1m_cut20" user_view_g_ordr_crt_usr_ratio_1m_cut20_ Categorical
+0267	863729	USER_CONTEXT	3934	"user_view_g_ordr_crt_usr_ratio_1m_all_seq_prefer" concat_typed(log_with_base(seq_prefer(user_view_g_ordr_crt_usr_ratio_1m_all_))) max_len=200 with_key_sorted=1 lwb_base=1.1 lwb_offset=1.0 lwb_up_bound=8000 Categorical
+0268	865600	USER_CONTEXT	4375	"user_impr_pidv3_cut20" key(long_impr_product3_) max_length=20 Categorical
+0269	866012	USER_COMMON	711	"map_cate1_unit_price_lvl_3m_kv" default_key_i(concat_typed(i64(USER_COMMON.map_cate1_unit_price_lvl_3m))) Categorical default_key=-1
+0270	866013	USER_COMMON	712	"term_90d_cba_cnt" default_key_i(value2key_i(log_with_base(i64(USER_COMMON.term_is_cba_cnt_list_90d)))) Categorical default_key=-1 lwb_base=1.1 lwb_up_bound=1000000
+0271	866014	USER_COMMON	713	"last_pay_app_id" default_key_i(i64(USER_COMMON.last_pay_app_id)) Categorical default_key=-1
+0272	866023	USER_COMMON	717	"history_buy_ordr_amts" default_key_i(hbgmv_) Categorical default_key=-1
+0273	866024	USER_COMMON	798	"hb_usr_rcvr_phnno" default_key_i(hb_usr_rcvr_phnno_) Categorical default_key=-1
+0274	866027	USER_COMMON	720	"history_buy_cat1_x_tg_seq_prefer" default_key_i(concat_typed(seq_prefer(history_buy_cat1_x_tg_))) Categorical max_len=400 with_key_sorted=1 default_key=-1
+0275	866029	USER_COMMON	799	"hbspu_x_tg" default_key_i(concat_typed(hbspu_, hbtg_)) Categorical default_key=-1
+0276	866034	USER_COMMON	729	"clk_buy_all_cat1_x_tg_60d" default_key_i(concat_typed(clk_buy_all_cat1_ids_60d_extend_, clk_buy_all_timegap_60d_extend_)) Categorical default_key=-1
+0277	866041	USER_COMMON	739	"s30s_90d_tg" default_key_i(s30s_90d_extend_tg_) Categorical default_key=-1
+0278	866054	USER_COMMON	750	"ordrv3_2y_dc_tgdf_x_ordr_logic_stts" default_key_i(concat_typed(ordrv3_2y_tgdf_log_, ordrv3_2y_dc_ordr_logic_stts_)) Categorical default_key=-1
+0279	866061	USER_COMMON	754	"session_ups_gd_v1_stay_time_dis_x_tg" default_key_i(session_ups_gd_v1_stay_time_dis_x_tg_) Categorical default_key=-1
+0280	866063	USER_COMMON	757	"page_view_tg_seq_x_ordr_amt_3m" default_key_i(concat_typed(lst_page_view_timegap_seq_3m_,lead_ordr_crt_ordr_amt_seq_3m_)) Categorical default_key=-1
+0281	866064	USER_COMMON	759	"bgpage_product_pay_act_tg" default_key_i(bgpage_product_pay_act_tg_) Categorical default_key=-1
+0282	866065	USER_COMMON	763	"lstclk6m_buy_clk_tg_tarps" default_key_i(lstclk6m_buy_clk_tg_tarps_) Categorical default_key=-1
+0283	866066	USER_COMMON	764	"lstclk6m_idx" default_key_i(value2key_i(USER_COMMON.lstclk6m_idx)) Categorical default_key=-1
+0284	866068	USER_COMMON	765	"lstclk6m_sales" default_key_i(dis2xf3_i(USER_COMMON.lstclk6m_sales)) Categorical discrete_key=sales default_key=-1
+0285	866069	USER_COMMON	768	"lstclk6m_ordr_time_adjacent_tg" default_key_i(lstclk6m_ordr_time_adjacent_tg_) Categorical default_key=-1
+0286	866070	USER_COMMON	772	"fstclk6m_buy_clk_tg_tarps" default_key_i(fstclk6m_buy_clk_tg_tarps_) Categorical default_key=-1
+0287	866071	USER_COMMON	773	"fstclk6m_idx" default_key_i(value2key_i(USER_COMMON.fstclk6m_idx)) Categorical default_key=-1
+0288	866072	USER_COMMON	775	"gpage_1y_pstgt_actions" default_key_i(gpage_1y_pstgt_actions_mod2_) Categorical default_key=-1
+0289	866073	USER_COMMON	779	"gpage_1y_cba_page_sn_x_el_sns_x_st" default_key_i(gpage_1y_cba_page_sn_x_el_sns_x_st_v2_) Categorical default_key=-1
+0290	866082	USER_CONTEXT	4421	"user_clk_staytime_x_cnt_3d" default_key_i(concat_typed(user_clk_staytime_seq_3d_uniq_, goods_ids_view_cnt_seq_3d_uniq_)) Categorical default_key=-1
+0291	866103	USER_CONTEXT	4426	"cate1_ids_view_seq_1y_x_pagesn_cnt" default_key_i(concat_typed(cate1_ids_view_seq_1y_x_pagesn_prefer, value2key_i(log_with_base_v2_typed(cate1_ids_view_seq_1y_x_pagesn_prefer)))) Categorical lwb_base=1.1 lwb_up_bound=10000 default_key=-1
+0292	866250	USER_COMMON	743	"user_life_clk_staytime_top200" default_key_i(user_life_clk_staytime_top200_) Categorical default_key=-1
+0293	866251	USER_COMMON	745	"user_life_clk_daygap_dis_top200_x_clkcnt" default_key_i(concat_typed(user_life_clk_daygap_dis_top200_, user_life_clk_cnt_dis_top200_)) Categorical default_key=-1
+0294	33866903	USER_CONTEXT	4984	"sku_clk_v4_sku_trixi_cluster_id_x_price_dis" sku_clk_v4_sku_trixi_cluster_id_x_price_dis_ Categorical
+0295	867603	USER_CONTEXT	4448	"cpv3_tag_list_hashs" cpv3_tag_list_hashs_ Categorical
+0296	867645	USER_CONTEXT	4470	"gd_impr_prices_discount_info" gd_impr_prices_discount_info_ Categorical
+0297	867648	USER_CONTEXT	4473	"gd_impr_content_list_hashs" gd_impr_content_list_hashs_ Categorical
+0298	868023	USER_COMMON	834	"ho_src_info_cut" key(ho_src_info_) max_length=800 Categorical
+0299	868404	USER_COMMON	813	"user_c2b_7d_clk_bits_ors" user_c2b_7d_clk_bits_ors_ Categorical
+0300	868405	USER_COMMON	814	"user_c2b_7d_actions_ors" user_c2b_7d_actions_ors_ Categorical
+0301	868407	USER_COMMON	815	"user_c2b_7d_pgsn_x_elsn_list_hashs" user_c2b_7d_pgsn_x_elsn_list_hashs_ Categorical
+0302	868413	USER_COMMON	816	"user_c2b_7d_srch_impr_cnts" user_c2b_7d_srch_impr_cnts_ Categorical
+0303	868414	USER_COMMON	817	"user_c2b_7d_srch_clk_cnts" user_c2b_7d_srch_clk_cnts_ Categorical
+0304	868427	USER_COMMON	818	"user_c2b_7d_clk_cmt_cnts" user_c2b_7d_clk_cmt_cnts_ Categorical
+0305	870025	USER_COMMON	469	"u_sku_id_buy_ordr_amt_90d_top100" default_key_i(value2key_i(log_v2(u_sku_id_buy_ordr_amt_90d_top100_))) Categorical default_key=-1
+0306	870038	USER_CONTEXT	3485	"user_view_24h_pagesn_x_goods_01" default_key_i(concat_typed(pagesn_view_seq_24h_, goods_view_seq_24h_0_1_)) Categorical default_key=-1
+0307	870059	USER_CONTEXT	3488	"user_impr_1h_timediff_x_goods_01" default_key_i(concat_typed(user_impr_1h_timediff_x_goods_01_)) Categorical default_key=-1
+0308	870069	USER_CONTEXT	3678	"user_impr_1h_cat1_x_pagesn_cnt" default_key_i(concat_typed(seq_prefer(concat_typed(cat1_impr_seq_1h_, pagesn_impr_seq_1h_)))) Categorical max_len=100 with_key_sorted=1 default_key=-1
+0309	870130	USER_CONTEXT	3492	"page_tg_impr_seq_1h" default_key_i(list_index_typed(page_tg_impr_seq_, user_impr_1h_index_)) Categorical default_key=-1
+0310	870277	USER_CONTEXT	3552	"clk_buy_all_timestamp_6m_extend_map_kv" default_key_i(concat_typed(clk_buy_all_timestamp_6m_extend_map_,clk_buy_all_timestamp_6m_extend_map_val_)) Categorical default_key=-1
+0311	870311	USER_CONTEXT	3681	"view_stay_times_x_ln_tg" default_key_i(key{max_length=200}(concat_typed(stay_times_seq_dis_,action_time_view_div_seq_))) Categorical default_key=-1
+0312	870322	USER_CONTEXT	3597	"cate1_last_view_buy_tg" default_key_i(cate1_last_view_buy_tg_seq_) Categorical default_key=-1
+0313	870324	USER_CONTEXT	3641	"cate_last_fav_buy_tg" default_key_i(cate_last_fav_buy_tg_seq_) Categorical default_key=-1
+0314	881102	USER_CONTEXT	4137	"rtordr_v2_aftcpn_prc_pay_xf" rtordr_v2_aftcpn_prc_pay_xf_ Categorical
+0315	881104	USER_CONTEXT	4138	"rtordr_v2_discount_info_pay" rtordr_v2_discount_info_pay_ Categorical
+0316	881203	USER_CONTEXT	4160	"acv2_pgsn_x_elsn_x_td" default_key_i(uniq_typed(acv2_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0317	881204	USER_CONTEXT	4161	"acv2_pgsn_x_elsn_x_tg" default_key_i(uniq_typed(acv2_pgsn_x_elsn_x_tg_)) Categorical default_key=-1
+0318	881206	USER_CONTEXT	4162	"acv2_pgsn_x_elsn_x_tg_x_idx" default_key_i(lconcatp_typed(acv2_pgsn_x_elsn_x_tg_)) Categorical default_key=-1
+0319	881215	USER_CONTEXT	4165	"acv2_pgsn_x_elsn_x_sect" default_key_i(uniq_typed(acv2_pgsn_x_elsn_x_sect_)) Categorical default_key=-1
+0320	881402	USER_CONTEXT	4230	"clk_lead_ordr_pgsn_x_elsn_x_td" default_key_i(uniq_typed(clk_lead_ordr_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0321	881404	USER_CONTEXT	4231	"clk_lead_ordr_pgsn_x_elsn_x_clo_tg" default_key_i(uniq_typed(clk_lead_ordr_pgsn_x_elsn_x_clo_tg_)) Categorical default_key=-1
+0322	881663	USER_CONTEXT	4204	"acv2_pgsn_x_elsn_x_td_10014" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_td_, acv2_10014_index_))) Categorical default_key=-1
+0323	881664	USER_CONTEXT	4205	"acv2_pgsn_x_elsn_x_tg_10014" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_tg_, acv2_10014_index_))) Categorical default_key=-1
+0324	881665	USER_CONTEXT	4206	"acv2_pgsn_x_elsn_x_idx_10014" default_key_i(uniq_typed(lconcatp_typed(list_index_v2_typed(acv2_pgsn_x_elsn_, acv2_10014_index_)))) Categorical default_key=-1
+0325	881687	USER_CONTEXT	4208	"acv2_pgsn_x_elsn_x_td_10058" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_td_, acv2_10058_index_))) Categorical default_key=-1
+0326	881691	USER_CONTEXT	4209	"acv2_page_sect_hashs_x_td_10058" default_key_i(uniq_typed(list_index_v2_typed(acv2_page_sect_hashs_x_td_, acv2_10058_index_))) Categorical default_key=-1
+0327	881711	USER_CONTEXT	4212	"acv2_pgsn_x_elsn_x_td_10034" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_td_, acv2_10034_index_))) Categorical default_key=-1
+0328	2014601	QUERY	5787	"gpage_d_2y_pstgt_act" default_key_i(key(gpage_d_2y_pstgt_act_)) Categorical max_length=400 default_key=-1
+0329	795014	QUERY	5817	"" default_key_i(key(concat_typed(precpn_start_time_2_tg_, precpn_discount_param_2_value_))) Categorical max_length=400 default_key=-1
+0330	795012	QUERY	5815	"precpn_disc_value_2_rec_" default_key_i(key(precpn_disc_value_2_rec_)) Categorical max_length=400 default_key=-1
+0331	795602	QUERY	5831	"user_view_1d_cnt_before_buy_dis_" default_key_i(key(user_view_cat_1d_cnt_before_buy_dis_)) Categorical max_length=400 default_key=-1
+0332	2017702	QUERY	5789	key(behave_mall_tag_seq) Categorical max_length=400
+0333	882303	USER_CONTEXT	4730	"all_impr_pgsn_x_elsn_x_td" default_key_i(uniq_typed(all_impr_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0334	882304	USER_CONTEXT	4731	"all_impr_pgsn_x_elsn_x_tg" default_key_i(uniq_typed(all_impr_pgsn_x_elsn_x_tg_)) Categorical default_key=-1
+0335	882306	USER_CONTEXT	4733	"all_impr_pgsn_x_elsn_x_tg_x_idx" default_key_i(lconcatp_typed(all_impr_pgsn_x_elsn_x_tg_)) Categorical default_key=-1
+0336	882305	USER_CONTEXT	4732	"all_impr_pgsn_x_elsn_x_td_x_idx" default_key_i(lconcatp_typed(all_impr_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0337	881820	USER_COMMON	905	"upstat_pgsn_x_elsn_x_lst_clk_td" concat_typed(upstat_pgsn_x_elsn_, upstat_lst_clk_timediff_log_) Categorical
+0338	881816	USER_COMMON	902	"upstat_pgsn_x_elsn_x_ctr" concat_typed(upstat_pgsn_x_elsn_, upstat_ctr_) Categorical
+0339	881842	USER_COMMON	912	"upstat_clk_topk_pgsn_x_elsn" upstat_clk_topk_pgsn_x_elsn_ Categorical
+0340	881818	USER_COMMON	904	"upstat_pgsn_x_elsn_x_clk_cnt" concat_typed(upstat_pgsn_x_elsn_, upstat_clk_cnt_log_) Categorical
+0341	881834	USER_COMMON	909	"upstat_impr_topk_pgsn_x_elsn_x_ctr" concat_typed(upstat_impr_topk_pgsn_x_elsn_, upstat_impr_topk_ctr_) Categorical
+0342	881817	USER_COMMON	903	"upstat_pgsn_x_elsn_x_impr_cnt" concat_typed(upstat_pgsn_x_elsn_, upstat_impr_cnt_log_) Categorical
+0343	4418192	QUERY	5904	"view_1y_2k5_prod_cl_id_post_1d_cvr_fix_" default_key_i(view_1y_2k5_prod_cl_id_post_1d_cvr_fix_) Categorical default_key=-1
+0344	4418196	QUERY	5908	"view_1y_2k5_prod_cl_id_post_1d_cvr_0p_filt_ts_gap_diff_dis" default_key_i(view_1y_2k5_prod_cl_id_post_1d_cvr_0p_filt_ts_gap_diff_dis_) Categorical default_key=-1
+0345	204530	USER_CONTEXT	4768	"fltr_view_last_name_index" key(fltr_view_last_name_index_) max_length=600 Categorical
+0346	204543	USER_CONTEXT	4773	"fltr_in_vertical_name_x_timegap" key(concat_typed(fltr_in_vertical_name_,fltr_in_vertical_timegap_)) max_length=600 Categorical
+0347	4439006	QUERY	5917	"all_clk_seq_1m_page_sn_X_el_sn_X_agj_tg_ck_log_key" default_key_i(key(all_clk_seq_1m_page_sn_X_el_sn_X_agj_tg_ck_log_)) Categorical default_key=-1
+0348	2015703	QUERY	5750	"fcpa_mall_mall_x_tag_seq" key(fcpa_mall_mall_x_tag_seq) Categorical max_length=400
+0349	2015709	QUERY	5752	"fcpa_brd_id_seq" key(fcpa_brd_id_seq) Categorical max_length=400
+0350	2015745	QUERY	5761	"fcpa_brdc3_brdc3_seq" key(fcpa_brdc3_brdc3_seq) Categorical max_length=400
+0351	2022401	QUERY	5792	"precpn_goods_id" key(default_key_i(precpn_goods_id_)) Categorical default_key=-1 max_length=600
+0352	300091	QUERY	5803	"prev_sales_90ds_x_uv_" dis2xf3_i(k2v_i(prev_sales_90ds_x_uv_)) discrete_key=sales_90d Categorical
+0353	160034	CONTEXT	1301	"ori_q_word_seg_hash_uniq_" default_key_i(ori_q_word_seg_hash_uniq_v2_) Categorical
+0354	24904004	CONTEXT	1286	"sug_srch_type_x_context_search_met" concat_typed(key(i64(CONTEXT.sug_srch_type)),search_met_) Categorical
+0355	304322	USER_CONTEXT	5134	"user_impr_cat_ids_1h_ordr_cnt_2y_" concat_typed(user_impr_cat_ids_1h_ordr_cnt_2y_) Categorical
+0356	306045	USER_CONTEXT	5153	"top800_goods_scores_f_q2c_" dis2xf3_i(filternum(top800_goods_scores_f_q2c_)) Categorical discrete_key=goods_score_rk filter_num=-1
+0357	310614	USER_CONTEXT	5156	"top800_price_f_q2c1_" dis2xf3_i(k2v_f(top800_price_f_q2c1_)) Categorical discrete_key=new_price
+0358	241125006	USER_CONTEXT	5140	"user_view_hourgap_1y" key(user_view_hourgap_1y_kv_) Categorical
+0359	031090	USER_CONTEXT	5129	"user_view_uniq_x_rklist_pid3_cnt" key_size_v3(user_view_uniq_x_rklist_pid3_) Categorical
+0360	340123	USER_COMMON	1002	"buy_clk_gap_7d_v2" default_key_i(buy_clk_gap_7d_v2_) Categorical default_key=-1
+0361	340121	USER_COMMON	1005	"buy1m_fstcvr_percent" default_key_i(value2key_i(buy1m_fstcvr_percent)) Categorical default_key=-1
+0362	340059	USER_COMMON	1049	"clk_rev_cmps_x_psts" default_key_i(concat_typed(dis2xf_i(k2v_f(clk_rev_cmps_)), clk_rev_psts_)) Categorical discrete_key=compic_p default_key=-1
+0363	340063	USER_COMMON	1053	"gpv_sts_reduce_filter_ib" default_key_i(dis2xf_i(v2v_f(sum_vlist(groupby_key(list_2_map(gpv_iids_filter_ib_, gpv_sts_key_filter_ib_)))))) Categorical default_key=-1 discrete_key=gpv_sts_reduce_filter_ib
+0364	340092	USER_COMMON	1045	"gpv_bg_2y_codes" default_key_i(gpv_bg_2y_codes_) Categorical default_key=-1
+0365	340086	USER_COMMON	1006	"clkscore2m_fst_cvr" default_key_i(value2key_i(clkscore2m_fst_cvr)) Categorical default_key=-1
+0366	340125	USER_COMMON	1007	"price_rank_x_all_hash_cnt_map_raw" concat_typed(v2v_f(i64(USER_COMMON.price_rank_x_all_hash_cnt_map))) Categorical
+0367	340093	USER_COMMON	1013	"i2b_3d_timegap_1y_seq" default_key_i(i2b_3d_timegap_1y_seq_) Categorical default_key=-1
+0368	340037	USER_COMMON	1011	"cate_id_30d_seq_x_clkcnt" default_key_i(concat_typed(cate_id_30d_seq_, cate_clk_cnt_30d_seq_lg_)) Categorical default_key=-1
+0369	340054	USER_COMMON	1039	"gpv_gfpst_dist" default_key_i{default_key=-1}(concat_typed(log_with_base_v2_typed{need_ceil=1,lwb_base=1.1,lwb_up_bound=200}(count_key(gpv_fpst_)))) Categorical
+0370	340109	USER_COMMON	1061	"ac_uniq_1y_ext_page_sn_x_elsn_count_concat" default_key_i(concat_typed(log_with_base(count_key(ac_uniq_1y_ext_page_sn_x_elsn_)))) Categorical lwb_base=1.1 lwb_up_bound=8000 default_key=-1
+0371	340160	USER_COMMON	1062	"ac_uniq_1y_ext_page_sn_x_idx_count_concat" default_key_i(concat_typed(log_with_base(count_key(ac_uniq_1y_ext_page_sn_x_idx_)))) Categorical lwb_base=1.1 lwb_up_bound=8000 default_key=-1
+0372	340001	USER_COMMON	1008	"rec1_vst_dur_30d" default_key_i(dis2xf_i(USER_COMMON.rec1_vst_dur_30d)) Categorical discrete_key=rec1_vst_dur_30d default_key=-1
+0373	110151	USER_CONTEXT	4885	"coupon_use_plat_discpn_timegap" default_key_i(coupon_use_plat_discpn_timegap_) default_key=-1 Categorical
+0374	110153	USER_CONTEXT	4886	"coupon_use_plat_discpn_sdchnl_type" default_key_i(coupon_use_plat_discpn_sdchnl_type_) default_key=-1 Categorical
+0375	87560211	CONTEXT	1297	"clk_ori_del_sug_q_seg_word_hash" list_concat_typed(default_key_i(clk_ori_del_sug_q_seg_word_hash_),search_met_) Categorical
+0376	340453	USER_CONTEXT	5206	"history_norm_query_hash_hit_cnt" key_size_v3(greater_than_index(i64(history_norm_query_hash_hit_idx_), const_thres_2_)) margin=1 Categorical
+0377	340394	USER_COMMON	1087	"user_buy_term_2y_hit_q2g_v_" user_buy_term_2y_hit_q2g_v_ Categorical
+0378	340364	USER_COMMON	1075	"user_clk_term_hash_90d_hit_q2g_v_" user_clk_term_hash_90d_hit_q2g_v_ Categorical
+0379	340374	USER_COMMON	1081	"user_clk_term_map_1y_kv_hit_q2g_v_" user_clk_term_map_1y_kv_hit_q2g_v_ Categorical
+0380	340367	USER_COMMON	1078	"user_clk_term_hash_90d_hit_q2g_merge_term_v_" user_clk_term_hash_90d_hit_q2g_merge_term_v_ Categorical
+0381	340451	USER_CONTEXT	5201	"history_search_method_list" i64(history_search_met_k_) Categorical
+0382	340377	USER_COMMON	1084	"user_clk_term_map_1y_kv_hit_q2g_merge_term_v_" user_clk_term_map_1y_kv_hit_q2g_merge_term_v_ Categorical
+0383	110011	USER_CONTEXT	4875	"coupon_use_sdchnl_type" coupon_use_sdchnl_type_ Categorical
+0384	340455	USER_CONTEXT	5207	"history_query_tg_log_45d_hit_norm_query_" history_query_tg_log_45d_hit_norm_query_ Categorical
+0385	340122	USER_COMMON	1004	"buy_lstclk_timegap_seq_30d" default_key_i(concat_typed(hash(buy1m_lstclk_app_name_v2),i64(buyclk_tg_seq_1m_))) Categorical default_key=-1
+
+------------------------------------------------------------------------------------------------------------------------
+【item 桶】共 835 个字段
+------------------------------------------------------------------------------------------------------------------------
+桶内序号	特征ID	USER_COM分区	USER_COM行号	字段语义
+0001	10002	USER_COMMON	68	"clk_cate_x_cat" list_concat_typed(view_cat_30d,i64(ITEM_CONTEXT.cat_id)) Categorical
+0002	10003	USER_COMMON	75	"age_grp_x_goods" concat_typed(i64(age_grp),i64(ITEM_CONTEXT.goods_id)) Categorical
+0003	10007	USER_COMMON	69	"clk_cat1_x_cat1" list_concat_typed(view_cat1_30d,i64(ITEM_CONTEXT.cat1_id)) Categorical
+0004	10008	USER_COMMON	70	"clk_cat2_x_cat2" list_concat_typed(view_cat2_30d,i64(ITEM_CONTEXT.cat2_id)) Categorical
+0005	10010	USER_COMMON	72	"top_fav_cat1_x_goods" list_concat_typed(fav_cat1_30d_top,i64(ITEM_CONTEXT.goods_id)) Categorical
+0006	10012	USER_COMMON	74	"user_pro_info_x_cat" concat_typed(user_gndr_info,user_age_info,i64(ITEM_CONTEXT.cat_id)) Categorical
+0007	10013	USER_COMMON	76	"gender_x_cat" concat_typed(i64(user_gndr),i64(ITEM_CONTEXT.cat_id)) Categorical
+0008	10014	USER_COMMON	77	"gender_x_goods" concat_typed(i64(user_gndr),i64(ITEM_CONTEXT.goods_id)) Categorical
+0009	10016	USER_COMMON	79	"province_x_cat" concat_typed(i64(prov_id),i64(ITEM_CONTEXT.cat_id)) Categorical
+0010	10018	USER_COMMON	80	"user_x_cat" concat_typed(i64(user_id),i64(ITEM_CONTEXT.cat_id)) Categorical
+0011	10020	USER_COMMON	81	"age_grp_x_cat" concat_typed(i64(age_grp),i64(ITEM_CONTEXT.cat_id)) Categorical
+0012	10021	USER_COMMON	82	"user_x_stpl" concat_typed(i64(user_id),i64(GOODS.stpl_id)) Categorical
+0013	10022	USER_COMMON	83	"city_x_cat" concat_typed(i64(city_id),i64(ITEM_CONTEXT.cat_id)) Categorical
+0014	10059	USER_COMMON	189	"u_cat_30d_hit" concat_typed(user_cat_30d_hit4,user_cat_30d_hit3,cnslt_cat_30d_x_cat) Categorical
+0015	10062	USER_COMMON	210	"u_cat1_30d_hit" concat_typed(user_cat1_30d_hit4,user_cat1_30d_hit3,cnslt_cat1_30d_x_c1) Categorical
+0016	10068	USER_COMMON	217	"u_mall_30d_hit" concat_typed(user_mall_30d_hit2,user_mall_30d_hit3) Categorical
+0017	10152	USER_COMMON	233	"u_cat_ctr_all_x_c" concat_typed(u_cat_ctr_all,i64(ITEM_CONTEXT.cat_id)) Categorical
+0018	10154	USER_COMMON	234	"u_cat1_ctr_all_x_c1" concat_typed(u_cat1_ctr_all,i64(ITEM_CONTEXT.cat1_id)) Categorical
+0019	10160	USER_COMMON	237	"u_cat1_cvr_all_x_c1" concat_typed(u_cat1_cvr_all,i64(ITEM_CONTEXT.cat1_id)) Categorical
+0020	10207	GOODS	1572	"g_srch_30d_prvn_x_ctr" concat_typed(user_province,d_goods_search_province_ctr_seg_30d) Categorical
+0021	10210	GOODS	1579	"g_srch_plat_7d" concat_typed(d_goods_search_platform_impr_seg_7d,d_goods_search_platform_view_seg_7d,d_goods_search_platform_order_seg_7d) Categorical
+0022	10213	GOODS	1583	"g_srch_7d_gndr_x_ctr" concat_typed(user_gender,d_goods_search_gender_ctr_seg_7d) Categorical
+0023	10216	GOODS	1587	"g_srch_30d_bypr_x_ctr" concat_typed(user_buypower,d_goods_search_buypower_ctr_seg_30d) Categorical
+0024	10219	GOODS	1591	"g_srch_query_ctr_7d" d_goods_search_query_ctr_seg_7d Categorical
+0025	10310	CAT	2149	"c_srch_7d_plat_x_ctr" concat_typed(user_platform,d_cat_search_platform_ctr_seg_7d) Categorical
+0026	10359	GOODS	1664	"buypower_x_cate1_top1k_price_freq10" concat_typed(i64(cate1_top1k_price_freq10), i64(USER_COMMON.user_buypower)) Categorical
+0027	10387	GOODS	1667	"buypower_x_avg_rn_rank2" concat_typed(dis2xf3_i(i64(avg_rn_rank2)), i64(USER_COMMON.user_buypower)) discrete_key=avg_rn_rank2 Categorical
+0028	10388	GOODS	1668	"buypower_x_avg_rn_rank_ratio2" concat_typed(dis2xf3_i(i64(avg_rn_rank_ratio2)), i64(USER_COMMON.user_buypower)) discrete_key=avg_rn_rank_ratio2 Categorical
+0029	10407	MALL	2203	"m_srch_30d_prvn_x_ctr" concat_typed(user_province,d_mall_search_province_ctr_seg_30d) Categorical
+0030	10410	MALL	2210	"m_srch_plat_1d" concat_typed(d_mall_search_platform_impr_seg_1d,d_mall_search_platform_view_seg_1d,d_mall_search_platform_order_seg_1d) Categorical
+0031	10413	MALL	2214	"m_all_30d_gndr_x_ctr" concat_typed(user_gender,d_mall_all_gender_ctr_seg_30d) Categorical
+0032	10419	MALL	2218	"m_srch_query_ctr_7d" d_mall_search_query_ctr_seg_7d Categorical
+0033	10520	USER_COMMON	310	"is_mcard_user_x_avg_sku_cpn_prc" concat_typed(is_mcard_user_d,avg_sku_cpn_prc_d) Categorical
+0034	10524	USER_COMMON	312	"disc_ordr_count_min_x_min_sku_cpn_prc" concat_typed(disc_ordr_count_min_d,min_sku_cpn_prc_d) Categorical
+0035	10528	GOODS	1742	"price_diff_static_x_disc_ordr_cnt_new" concat_typed(price_diff_btw_cur_n_static_price_,disc_ordr_ratio_d) Categorical
+0036	1086	USER_COMMON	392	"user_goods_type1" cross_concat_i(i64(USER_COMMON.user_id),hash(GOODS.goods_type1)) Categorical
+0037	11006	USER_COMMON	87	"user_buypower_x_cat_10" concat_typed(value2key_i(value(hit(i64(USER_COMMON.user_buypower_cate_10),i64(ITEM_CONTEXT.cat_id)))),i64(GOODS.price_cluster_10)) Categorical
+0038	1110	USER_COMMON	39	"buy_then_buy_mall" concat_typed(last_buy_mall_time_t,user_buy_mall_avg_timegap_t) Categorical
+0039	1111	USER_COMMON	40	"buy_then_buy_cat" concat_typed(last_buy_cat_time_t,user_buy_cat_avg_timegap_t) Categorical
+0040	12088	USER_CONTEXT	2296	"goods_clk_3d_x_cat" list_concat_typed(i64(item_view_seq_3d),i64(ITEM_CONTEXT.cat_id)) Categorical
+0041	12092	USER_CONTEXT	2307	"cat_clk_seq_3d_x_cat" list_concat_typed(i64(leafcat_view_seq_3d),i64(ITEM_CONTEXT.cat_id)) Categorical
+0042	12094	USER_CONTEXT	2308	"m_clk_3d_x_cat" list_concat_typed(i64(mall_view_seq_3d),i64(ITEM_CONTEXT.cat_id)) Categorical
+0043	12100	USER_CONTEXT	2336	"c1_buy_cnt_rt_dis" concat_typed(c1_buy_cnt_1h_dis,c1_buy_cnt_1d_dis,c1_buy_cnt_3d_dis) Categorical
+0044	12101	USER_CONTEXT	2340	"c1_clk_cnt_rt_dis" concat_typed(c1_clk_cnt_1h,c1_clk_cnt_1d,c1_clk_cnt_3d) Categorical
+0045	12104	USER_CONTEXT	2345	"c1_stay_rt_dis" concat_typed(concat_typed(c1_stay_1h_dis,c1_stay_1d_dis),concat_typed(c1_stay_3d_dis,c1_stay_7d_dis)) Categorical
+0046	12110	USER_CONTEXT	2350	"goods_stay_rt_dis" concat_typed(concat_typed(item_stay_1h,item_stay_1d),concat_typed(item_stay_3d,item_stay_7d)) Categorical
+0047	12111	USER_CONTEXT	2355	"goods_clk_cnt_rt_dis" concat_typed(concat_typed(item_clk_cnt_1h,item_clk_cnt_1d),concat_typed(item_clk_cnt_3d,item_clk_cnt_7d)) Categorical
+0048	12112	USER_CONTEXT	2360	"cat_stay_rt_dis" concat_typed(concat_typed(leafcat_stay_1h,leafcat_stay_1d),concat_typed(leafcat_stay_3d,leafcat_stay_7d)) Categorical
+0049	12113	USER_CONTEXT	2364	"cat_clk_cnt_rt_dis" concat_typed(cat_clk_cnt_1h,cat_clk_cnt_1d,cat_clk_cnt_3d) Categorical
+0050	12115	USER_CONTEXT	2368	"m_clk_cnt_rt_dis" concat_typed(mall_clk_cnt_1h,mall_clk_cnt_1d,mall_clk_cnt_3d) Categorical
+0051	12117	USER_CONTEXT	2373	"m_stay_rt_dis" concat_typed(concat_typed(m_stay_1h,m_stay_1d),concat_typed(m_stay_3d,m_stay_7d)) Categorical
+0052	12118	USER_CONTEXT	2378	"goods_last_timegap" concat_typed(item_last_buy_timegap_dis,item_last_view_time_gap_dis) Categorical
+0053	12119	USER_CONTEXT	2379	"cat_last_timegap" concat_typed(cat_lastbuy_timegap_dis,cat_lastclk_timegap_dis) Categorical
+0054	12120	USER_CONTEXT	2382	"cat_buy_clk_item" concat_typed(cat_buy_cnt_7d,cat_clk_cnt_7d) Categorical
+0055	12122	USER_CONTEXT	2383	"item_last_fav_time_gap_x_discrete" default_key_i(dis2xf3_i(hit(i64(item_last_fav_time_gap),i64(ITEM_CONTEXT.goods_id)))) Categorical discrete_key=item_last_fav_time_gap_cvr default_key=-1
+0056	12134	CONTEXT	1201	"context.session_display_noclk_goods_ids_x_item.cat_id" list_concat_typed(key(key_distinct(i64(SessionDisplayNoclkGids))),i64(ITEM_CONTEXT.cat_id)) Categorical max_length=50
+0057	12137	CONTEXT	1202	"context.session_search_clk_goods_ids_x_item.cat_id" list_concat_typed(key(key_distinct(i64(SearchSessionClkGids))),i64(ITEM_CONTEXT.cat_id)) Categorical max_length=30
+0058	12138	CONTEXT	1203	"context.session_search_clk_goods_ids_x_item.mall_id" list_concat_typed(key(key_distinct(i64(SearchSessionClkGids))),i64(ITEM_CONTEXT.mall_id)) Categorical max_length=30
+0059	12140	CONTEXT	1204	"context.session_search_noclk_goods_ids_x_item.cat_id" list_concat_typed(key(key_distinct(i64(SessionSearchNoclkGids))),i64(ITEM_CONTEXT.cat_id)) Categorical max_length=50
+0060	12155	USER_CONTEXT	2304	"cat_clk_count_div_avg_item" concat_typed(cat_clk_count_div_avg_item_1h,cat_clk_count_div_avg_item_1d,cat_clk_count_div_avg_item_3d) Categorical
+0061	12157	USER_CONTEXT	2300	"item_bought_avg_timegap_x_last_buy_timegap" concat_typed(item_last_buy_timegap_d2,item_bought_avg_timegap_on_item_d) Categorical
+0062	12204	USER_CONTEXT	2395	"g_sales_rank" rank_i(i64(user_view_sales):IntList,i64(GOODS.sales)) Categorical
+0063	12205	USER_CONTEXT	2396	"g_sales_rank_qc" rank_i(user_view_sales_qc:IntList,i64(GOODS.sales)) Categorical
+0064	12206	USER_CONTEXT	2397	"g_sales_rank_qc_1h" rank_i(user_view_sales_qc_1h:IntList,i64(GOODS.sales)) Categorical
+0065	13002	CONTEXT	1220	"norm_query_hash_x_cat" list_concat_typed(i64(norm_query_hash),i64(ITEM_CONTEXT.cat_id)) Categorical
+0066	13005	CONTEXT	1223	"query_term_hit_title" key(query_term_hit_title_) Categorical
+0067	13006	CONTEXT	1224	"query_tag_hit_title" key(query_tag_hit_title_) Categorical
+0068	13009	CONTEXT	1225	"query_word_x_goods" list_concat_typed(i64(query_seg_ner_word),i64(ITEM_CONTEXT.goods_id)) Categorical
+0069	13010	CONTEXT	1226	"query_word_x_cat" list_concat_typed(i64(query_seg_ner_word),i64(ITEM_CONTEXT.cat_id)) Categorical
+0070	13020	CONTEXT	1230	"noclk_itemid_x_cat" list_concat_typed(key(key_distinct(i64(noclk_itemid))),i64(ITEM_CONTEXT.cat_id)) max_length=100 Categorical
+0071	13021	CONTEXT	1231	"noclk_mallid_x_cat" list_concat_typed(key(key_distinct(i64(noclk_mallid))),i64(ITEM_CONTEXT.cat_id)) max_length=100 Categorical
+0072	13022	CONTEXT	1232	"noclk_catid_x_cat" list_concat_typed(key(key_distinct(i64(noclk_catid))),i64(ITEM_CONTEXT.cat_id)) max_length=100 Categorical
+0073	131048	USER_CONTEXT	3227	"history_buy_goods_hit_v" key(history_buy_goods_hit_v) Categorical
+0074	131049	USER_CONTEXT	3228	"history_buy_cate_hit_v" key(history_buy_cate_hit_v) Categorical
+0075	131052	USER_CONTEXT	3229	"history_buy_goods_hit_i2i" key(history_buy_goods_hit_i2i) Categorical
+0076	131466	USER_CONTEXT	3235	"history_buy_cat_price_avg_x_cat" concat_typed(history_buy_cat_price_avg_dis,i64(ITEM_CONTEXT.cat_id)) Categorical
+0077	131467	USER_CONTEXT	3236	"history_buy_cat_price_avg_x_mall" concat_typed(history_buy_cat_price_avg_dis,i64(ITEM_CONTEXT.mall_id)) Categorical
+0078	131468	USER_CONTEXT	3240	"history_buy_cat_price_avg_x_diff" concat_typed(history_buy_cat_price_avg_dis,history_buy_cat_price_g_diff_u_d) Categorical
+0079	131470	USER_CONTEXT	3245	"history_buy_cat1_price_avg_x_cat" concat_typed(history_buy_cat1_price_avg_dis,i64(ITEM_CONTEXT.cat1_id)) Categorical
+0080	131472	USER_CONTEXT	3250	"history_buy_cat1_price_avg_x_diff" concat_typed(history_buy_cat1_price_avg_dis,history_buy_cat1_price_g_diff_u_d) Categorical
+0081	131473	USER_CONTEXT	3251	"history_buy_cat1_price_g_diff_u_r_x_cat" concat_typed(history_buy_cat1_price_g_diff_u_r,i64(ITEM_CONTEXT.cat1_id)) Categorical
+0082	131474	USER_CONTEXT	3257	"history_buy_price_lv_goods" history_buy_price_lv_goods_ Categorical
+0083	131475	USER_CONTEXT	3258	"history_buy_price_lv_cat_x_cat" list_concat_typed(history_buy_price_lv_cat_,i64(ITEM_CONTEXT.cat_id)) Categorical
+0084	131476	USER_CONTEXT	3259	"history_buy_price_lv_cat1_x_cat1" list_concat_typed(history_buy_price_lv_cat1_,i64(ITEM_CONTEXT.cat1_id)) Categorical
+0085	131478	USER_CONTEXT	3262	"history_buy_price_lv_top_x_g_x_cat" concat_typed(history_buy_price_lv_top_,pred_price_lv_,i64(ITEM_CONTEXT.cat_id)) Categorical
+0086	131479	USER_CONTEXT	3263	"history_buy_price_lv_top_x_g_x_mall" concat_typed(history_buy_price_lv_top_,pred_price_lv_,i64(ITEM_CONTEXT.mall_id)) Categorical
+0087	131482	USER_CONTEXT	3267	"history_buy_price_log_x_mall" list_concat_typed(history_buy_price_log_,i64(ITEM_CONTEXT.mall_id)) Categorical
+0088	131483	USER_CONTEXT	3271	"long_view_cat_sprice_cnt_x_rank_r" concat_typed(history_buy_cat_price_cnt_,history_buy_cat_price_rank_r) Categorical
+0089	131484	USER_CONTEXT	3275	"long_view_cat1_sprice_cnt_x_rank_r" concat_typed(history_buy_cat1_price_cnt_,history_buy_cat1_price_rank_r) Categorical
+0090	131485	USER_CONTEXT	3276	"" concat_typed(pred_price_dis,i64(ITEM_CONTEXT.mall_id)) Categorical
+0091	140700	GOODS	1869	"hpr_cat_percentile" i64(GOODS.hpr_cat_percentile) Categorical
+0092	140707	GOODS	1871	"hpr_level_7d_x_price_" default_key_i(concat_typed(i64(GOODS.hpr_level_7d), ictx_predicted_price_aftcpn_dis_)) default_key=-1 Categorical
+0093	16726	USER_COMMON	322	"goods_clk_cnts_before_buy_price_level" concat_typed(convert_prc_level,tmp_goods_clk_cnts_before_buy_price_level) Categorical
+0094	16728	USER_COMMON	329	"goods_mid_clk_cnts_before_buy_price_level" concat_typed(convert_prc_level,tmp_goods_mid_clk_cnts_before_buy_price_level) Categorical
+0095	16742	USER_COMMON	366	"cate1_mid_clk_cnts_before_buy_price_level" tmp_cate1_mid_clk_cnts_before_buy_price_level Categorical
+0096	16746	USER_COMMON	380	"brand_clk_before_buy_sum" concat_typed(is_brand_,tmp_brand_clk_before_buy, tmp_brand_low_price_clk_before_buy, tmp_brand_cheap_price_clk_before_buy, tmp_brand_mid_price_clk_before_buy, tmp_brand_high_price_clk_before_buy) Categorical
+0097	16759	USER_COMMON	391	"sysy_change_x_pred_price" concat_typed(been_sbsy_tag_,sbsy_flag_rt,sbsy_pred_price_dis_) Categorical
+0098	17027	USER_CONTEXT	2781	"ori_seq_goods_1d_rank_i2i_v1_concat" ngram(ori_seq_goods_1d_rank_i2i_v1) n=3000 Categorical
+0099	17033	USER_CONTEXT	2784	"item_last_buy_timegap_x_goods" concat_typed(item_last_buy_timegap_dis,i64(ITEM_CONTEXT.goods_id)) Categorical
+0100	17053	USER_CONTEXT	2787	"long_view_goods_3d_cnt_i2i_v1" value2key_i(sum_value(hit(long_view_goods_3d_map, value2key_i(GOODS.related_goods_ids)))) Categorical
+0101	17058	USER_CONTEXT	2788	"long_view_goods_180d_cnt_i2i_v3" value2key_i(sum_value(hit(long_view_goods_180d_map, value2key_i(GOODS.i2i_list_by_u2i)))) Categorical
+0102	17062	USER_CONTEXT	2789	"long_view_goods_180d_qc_cnt_i2i_v1" value2key_i(sum_value(hit(long_view_goods_180d_qc_map, value2key_i(GOODS.related_goods_ids)))) Categorical
+0103	17071	USER_CONTEXT	2794	"long_view_goods_3d_hit_i2i_v3" hit_no_value(value2key_i(GOODS.i2i_list_by_u2i),value2key_i(long_view_goods_3d)) Categorical
+0104	17086	USER_CONTEXT	2796	"long_buy_goods_730d_cnt_i2i_v1" value2key_i(sum_value(hit(user_buy_goods_730d_map, value2key_i(GOODS.related_goods_ids)))) Categorical
+0105	17088	USER_CONTEXT	2797	"long_buy_goods_730d_cnt_i2i_v2" value2key_i(sum_value(hit(user_buy_goods_730d_map, value2key_i(GOODS.i2i_list)))) Categorical
+0106	17107	USER_CONTEXT	2799	"long_fav_goods_730d_cnt_i2i_v1" value2key_i(sum_value(hit(user_fav_goods_730d_map_fix, value2key_i(GOODS.related_goods_ids)))) Categorical
+0107	17111	USER_CONTEXT	2800	"long_fav_goods_730d_cnt_i2i_v3" value2key_i(sum_value(hit(user_fav_goods_730d_map_fix, value2key_i(GOODS.i2i_list_by_u2i)))) Categorical
+0108	17135	CONTEXT	1250	"u_i_cnt1_in_srch" concat_typed(default_key_i(value2key_i(u_i_impr_cnt1_in_srch)),default_key_i(value2key_i(u_i_clk_cnt1_in_srch))) default_key=0 Categorical
+0109	17136	CONTEXT	1251	"u_i_cnt2_in_srch" concat_typed(default_key_i(value2key_i(u_i_impr_cnt2_in_srch)),default_key_i(value2key_i(u_i_clk_cnt2_in_srch))) default_key=0 Categorical
+0110	17137	CONTEXT	1252	"u_i_cnt3_in_srch" concat_typed(default_key_i(value2key_i(u_i_impr_cnt3_in_srch)),default_key_i(value2key_i(u_i_clk_cnt3_in_srch))) default_key=0 Categorical
+0111	17139	CONTEXT	1255	"u_i_cnt2_out_srch" concat_typed(default_key_i(value2key_i(u_i_impr_cnt2_out_srch)),default_key_i(value2key_i(u_i_clk_cnt2_out_srch))) default_key=0 Categorical
+0112	17177	GOODS	1780	"i2i_list" value2key_i(GOODS.i2i_list) Categorical
+0113	17178	GOODS	1781	"i2i_list_by_u2i" value2key_i(GOODS.i2i_list_by_u2i) Categorical
+0114	17194	MALL	2219	"mall_last_buy_time_x_goods" concat_typed(last_buy_mall_time_t,i64(ITEM_CONTEXT.cat_id)) Categorical
+0115	18004	USER_CONTEXT	2813	"user_view_goods_1d_i2i_hit" dis2xf3_i(sum_value(hit(user_view_goods_1d_map,value2key_i(GOODS.i2i_list)))) discrete_key=view_goods_hit_v Categorical
+0116	18007	USER_CONTEXT	2814	"user_view_goods_180d_i2i_hit" dis2xf3_i(sum_value(hit(user_view_goods_180d_map,value2key_i(GOODS.i2i_list)))) discrete_key=view_goods_hit_v Categorical
+0117	18010	USER_CONTEXT	2817	"user_view_cat_30d_hit_v" dis2xf3_i(hit(user_view_cat_30d_map,i64(ITEM_CONTEXT.cat_id))) discrete_key=view_cat_hit_v Categorical
+0118	18035	USER_CONTEXT	2821	"user_view_goods_3d_hit_i2i" hit_no_value(value2key_i(GOODS.i2i_list),value2key_i(user_view_goods_3d)) Categorical
+0119	18088	USER_CONTEXT	2868	"user_view_180d_hit_v_info_10002" concat_typed(user_view_goods_180d_10002_hit_cnt,user_view_goods_180d_10002_hit_i2i,user_view_cat_180d_10002_hit_cnt,user_view_mall_180d_10002_hit_cnt) Categorical
+0120	18197	USER_CONTEXT	2895	"full_ori_seq_goods_3d_rank_i2i_v3_concat" ngram(full_ori_seq_goods_3d_rank_i2i_v3) n=3000 Categorical
+0121	18501	ITEM_CONTEXT	1365	"title_word_x_query_hash" list_concat_typed(goods_title_term_hash_, i64(CONTEXT.norm_query_hash)) Categorical
+0122	18503	ITEM_CONTEXT	1367	"title_query_len" concat_typed(value2key_i(key_size(key_distinct(goods_title_term_hash_))), query_size, query_word_hit_size_) Categorical
+0123	18504	ITEM_CONTEXT	1368	"title_x_query_word" cross_concat_i(goods_title_term_hash_, i64(CONTEXT.query_seg_ner_word)) Categorical
+0124	19035	GOODS	1787	"ordr_crt_usr_cnt" concat_typed(ordr_crt_usr_cnt_log_map_) Categorical
+0125	19041	GOODS	1791	"in_fav_goods" concat_typed(in_fav_goods_log_map_) Categorical
+0126	19042	GOODS	1795	"fav_goods" concat_typed(fav_goods_log_map_) Categorical
+0127	19044	GOODS	1799	"clk_usr" concat_typed(clk_usr_log_map_) Categorical
+0128	19047	GOODS	1803	"dislk_clk_goods" concat_typed(dislk_clk_goods_log_map_) Categorical
+0129	200104	USER_CONTEXT	3302	"long_view_npid_goods_cnt_log_" long_view_npid_goods_cnt_log_ Categorical
+0130	200105	USER_CONTEXT	3303	"long_fav_npid_goods_cnt_log_" long_fav_npid_goods_cnt_log_ Categorical
+0131	200106	USER_CONTEXT	3304	"long_buy_npid_goods_cnt_log_" long_buy_npid_goods_cnt_log_ Categorical
+0132	200107	USER_CONTEXT	3305	"long_stay_npid_goods_cnt_log_" long_stay_npid_goods_cnt_log_ Categorical
+0133	200181	USER_CONTEXT	4012	"click_side_info_price_cut1_x_price" concat_typed(click_side_info_price_dis_cut1_, price_min_) Categorical
+0134	200210	USER_CONTEXT	3799	"ranklist_goods_tnpid_cnt" key_size_v3(ranklist_goods_tnpid_top200_) Categorical
+0135	200269	USER_CONTEXT	3801	"ranklist_tnpid_top20_index" ranklist_tnpid_top20_index_ Categorical
+0136	200283	USER_CONTEXT	4444	"ctr_score_top200_goods_index" default_key_i(list_in_list_index_typed(ctr_score_top200_goods_, i64(ITEM_CONTEXT.goods_id))) default_key=-1 Categorical
+0137	200284	USER_CONTEXT	4446	"cvr_score_top200_goods_index" default_key_i(list_in_list_index_typed(cvr_score_top200_goods_, i64(ITEM_CONTEXT.goods_id))) default_key=-1 Categorical
+0138	200310	USER_CONTEXT	3110	"lp_gd_ordr_cat_time_hour" get_time_info_typed(i64(lp_gd_ordr_cat_time_)) time_type=hour Categorical
+0139	200311	USER_CONTEXT	3112	"lp_gd_cnslt_cat_time_hour" get_time_info_typed(i64(lp_gd_cnslt_cat_time_)) time_type=hour Categorical
+0140	200313	USER_CONTEXT	3114	"lp_gd_sku_pid_time_hour" get_time_info_typed(i64(lp_gd_sku_pid_time_)) time_type=hour Categorical
+0141	200314	USER_CONTEXT	3116	"lp_gd_cmnt_pid_time_hour" get_time_info_typed(i64(lp_gd_cmnt_pid_time_)) time_type=hour Categorical
+0142	200315	USER_CONTEXT	3117	"lp_gd_cat_stay_time_dis" dis2xf3_i(lp_gd_cat_stay_time_) discrete_key=gd_stay_times_disc Categorical
+0143	200316	USER_CONTEXT	3118	"lp_gd_cat1_stay_time_dis" dis2xf3_i(lp_gd_cat1_stay_time_) discrete_key=gd_stay_times_disc Categorical
+0144	200317	USER_CONTEXT	3119	"lp_gd_pid_stay_time_dis" dis2xf3_i(lp_gd_pid_stay_time_) discrete_key=gd_stay_times_disc Categorical
+0145	200324	USER_CONTEXT	3345	"long_npid2_impr_idx_diff" default_key_i(value2key_i(log_with_base(k2v_f(long_npid2_impr_idx_diff_)))) Categorical lwb_base=1.1 lwb_up_bound=400 default_key=-1
+0146	200325	USER_CONTEXT	3354	"last_buy_time_gap" lconcatp_typed(extend(extend(extend(last_buy_cat_time_gap_minute,last_buy_cat1_time_gap_minute),last_buy_mall_time_gap_minute),last_buy_prod2_time_gap_minute)) Categorical
+0147	200406	USER_CONTEXT	3804	"user_view_pagesn_twbi2i" user_view_pagesn_t_trixi_w3_goods_ Categorical
+0148	200585	USER_CONTEXT	4010	"click_side_info_goods_hit_idx" click_side_info_goods_hit_idx_ Categorical
+0149	200615	USER_CONTEXT	4016	"impr_side_info_goods_hit_rank_idx_cut50" slice_v3_typed{start=0,end=50}(value2key_i(impr_side_info_goods_hit_rank_idx_)) Categorical
+0150	200640	USER_CONTEXT	3983	"user_view_mmd_img_cossim_max_sim" user_view_mmd_img_cossim_max_sim_ Categorical
+0151	200727	USER_CONTEXT	3132	"u_gd_slct_type_tget_cat_30d" hash(str(u_gd_slct_type_tget_cat_30d_)) strict=0 Categorical
+0152	200729	USER_CONTEXT	3133	"u_gd_slct_type_tget_cat_30d_0th" hash(str(slice_v3_typed{start=0,end=1}(u_gd_slct_type_tget_cat_30d_))) strict=0 Categorical
+0153	200751	USER_CONTEXT	3360	"user_impr_mall_all_hit" user_impr_mall_all_hit_ Categorical
+0154	200753	USER_CONTEXT	3366	"user_impr_mall_timegap" value2key_i(round(div_v2(user_impr_mall_time_, const_min_))) Categorical
+0155	200754	USER_CONTEXT	3369	"user_impr_goods_x_rerank_i2i_idx_" user_impr_goods_x_rerank_i2i_idx_ Categorical
+0156	200756	USER_CONTEXT	3371	"user_view_goods_x_rerank_i2i_idx_" user_view_goods_x_rerank_i2i_idx_ Categorical
+0157	200757	USER_CONTEXT	3373	"user_view_goods_x_nlp_i2i_idx_" user_view_goods_x_nlp_i2i_idx_ Categorical
+0158	200765	USER_CONTEXT	3392	"p2p_hit_long_view_proid_v2_cnt" key_size_v3(p2p_hit_long_view_proid_v2_idx_) Categorical
+0159	200768	USER_CONTEXT	3396	"i2i_rerank_hit_impr_pagesn_3d" key_distinct(i64(i2i_rerank_hit_impr_pagesn_3d_)) Categorical
+0160	200780	USER_CONTEXT	3989	"user_rn_impr_mmd_img_vec_pooling_cossim" user_rn_impr_mmd_img_vec_pooling_cossim_ Categorical
+0161	201021	USER_CONTEXT	3986	"user_view_mmd_img_cossim_geq_800_count_concat" concat_typed(count_key(user_view_mmd_img_cossim_geq_800_)) Categorical
+0162	201705	USER_COMMON	439	"hb_tctgtv3_dgdf" default_key_i(hb_tctgtv3_dgdf_) Categorical default_key=-1
+0163	201716	USER_CONTEXT	3404	"gdoff_3m_acty_tpid2" default_key_i(hash(str(gdoff_3m_acty_tpid2_))) strict=0 default_key=-1 Categorical
+0164	201717	USER_CONTEXT	3405	"gdoff_3m_staytime_dis_tpid2" default_key_i(gdoff_3m_staytime_dis_tpid2_) Categorical default_key=-1
+0165	201735	USER_CONTEXT	3408	"gdoff_3m_acty_ttrixip" default_key_i(hash(str(gdoff_3m_acty_ttrixip_))) strict=0 default_key=-1 Categorical
+0166	201809	USER_CONTEXT	3671	"gd_3m_clk_buy_stay_time_dis_tgoods" gd_3m_clk_buy_stay_time_dis_tgoods_ Categorical
+0167	201825	USER_CONTEXT	3790	"gd_3m_clk_buy_stay_time_dis_ti2irerk" gd_3m_clk_buy_stay_time_dis_ti2irerk_ Categorical
+0168	201856	USER_CONTEXT	3421	"gd_3m_stay_time_dis_ti2iv1" default_key_i(list_index_typed(gd_3m_stay_time_dis_,gd_3m_ti2iv1_index_)) Categorical default_key=-1
+0169	201910	USER_COMMON	454	"user_clk_cnt_dis_2y_tcat" user_clk_cnt_dis_2y_tcat_ Categorical
+0170	201911	USER_COMMON	455	"user_clk_cnt_dis_2y_tcat1" user_clk_cnt_dis_2y_tcat1_ Categorical
+0171	201912	USER_COMMON	457	"user_clk_sum_log_2y_tci2i" user_clk_sum_log_2y_tci2i_ Categorical
+0172	201916	USER_COMMON	464	"user_ordr_cnt_log_2y_tcat1" user_ordr_cnt_log_2y_tcat1_ Categorical
+0173	201918	USER_COMMON	465	"user_ordr_sum_log_2y_tci2i" user_ordr_sum_log_2y_tci2i_ Categorical
+0174	202096	USER_CONTEXT	3685	"lp_gd_ordr_stay_times_tc2cixi" dis2xf3_i(k2v_f(lp_gd_ordr_stay_times_tc2cixi_)) Categorical discrete_key=user_gd_stay_time
+0175	33203301	USER_CONTEXT	4897	"sku_clk_v4_img_sim_64d_top1_index" sku_clk_v4_img_sim_64d_top1_index_ Categorical
+0176	33203302	USER_CONTEXT	4898	"sku_clk_v4_img_sim_64d_top10" sku_clk_v4_img_sim_64d_top10_ Categorical
+0177	33203303	USER_CONTEXT	4899	"sku_clk_v4_img_sim_64d_top1" sku_clk_v4_img_sim_64d_top1_ Categorical
+0178	33203304	USER_CONTEXT	4901	"sku_clk_v4_64d_top10_timediff" sku_clk_v4_64d_top10_timediff_ Categorical
+0179	33203306	USER_CONTEXT	4903	"sku_clk_v4_64d_top1_timediff" sku_clk_v4_64d_top1_timediff_ Categorical
+0180	33203308	USER_CONTEXT	4905	"sku_clk_v4_img_sim_64d_cut20" sku_clk_v4_img_sim_64d_cut20_ Categorical
+0181	33203310	USER_CONTEXT	4910	"sku_clk_v4_pay_price_diff_dis_cut20" sku_clk_v4_pay_price_diff_dis_cut20_ Categorical
+0182	33203311	USER_CONTEXT	4911	"sku_clk_v4_pay_price_diff_dis_x_sim_64d_cut20" concat_typed(sku_clk_v4_pay_price_diff_dis_cut20_,sku_clk_v4_img_sim_64d_cut20_) Categorical
+0183	33203312	USER_CONTEXT	4913	"sku_clk_v4_top10_pay_price_diff_dis_x_sim_64d" concat_typed(sku_clk_v4_img_sim_64d_top10_pay_price_diff_,sku_clk_v4_img_sim_64d_top10_) Categorical
+0184	33203320	USER_CONTEXT	4917	"sku_clk_v4_img_sim_64d_geq_800_count_concat" default_key_i(concat_typed(count_key(sku_clk_v4_img_sim_64d_geq_800_))) default_key=-1 Categorical
+0185	33203321	USER_CONTEXT	4918	"sku_clk_v4_pay_price_diff_dis_img_64d_geq_800" default_key_i(sku_clk_v4_pay_price_diff_dis_img_64d_geq_800_) default_key=-99999999 Categorical
+0186	33203330	USER_CONTEXT	4923	"sku_clk_v4_img_sim_64d_geq_900_count_concat" default_key_i(concat_typed(count_key(sku_clk_v4_img_sim_64d_geq_900_))) default_key=-1 Categorical
+0187	33203331	USER_CONTEXT	4924	"sku_clk_v4_pay_price_diff_dis_img_64d_geq_900" default_key_i(sku_clk_v4_pay_price_diff_dis_img_64d_geq_900_) default_key=-99999999 Categorical
+0188	33203332	USER_CONTEXT	4925	"sku_clk_v4_img_sim_64d_geq_900_idx_x_pos" default_key_i(lconcatp_typed(sku_clk_v4_img_sim_64d_geq_900_index_)) default_key=-1 Categorical
+0189	33203333	USER_CONTEXT	4926	"sku_clk_v4_img_sim_64d_geq_900_count" key_size_v3(sku_clk_v4_img_sim_64d_geq_900_index_) Categorical
+0190	33203334	USER_CONTEXT	4927	"sku_clk_v4_timediff_dis_img_64d_geq_900" default_key_i(sku_clk_v4_timediff_dis_img_64d_geq_900_) default_key=-1 Categorical
+0191	20500	USER_COMMON	268	"user_click_goods_cnt_180d" dis2xf3_i(get(to_map(i64(click_goods_cnts_180d)),i64(ITEM_CONTEXT.goods_id))) Categorical discrete_key=click_goods_cnts_180d
+0192	20501	USER_COMMON	269	"user_click_goods_cnt_90d" dis2xf3_i(get(to_map(i64(click_goods_cnts_90d)),i64(ITEM_CONTEXT.goods_id))) Categorical discrete_key=click_goods_cnts_90d
+0193	20504	USER_COMMON	271	"user_click_cat_cnt_180d" dis2xf3_i(get(to_map(i64(click_cat_cnts_180d)),i64(ITEM_CONTEXT.cat_id))) Categorical discrete_key=click_cat_cnts_180d
+0194	20505	USER_COMMON	272	"user_click_cat_cnt_90d" dis2xf3_i(get(to_map(i64(click_cat_cnts_90d)),i64(ITEM_CONTEXT.cat_id))) Categorical discrete_key=click_cat_cnts_90d
+0195	20512	USER_COMMON	278	"price_buy_indicator" concat_typed(default_key_i(price_greater_than_min),default_key_i(price_lower_than_max)) Categorical default_key=-1
+0196	206029	USER_COMMON	697	"gpage_1y_clk_buy_pagesn_x_elsn_tpidv2" default_key_i(gpage_1y_clk_buy_pagesn_x_elsn_tpidv2_) Categorical default_key=-1
+0197	206051	USER_COMMON	795	"user_view_timediff_t_goods_log_x_pagesn_x_elsn" default_key_i(concat_typed(user_view_timediff_t_goods_log_,user_view_pagesn_x_elsn_t_goods_)) Categorical default_key=-1
+0198	206056	USER_COMMON	702	"" default_key_i(afs_tgt_c1_fnsh_timegaps_) Categorical default_key=-1
+0199	206077	USER_CONTEXT	4402	"long_view_sprice_t_trixi_pdct_diff_pred_price_dis" long_view_sprice_t_trixi_pdct_diff_pred_price_dis_ Categorical
+0200	206081	USER_CONTEXT	4409	"history_buy_aftcpn_prcs_diff_dis_t_cat1" default_key_i(history_buy_aftcpn_prcs_diff_dis_t_cat1_) Categorical default_key=-1
+0201	206082	USER_CONTEXT	4413	"history_buy_aftcpn_prcs_diff_dis_t_trixi_cluster_v3" default_key_i(history_buy_aftcpn_prcs_diff_dis_t_trixi_cluster_v3_) Categorical default_key=-1
+0202	206157	USER_COMMON	710	"user_life_clk_staytime_sec_t_c2x_countkey" default_key_i(concat_typed(user_life_clk_staytime_sec_t_c2x_countkey_)) Categorical default_key=-1
+0203	21034	USER_CONTEXT	2449	"user_impr_goods_pagesn_time_gap_sum" concat_typed(count_key(user_impr_goods_pagesn_time_gap_filter)) Categorical
+0204	21035	USER_CONTEXT	2450	"user_view_goods_pagesn_time_gap_sum" concat_typed(count_key(user_view_goods_pagesn_time_gap_filter)) Categorical
+0205	21036	USER_CONTEXT	2453	"user_impr_cate_pagesn_time_gap_sum" concat_typed(count_key(user_impr_cate_pagesn_time_gap_filter)) Categorical
+0206	21037	USER_CONTEXT	2454	"user_view_cate_pagesn_time_gap_sum" concat_typed(count_key(user_view_cate_pagesn_time_gap_filter)) Categorical
+0207	21050	USER_CONTEXT	2630	"long_impr_30d_hit_v_info" concat_typed(long_impr_mall_30d_hit_v,long_impr_brand_30d_hit_v,long_impr_cate_30d_hit_v,long_impr_goods_30d_hit_v,long_impr_nproduct_30d_hit_v,long_impr_cluster_30d_hit_v) Categorical
+0208	21051	USER_CONTEXT	2631	"long_view_180d_qc_hit_v_info" concat_typed(long_view_mall_180d_qc_hit_v,long_view_brand_180d_qc_hit_v,long_view_cate_180d_qc_hit_v,long_view_goods_180d_qc_hit_v,long_view_nproduct_180d_qc_hit_v,long_view_cluster_180d_qc_hit_v) Categorical
+0209	21052	USER_CONTEXT	2632	"long_view_3d_qc_hit_v_info" concat_typed(long_view_mall_3d_qc_hit_v,long_view_brand_3d_qc_hit_v,long_view_cate_3d_qc_hit_v,long_view_goods_3d_qc_hit_v,long_view_nproduct_3d_qc_hit_v,long_view_cluster_3d_qc_hit_v) Categorical
+0210	21053	USER_CONTEXT	2633	"long_buy_180d_hit_v_info" concat_typed(long_buy_mall_180d_hit_v,long_buy_brand_180d_hit_v,long_buy_cate_180d_hit_v,long_buy_goods_180d_hit_v,long_buy_nproduct_180d_hit_v,long_buy_cluster_180d_hit_v) Categorical
+0211	21054	USER_CONTEXT	2634	"long_fav_180d_hit_v_info" concat_typed(long_fav_mall_180d_hit_v,long_fav_brand_180d_hit_v,long_fav_cate_180d_hit_v,long_fav_goods_180d_hit_v,long_fav_nproduct_180d_hit_v,long_fav_cluster_180d_hit_v) Categorical
+0212	2111	CONTEXT	1190	"u_fav_unfav_cat_cnt" concat_typed(u_c_fav_cnt,u_c_unfav_cnt) Categorical
+0213	21110	ITEM_CONTEXT	1369	"viewed_pagesns" key(i64(viewed_pagesns)) Categorical
+0214	211100	USER_CONTEXT	3997	"user_query_q2i_kv_hit_goods_cnt" default_key_i(value2key_i(user_query_q2i_kv_hit_goods_)) default_key=0 Categorical
+0215	211130	USER_CONTEXT	4001	"user_query_q2p_kv_hit_pidv2_cnt" default_key_i(value2key_i(user_query_q2p_kv_hit_pidv2_)) default_key=0 Categorical
+0216	21114	ITEM_CONTEXT	1372	"view_cnt" value2key_i(key_size(i64(viewed_pagesns))) Categorical
+0217	21115	ITEM_CONTEXT	1373	"view_pagesns_cnt" value2key_i(key_size(i64(viewed_pagesns_cnt))) Categorical
+0218	2115	CONTEXT	1193	"u_word_clk_cnt" dis2xf3_i(sum(hit(i64(SearchSessionClkWordsV2),goods_title_term_hash_))) Categorical discrete_key=u_i_clk_words_sum
+0219	21201	USER_CONTEXT	2576	"mall_size_180d_x_buy_cnt_x_total_cnt" concat_typed(long_buy_mall_180_qc_size, long_buy_mall_180_qc_total_cnt, long_buy_mall_180d_qc_cnt) Categorical
+0220	21202	USER_CONTEXT	2581	"brand_size_180d_x_buy_cnt_x_total_cnt" concat_typed(long_buy_brand_180_qc_size, long_buy_brand_180_qc_total_cnt, long_buy_brand_180d_qc_cnt) Categorical
+0221	21242	USER_CONTEXT	2639	"long_stay_cluster_30d_sum_time" value2key_i(sum(filter_by_key_i(long_stay_cluster_30d:IntList,cluster_id_str,long_stay_time_30d:IntList))) Categorical
+0222	215334	USER_CONTEXT	4269	"hit_trixi_w3_c_x_brtdurhpd_tg_impr_seq_" hit_trixi_w3_prdv2_x_brtdurhpd_tg_impr_seq_ Categorical
+0223	215337	USER_CONTEXT	4272	"hit_trixi_w3_nprd_x_brtdurhpd_tg_impr_seq_" hit_trixi_w3_nprd_x_brtdurhpd_tg_impr_seq_ Categorical
+0224	215350	USER_CONTEXT	4323	"hit_trixi_w3_g_x_impr_v2_1d_dur_phd_" hit_trixi_w3_g_x_impr_v2_1d_dur_phd_ Categorical
+0225	215393	USER_CONTEXT	4243	"hit_prdv2_x_brtavg_impr_seq_x_prc_" hit_prdv2_x_brtavg_impr_seq_x_prc_ Categorical
+0226	215399	USER_CONTEXT	4369	"hit_trixi_w3_g_x_impr_v2_1d_0to2_dur_hpd_idx_idx_" hit_trixi_w3_g_x_impr_v2_1d_0to2_dur_hpd_idx_idx_ Categorical
+0227	21668	USER_CONTEXT	3010	"item_price_rank_in_impr" mergekey(lrn_item_price_rank_in_impr_,item_price_rank_in_impr_) Categorical
+0228	21669	USER_CONTEXT	3011	"item_price_rank_in_click" concat_typed(lrn_item_price_rank_in_click_,item_price_rank_in_click_) Categorical
+0229	21702	USER_CONTEXT	3029	"long_buy_cat_sprice_avg_x_cat" concat_typed(long_buy_cat_sprice_avg_dis,i64(ITEM_CONTEXT.cat_id)) Categorical
+0230	21708	USER_CONTEXT	3032	"long_view_cat_sprice_avg_x_diff" concat_typed(long_stay_cat_sprice_avg_dis,long_stay_cat_sprice_g_diff_u_d) Categorical
+0231	21726	USER_CONTEXT	3047	"long_view_pid_sprice_avg_x_diff" concat_typed(long_fav_pid_sprice_avg_dis,long_fav_pid_sprice_g_diff_u_d) Categorical
+0232	21728	USER_CONTEXT	3048	"long_view_pid_sprice_avg_x_diff" concat_typed(long_stay_pid_sprice_avg_dis,long_stay_pid_sprice_g_diff_u_d) Categorical
+0233	21729	USER_CONTEXT	3049	"long_view_pid_sprice_g_diff_u_r_x_cat" concat_typed(long_view_pid_sprice_g_diff_u_r,nlp_product_id) Categorical
+0234	21743	USER_CONTEXT	3055	"long_buy_sprice_lv_goods_x_mall" key(long_buy_sprice_lv_goods_) max_length=200 Categorical
+0235	21746	USER_CONTEXT	3056	"long_sprice_lv_vcnt_x_bcnt" concat_typed(key_size_v3(long_view_sprice_lv_goods_),key_size_v3(long_buy_sprice_lv_goods_)) Categorical
+0236	21752	USER_CONTEXT	3062	"long_buy_sprice_log_x_mall" list_concat_typed(long_buy_sprice_log_,i64(ITEM_CONTEXT.mall_id)) Categorical
+0237	21760	USER_CONTEXT	3066	"long_fav_cat_sprice_cnt_x_rank_r" concat_typed(long_fav_cat_sprice_cnt_,long_fav_cat_sprice_rank_r) Categorical
+0238	21762	USER_CONTEXT	3067	"" concat_typed(sku_price_dis,i64(ITEM_CONTEXT.mall_id)) Categorical
+0239	22101	USER_CONTEXT	2919	"price_buy_indicator" concat_typed(default_key_i(price_greater_than_min_pred),default_key_i(price_lower_than_max_pred)) Categorical default_key=-1
+0240	22102	ITEM_CONTEXT	1397	"fix_price_dis_new" dis2xf3_i(i64(ITEM_CONTEXT.predicted_price)) Categorical discrete_key=fix_price_dis
+0241	22106	ITEM_CONTEXT	1399	"buypower_discount_10_x_global_price_coupon_effect" concat_typed(global_price_coupon_effect_fix_new_, i64(USER_COMMON.avg_disc_ratio_discrete_10)) Categorical
+0242	22119	ITEM_CONTEXT	1401	"rt_sku_min_price_dis" rt_sku_min_price_dis_ Categorical
+0243	22120	ITEM_CONTEXT	1405	"min_sku_price_cpn_discount" dis2xf3_i(min_sku_price_cpn_discount) Categorical discrete_key=price_disc_rate
+0244	22129	USER_CONTEXT	2922	"u_view_price_rank_r" dis2xf3_i(u_view_price_rank_r_) Categorical discrete_key=price_rank_rate
+0245	22131	USER_CONTEXT	2926	"u_view_price_qc_diff_r" dis2xf3_i(user_view_price_qc_diff_r_) Categorical discrete_key=price_diff_rate
+0246	231333	USER_COMMON	521	value2key_i(log_with_base(sum_value(k2v_f(list_index_typed(user_life_clk_staytime_, u_lifeclk_hit_v3_idx_))))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0247	231334	USER_COMMON	522	value2key_i(log_with_base(list_index_typed(user_life_clk_timediff_hour_, u_lifeclk_hit_v3_idx_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0248	231344	USER_COMMON	523	value2key_i(log_with_base(list_index_typed(user_life_clk_timediff_hour_, u_lifeclk_hit_v4_idx_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0249	231374	USER_COMMON	524	value2key_i(log_with_base(list_index_typed(user_life_clk_timediff_hour_, u_lifeclk_hit_v7_idx_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0250	231494	QUERY	5686	value2key_i(log_with_base(list_index_typed(uc_lifeclk_timediff_hour_, uc_lifeclk_hit_v9_idx_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0251	24021	GOODS	1678	"nlp_product_id" i64(GOODS.nlp_product_id) Categorical
+0252	24082404	QUERY	5630	"acv2_uniq_6m_gtgt_tgdfv2_x_page_sn_x_elsn" default_key_i(concat_typed(acv2_uniq_6m_gtgt_tgdfv2_log_,acv2_uniq_6m_gtgt_page_sn_x_elsn_)) Categorical default_key=-1
+0253	24082417	QUERY	5676	"ordrv3_2y_qv2tgt_ordr_logic_stts" default_key_i(ordrv3_2y_qv2tgt_ordr_logic_stts_) Categorical default_key=-1
+0254	24082423	QUERY	5678	"tsghi_i2i_history_buy_goods_ids_f" default_key_i(tsghi_i2i_history_buy_goods_ids_f_) default_key=-1 Categorical
+0255	24107	GOODS	1669	"goods_cvr_cnts_180d" dis2xf3_i(k2v_i(i64(cvr_cnts_180d))) discrete_key=cvr_cnts_180d Categorical
+0256	24108	GOODS	1670	"goods_cvr_avg_len_180d" dis2xf3_i(k2v_i(i64(cvr_avg_len_180d))) discrete_key=cvr_avg_len_180d Categorical
+0257	24115	GOODS	1671	"goods_cvr_fst_cnts_180d" dis2xf3_i(k2v_i(i64(cvr_fst_cnts_180d))) discrete_key=cvr_fst_cnts_180d Categorical
+0258	24116	GOODS	1672	"goods_cvr_fst_avg_len_180d" dis2xf3_i(k2v_i(i64(cvr_fst_avg_len_180d))) discrete_key=cvr_fst_avg_len_180d Categorical
+0259	24121	GOODS	1673	"goods_cvr_fst_5_avg_len_180d" dis2xf3_i(k2v_i(i64(cvr_fst_5_avg_len_180d))) discrete_key=cvr_fst_5_avg_len_180d Categorical
+0260	24218	GOODS_HOUR	1986	"p_srch_impr_cnt_sgl_info" concat_typed(p_srch_impr_1h_cnt_dis, p_srch_impr_2h_sgl_cnt_dis, p_srch_impr_3h_sgl_cnt_dis, p_srch_impr_4h_sgl_cnt_dis) Categorical
+0261	24231	CAT_HOUR	2164	"c_stay_sgl_cnt_info" c_stay_sgl_cnt_info Categorical
+0262	24237	CAT_HOUR	2174	"c_stay_gender_sgl_cnt_info" c_stay_gender_sgl_cnt_info Categorical
+0263	24242	CAT_HOUR	2184	"c_srch_view_cnt_sgl_info" concat_typed(c_srch_view_1h_cnt_dis, c_srch_view_2h_sgl_cnt_dis, c_srch_view_3h_sgl_cnt_dis, c_srch_view_4h_sgl_cnt_dis) Categorical
+0264	24246	CAT_HOUR	2193	"c_srch_cvr_info" concat_typed(c_srch_1h_cvr, c_srch_2h_cvr, c_srch_3h_cvr, c_srch_4h_cvr) Categorical
+0265	24328	USER_CONTEXT	2385	"search_session_price_rank" default_key_i(search_session_price_rank_fix) Categorical default_key=-1
+0266	24330	USER_CONTEXT	2399	"g_price_rank_qc" rank_i(user_view_price_qc:IntList,i64(ictx_min_price_aftcpn_)) Categorical
+0267	24332	USER_CONTEXT	2400	"g_price_rank_cat_1h" rank_i(user_view_price_cat_1h:IntList,i64(ictx_min_price_aftcpn_)) Categorical
+0268	24496	GOODS	1658	"price_cat_percentile" value2key_i(GOODS.price_cat_percentile) Categorical
+0269	24497	GOODS	1659	"price_clu_percentile" value2key_i(GOODS.price_cluster_percentile) Categorical
+0270	24498	GOODS	1660	"price_nprod_percentile" value2key_i(GOODS.price_nproduct_percentile) Categorical
+0271	24530	GOODS	1640	"pay_ord_disc_ratio_dis" pay_ord_disc_ratio_dis Categorical
+0272	24531	GOODS	1645	"pay_ord_nrfnd_ratio_dis" pay_ord_nrfnd_ratio_dis Categorical
+0273	24541	GOODS	1663	"cluster_price_greater_x_smaller" concat_typed(cluster_price_greater_cnt_,cluster_price_smaller_cnt_) Categorical
+0274	246004	QUERY	5700	"" default_key_i(rankV2_i(rc_impr_top20_price,ITEM_CONTEXT.price)) Categorical default_key=-1
+0275	246005	QUERY	5701	"" default_key_i(rankV2_i(rc_impr_top50_price,ITEM_CONTEXT.price)) Categorical default_key=-1
+0276	246006	QUERY	5702	"" default_key_i(rankV2_i(rc_impr_top100_price,ITEM_CONTEXT.price)) Categorical default_key=-1
+0277	246007	QUERY	5703	"" default_key_i(rankV2_i(rc_impr_top200_price,ITEM_CONTEXT.price)) Categorical default_key=-1
+0278	246014	QUERY	5707	"top_pred_price_pre_rank_x_index" concat_typed(impr_top_pre_index_price_rank, default_key_i(rc_impr_top200_goods_index_)) Categorical default_key=-1
+0279	24701	GOODS_HOUR	1998	"g_srch_impr_cnt_info" concat_typed(g_srch_impr_1h_cnt_dis_yrt_, g_srch_impr_2h_cnt_dis_yrt_, g_srch_impr_3h_cnt_dis_yrt_, g_srch_impr_4h_cnt_dis_yrt_) Categorical
+0280	24702	GOODS_HOUR	1999	"g_srch_impr_up_cnt_info" concat_typed(g_srch_impr_2h_up_cnt_dis_yrt_, g_srch_impr_3h_up_cnt_dis_yrt_, g_srch_impr_4h_up_cnt_dis_yrt_) Categorical
+0281	24703	GOODS_HOUR	2011	"g_buy_cnt_info" concat_typed(g_buy_1h_cnt_dis_yrt_, g_buy_2h_cnt_dis_yrt_, g_buy_3h_cnt_dis_yrt_, g_buy_4h_cnt_dis_yrt_) Categorical
+0282	24704	GOODS_HOUR	2012	"g_buy_up_cnt_info" concat_typed(g_buy_2h_up_cnt_dis_yrt_, g_buy_3h_up_cnt_dis_yrt_, g_buy_4h_up_cnt_dis_yrt_) Categorical
+0283	24705	GOODS_HOUR	2024	"g_fav_cnt_info" concat_typed(g_fav_1h_cnt_dis_yrt_, g_fav_2h_cnt_dis_yrt_, g_fav_3h_cnt_dis_yrt_, g_fav_4h_cnt_dis_yrt_) Categorical
+0284	24706	GOODS_HOUR	2025	"g_fav_up_cnt_info" concat_typed(g_fav_2h_up_cnt_dis_yrt_, g_fav_3h_up_cnt_dis_yrt_, g_fav_4h_up_cnt_dis_yrt_) Categorical
+0285	24707	GOODS_HOUR	2032	"g_srch_impr_cnt_sgl_info" concat_typed(g_srch_impr_1h_cnt_dis_yrt_, g_srch_impr_2h_sgl_cnt_dis_yrt_, g_srch_impr_3h_sgl_cnt_dis_yrt_, g_srch_impr_4h_sgl_cnt_dis_yrt_) Categorical
+0286	24708	GOODS_HOUR	2039	"g_buy_cnt_sgl_info" concat_typed(g_buy_1h_cnt_dis_yrt_, g_buy_2h_sgl_cnt_dis_yrt_, g_buy_3h_sgl_cnt_dis_yrt_, g_buy_4h_sgl_cnt_dis_yrt_) Categorical
+0287	24709	GOODS_HOUR	2043	"g_fav_cnt_sgl_info" concat_typed(g_fav_1h_cnt_dis_yrt_, g_fav_2h_sgl_cnt_dis_yrt_, g_fav_3h_sgl_cnt_dis_yrt_, g_fav_4h_sgl_cnt_dis_yrt_) Categorical
+0288	24710	GOODS_HOUR	2053	"g_stay_avg_cnt_info_x_user" concat_typed(g_stay_1h_cnt_avg_dis_yrt_, g_stay_2h_cnt_avg_dis_yrt_, g_stay_3h_cnt_avg_dis_yrt_, g_stay_4h_cnt_avg_dis_yrt_, goods_stay_rt_dis) Categorical
+0289	24711	GOODS_HOUR	2082	"g_search_cvr_h" concat_typed(g_srch_1h_cvr_yrt_, g_srch_2h_cvr_yrt_, g_srch_3h_cvr_yrt_, g_srch_4h_cvr_yrt_) Categorical
+0290	25008	GOODS	1747	"" rev_cnt_all_dis Categorical
+0291	25010	GOODS	1754	"" no_ship_count_dis Categorical
+0292	25011	GOODS	1761	"" ship_2_count_dis Categorical
+0293	25012	GOODS	1768	"" ship_1_count_dis Categorical
+0294	25014	GOODS	1772	"" dlv_ratio_dis Categorical
+0295	25015	GOODS	1776	"" rcv_ratio_dis Categorical
+0296	25027	GOODS	1777	"buypower_x_avg_rn_impr_rank_ratio2" concat_typed(dis2xf3_i(i64(avg_rn_impr_rank_ratio2)), i64(USER_COMMON.user_buypower)) discrete_key=avg_rn_rank_ratio2 Categorical
+0297	25048	USER_CONTEXT	2654	"impr_cate_1st_gap_dis" dis2xf3_i(impr_cate_1st_gap) discrete_key=impr_cate_1st_gap Categorical
+0298	25059	USER_CONTEXT	2668	"ugh_6h_p_info" concat_typed(impr_goods_hit_6h_cnt_dis, view_goods_hit_6h_cnt_dis) Categorical
+0299	25060	USER_CONTEXT	2677	"uch_30d_p_info" concat_typed(impr_cate_hit_30d_cnt_dis, view_cate_hit_30d_cnt_dis, user_cate_hit_30d_ctr_dis) Categorical
+0300	25073	USER_CONTEXT	2687	"buy_cate_180d_dist_info" concat_typed(buy_cate_180d_ratio_dis, buy_cate_180d_mean_dis, buy_cate_180d_var_dis) Categorical
+0301	25093	QUERY	5483	"long_hitnum_kr_favorder" concat_typed(Query30d_fav_kr_new, Query30d_ordr_kr_new) Categorical
+0302	25106	QUERY	5484	"query_not_hit_titlt_size" key_size_v3(list_delete_fast(hash(QUERY.term_fav_seg30), goods_title_term_)) Categorical
+0303	25113	QUERY	5487	"ngram2_x_goods_id" list_concat_typed(ngram(i64(CONTEXT.query_seg_info_list_term)), i64(ITEM_CONTEXT.goods_id)) n=2 Categorical
+0304	25116	QUERY	5486	"ngram2_x_cat_id" list_concat_typed(ngram(i64(CONTEXT.query_seg_ner_word)), i64(ITEM_CONTEXT.cat_id)) n=2 Categorical
+0305	25120	QUERY	5485	"ngram2_his_hit_goods" default_key_i(hit_no_value(ngram(i64(value2key_i(USER_CONTEXT.user_history_query))), ngram(goods_title_term_hash_))) n=2 Categorical
+0306	25501	ITEM_CONTEXT	1388	"sku_content_hash_cnt_avg" default_key_i(value2key_i(round(sku_content_hash_cnt_avg_))) Categorical default_key=-1
+0307	25504	ITEM_CONTEXT	1395	"cat1_sku_hash_clk_cnt_hit_avg" default_key_i(value2key_i(round(cat1_sku_hash_clk_cnt_hit_avg_))) Categorical default_key=-1
+0308	25506	ITEM_CONTEXT	1396	"cat1_sku_hash_clk_cnt_map_concat" default_key_i(concat_typed(cat1_sku_hash_clk_cnt_map_)) Categorical default_key=-1
+0309	25515	USER_CONTEXT	2932	"" default_key_i(concat_typed(clk_hash_pid_cnt_14d_)) Categorical default_key=-1
+0310	25711	USER_CONTEXT	3085	"lp_gd_ordr_cat_goods_cnt" key_size_v3(lp_gd_ordr_cat_goods_) Categorical
+0311	25717	USER_CONTEXT	3087	"lp_gd_cmnt_cat_goods_cnt" key_size_v3(lp_gd_cmnt_cat_goods_) Categorical
+0312	25721	USER_CONTEXT	3089	"lp_gd_ordr_cat1_goods_cnt" key_size_v3(lp_gd_ordr_cat1_goods_) Categorical
+0313	25741	USER_CONTEXT	3091	"lp_gd_ordr_pid_goods_cnt" key_size_v3(lp_gd_ordr_pid_goods_) Categorical
+0314	25751	USER_CONTEXT	3098	"lp_gd_cat_stay_time_sum_log_" lp_gd_cat_stay_time_sum_log_ Categorical
+0315	25752	USER_CONTEXT	3099	"lp_gd_cat1_stay_time_sum_log_" lp_gd_cat1_stay_time_sum_log_ Categorical
+0316	25754	USER_CONTEXT	3100	"lp_gd_pid_stay_time_sum_log_" lp_gd_pid_stay_time_sum_log_ Categorical
+0317	26003	USER_CONTEXT	2711	"user_buy_730d_info" concat_typed(user_buy_goods_730d_map_hit_v,user_buy_mall_730d_map_hit_v,user_buy_cat_730d_map_hit_v) Categorical
+0318	26007	USER_CONTEXT	2712	"user_fav_730d_info" concat_typed(user_fav_goods_730d_map_hit_v,user_fav_mall_730d_map_hit_v,user_fav_cat_730d_map_hit_v) Categorical
+0319	27102	CONTEXT	1259	"sess_clk_price_diff_r" dis2xf3_i(sess_clk_price_diff_r_) Categorical discrete_key=price_diff_rate
+0320	27303	GOODS	1727	"min_sold_sku_price" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(i64(GOODS_YRT.min_sold_sku_price))))) Categorical default_key=-1
+0321	27308	GOODS	1729	"max_min_sku_price_diff" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(i64(GOODS_YRT.max_min_sku_price_diff))))) Categorical default_key=0
+0322	27311	GOODS	1730	"after_cpn_median" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(i64(GOODS.after_cpn_median))))) Categorical default_key=-1
+0323	27316	GOODS	1733	"mid_sku_price_aft_cpn_dis" mid_sku_price_aft_cpn_dis_ Categorical
+0324	27321	GOODS	1702	"mid_sku_price_aft_cpn_diff" concat_typed(mid_sku_price_aft_cpn_diff_3d_, mid_sku_price_aft_cpn_diff_7d_, mid_sku_price_aft_cpn_diff_13d_, mid_sku_price_aft_cpn_diff_30d_) Categorical
+0325	27367	GOODS	1736	"i2i_price_list_rank_r" dis2xf3_i(i2i_price_list_rank_r_v2_) Categorical discrete_key=price_rank_rate
+0326	27402	USER_CONTEXT	2936	"u_view_price_diff_r" dis2xf3_i(u_view_price_diff_r_) Categorical discrete_key=price_diff_rate
+0327	27443	GOODS	1711	"pred_price_x_product_price_diff" value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(pred_price_x_product_price_diff_))) Categorical
+0328	27445	GOODS	1713	"pred_price_x_product_price_diff_ratio" dis2xf3_i(div_v2(pred_price_x_product_price_diff_,i64(GOODS.product_avg_goods_price))) discrete_key=price_diff_rate_v3 Categorical
+0329	27447	GOODS	1719	"aftcpn_sku_price_his_rt_diff" value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(aftcpn_sku_price_his_rt_diff_))) Categorical
+0330	27459	GOODS	1685	"pred_price_ord_prc_diff" pred_price_ord_prc_diff_ Categorical
+0331	27507	QUERY	5490	"q2i_price_list_diff" value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(q2i_price_list_diff_))) Categorical
+0332	27525	QUERY	5499	concat_typed(default_key_i(key_size_v3(q2i_hit_i2i_v1)), default_key_i(key_size_v3(q2i_hit_i2i_v2)), default_key_i(key_size_v3(q2i_hit_i2i_v3))) Categorical default_key=0
+0333	27533	QUERY	5503	"q2i/m/p hit idx" extend(extend(q2i_hit_goods_idx, q2m_hit_mall_idx), q2p_hit_prod_idx) Categorical
+0334	27606	GOODS	1690	"cur_n_snap_price_diff_r" concat_typed(cur_n_snap_price_diff_r_1d_, cur_n_snap_price_diff_r_3d_, cur_n_snap_price_diff_r_7d_, cur_n_snap_price_diff_r_13d_) Categorical
+0335	27616	GOODS	1726	"price_diff_min_num" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(price_diff_min_))) Categorical
+0336	27626	CONTEXT	1273	"aftcpn_price_diff_avg_" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(aftcpn_price_diff_avg_))) Categorical
+0337	27631	CONTEXT	1281	"cspu_id" default_key_i(i64(ITEM_CONTEXT.cspu_id)) Categorical
+0338	27632	CONTEXT	1282	"is_bybt_act" default_key_i(i64(ITEM_CONTEXT.is_bybt_act)) Categorical
+0339	27634	CONTEXT	1261	rt_sku_aftcpn_price_min_dis_ Categorical
+0340	27635	CONTEXT	1263	"min_sku_price_cpn_discount" dis2xf3_i(min_sku_price_cpn_discount_v2) Categorical discrete_key=price_disc_rate
+0341	27640	CONTEXT	1278	"price_diff_rate_max" dis2xf3_i(aftcpn_price_diff_rate_max_) Categorical discrete_key=price_diff_rate
+0342	28003	USER_CONTEXT	2912	"long_view_term_qc_15d_nohit_word_cnt" dis2xf3_i(key_size(list_delete_fast(i64(long_view_term_qc_15d),i64(title_word_)))) Categorical discrete_key=long_view_term_qc_15d_nohit_word_cnt
+0343	28013	USER_CONTEXT	2913	"long_view_term_qc_1d_hit_word_cnt" default_key_i(value2key_i(key_size(intersection_typed(i64(long_view_term_qc_1d),i64(title_word_))))) Categorical default_ke=-1
+0344	28017	USER_CONTEXT	2914	"long_view_term_qc_180d_hit_word_cnt" default_key_i(value2key_i(key_size(intersection_typed(i64(long_view_term_qc_180d),i64(title_word_))))) Categorical default_ke=-1
+0345	28019	USER_CONTEXT	2915	"long_fav_term_qc_30d_hit_word_cnt" default_key_i(value2key_i(key_size(intersection_typed(i64(long_fav_term_qc_30d),i64(title_word_))))) Categorical default_ke=-1
+0346	28023	USER_CONTEXT	2916	"long_buy_term_qc_180d_hit_word_cnt" default_key_i(value2key_i(key_size(intersection_typed(i64(long_buy_term_qc_180d),i64(title_word_))))) Categorical default_ke=-1
+0347	280501	USER_CONTEXT	4435	"user_view_trixi_i2i_g_x_g_index_min" value2key_i(min(k2v_i(user_view_trixi_i2i_g_x_g_index_))) Categorical
+0348	280502	USER_CONTEXT	4437	"user_view_trixi_i2i_g_x_trixi_i2i_idx" slice_v3_typed{start=0,end=400}(user_view_trixi_i2i_g_x_trixi_i2i_idx_) Categorical
+0349	28060	USER_CONTEXT	2473	"gpage_merge" concat_typed(gpage_0_is_cnlt_x_goods_id, gpage_7_is_click_hot_sku_x_goods_id, gpage_8_is_click_mid_pindan_x_goods_id, gpage_11_is_click_comment_x_goods_id) Categorical
+0350	280602	USER_CONTEXT	4440	"user_view_trixi_i2i_g_x_g_rows_uniq" user_view_trixi_i2i_g_x_g_rows_uniq_ Categorical
+0351	280611	USER_CONTEXT	4007	"user_view_trixi_i2i_g_x_trixi_i2i_idx" slice_v3_typed{start=0,end=400}(tgt_trixi_x_ub_sim_idx_trixi_i2i_) Categorical
+0352	4003	GOODS	1549	"kr terms" key(hash(GOODS.kr_terms)) Categorical
+0353	4007	GOODS	1550	"kr terms hit term_fav_seg30" hit_no_value(hash(GOODS.kr_terms), hash(QUERY.term_fav_seg30)) Categorical
+0354	4009	GOODS	1551	"kr terms hit term_ordr_seg3" hit_no_value(hash(GOODS.kr_terms), hash(QUERY.term_ordr_seg3)) Categorical
+0355	4012	GOODS	1552	"kr terms hit ner_term_list" hit_no_value(hash(GOODS.kr_terms), hash(QUERY.ner_term_list)) Categorical
+0356	4014	GOODS	1553	"long_hitnum_kr_favorder" concat_typed(Query30d_fav_kr, Query30d_ordr_kr) Categorical
+0357	4017	GOODS	1554	"kr goods_options" key(i64(goods_options_)) Categorical
+0358	500000	ITEM_CONTEXT	1384	"sp_icon_list" key(i64(ITEM_CONTEXT.sp_icon_list)) Categorical
+0359	500001	ITEM_CONTEXT	1385	"goods_activity_type" i64(ITEM_CONTEXT.goods_activity_type) Categorical
+0360	500003	ITEM_CONTEXT	1418	"item_shlf_days" item_shlf_days_ Categorical
+0361	500015	ITEM_CONTEXT	1437	"goods_option" goods_new_option_ Categorical
+0362	5001	ITEM_CONTEXT	1357	"plan_id" key(i64(plan_id)) Categorical
+0363	5014	ITEM_CONTEXT	1361	"rtgn_group_1" dis2xf_i(i64(rtgn)) Categorical discrete_key=rtgn_group_1
+0364	5019	ITEM_CONTEXT	1362	"rtgn_group_3_x_userbuypower" concat_typed(dis2xf_i(i64(rtgn)),i64(USER_COMMON.user_buypower)) Categorical discrete_key=rtgn_group_3
+0365	5410	ITEM_CONTEXT	1375	"cur_goods_ner_x_click_goods_ner_v3" key_hit_syn_ner_v3(GOODS_YRT.goods_ner, USER_CONTEXT.click_goods_ner_kstringset) Categorical
+0366	600001	GOODS	1804	"disc_ordr_cnt_rate_freq50_cat_x_has_mall_publc_cpn_x_has_cmmn_pcpn" concat_typed(default_key_i(i64(USER_COMMON.has_cmmn_pcpn)),concat_typed(default_key_i(value2key_i(value(hit(i64(USER_COMMON.disc_ordr_cnt_rate_freq50_cat_map),i64(ITEM_CONTEXT.cat_id))))),default_key_i(i64(has_mall_publc_cpn)))) Categorical default_key=-1
+0367	600022	GOODS	1819	"serv_tag_list_x_cat_id" list_concat_typed(serv_tag_list_,i64(ITEM_CONTEXT.cat_id)) Categorical
+0368	600024	GOODS	1821	"tag_list" key(hash(GOODS.tag_list)) max_len=100 Categorical
+0369	6001	GOODS	1521	"goods_id" key(i64(ITEM_CONTEXT.goods_id)) Categorical
+0370	600100	GOODS	1863	"stay_msec_list_log" default_key_i(lconcatp_typed(stay_msec_list_log_)) Categorical default_key=-1
+0371	600101	GOODS	1864	"clk_times_list_log" default_key_i(lconcatp_typed(clk_times_list_log_)) Categorical default_key=-1
+0372	600102	GOODS	1866	"clk_rev_and_buy_rate_norm_log" default_key_i(clk_rev_and_buy_rate_norm_log_) Categorical default_key=-1
+0373	600112	GOODS	1868	"" default_key_i(gcvr30_v2_2_) Categorical default_key=-1
+0374	6004	GOODS	1522	"stpl_id" key(i64(GOODS.stpl_id)) Categorical
+0375	6007	GOODS	1523	"cat_id_1" key(i64(ITEM_CONTEXT.cat1_id)) Categorical
+0376	6008	GOODS	1524	"cat_id_2" key(i64(ITEM_CONTEXT.cat2_id)) Categorical
+0377	6011	GOODS	1525	"sales" value2key_i(round(log2(i64(GOODS.sales)))) Categorical
+0378	60119	QUERY	5479	"sales_nolog" value2key_i(round(i64(ITEM_CONTEXT.sales))) Categorical
+0379	6012	GOODS	1526	"thumb_url" key(hash(thumb_url_)) Categorical
+0380	6013	GOODS	1527	"brand_id" key(i64(brand_id_)) Categorical
+0381	6016	GOODS	1539	"g_srch_7d" concat_typed(d_goods_search_impr_seg_7d,d_goods_search_view_seg_7d,d_goods_search_order_seg_7d) Categorical
+0382	6021	GOODS	1740	"goods_type1" key(hash(GOODS.goods_type1)) Categorical
+0383	6041	GOODS	1544	"sku_vals_onsale_size" key(i64(GOODS.sku_vals_size)) Categorical
+0384	6046	GOODS	1557	"global_price_slot" key(i64(global_price_slot)) Categorical
+0385	6047	GOODS	1556	"global_sales_slot" key(i64(global_sales_slot)) Categorical
+0386	6131	GOODS	1592	"goods_all_order_seg3_x_discrete" dis2xf3_i(i64(goods_all_order_seg_3d)) Categorical discrete_key=goods_all_order_seg3_cvr
+0387	6133	GOODS	1593	"goods_all_cvr_seg7_x_discrete" dis2xf3_i(default_value(wilson_ctr(i64(goods_all_order_seg_7d), i64(goods_all_view_seg_7d)))) Categorical discrete_key=goods_all_cvr_seg7_cvr
+0388	6134	GOODS	1594	"goods_all_cvr_seg30_x_discrete" dis2xf3_i(default_value(wilson_ctr(i64(goods_all_order_seg_30d), i64(goods_all_view_seg_30d)))) Categorical discrete_key=goods_all_cvr_seg30_cvr
+0389	620000	GOODS	1820	"related_goods_ids" value2key_i(GOODS.related_goods_ids) Categorical
+0390	6206	GOODS	1595	"serv_tag_num" key(i64(serv_tag_num)) Categorical
+0391	621412	GOODS	1826	"g_ordr_crt_usr_ratio_1m" g_ordr_crt_usr_ratio_1m_ Categorical
+0392	621414	GOODS	1827	"g_clk_rev_ratio_1m" g_clk_rev_ratio_1m_ Categorical
+0393	621415	GOODS	1828	"g_grp_ordr_ratio_1m" g_grp_ordr_ratio_1m_ Categorical
+0394	621416	GOODS	1829	"g_stay_gt20s_ratio_1m" g_stay_gt20s_ratio_1m_ Categorical
+0395	621842	GOODS	1842	"gpage_view_cnt_lt" concat_typed(list_2_map(const_day_180_365_500_, extend(gpage_view_cnt_6m_dis_, extend(gpage_view_cnt_1y_dis_, gpage_view_cnt_500d_dis_)))) Categorical
+0396	621856	GOODS	1850	"imp_pic_gt1_ratio_mt" concat_typed(list_2_map(const_day_14_30_60_90_, extend(imp_pic_gt1_ratio_hm_dis_v2_, extend(imp_pic_gt1_ratio_1m_dis_v2_, extend(imp_pic_gt1_ratio_2m_dis_v2_, imp_pic_gt1_ratio_3m_dis_v2_))))) Categorical
+0397	621872	GOODS	1851	"clk_cnslt_ratio_lt" concat_typed(list_2_map(const_day_180_365_500_, extend(clk_cnslt_ratio_6m_dis_v2_, extend(clk_cnslt_ratio_1y_dis_v2_, clk_cnslt_ratio_500d_dis_v2_)))) Categorical
+0398	621877	GOODS	1859	"clk_fav_ratio_mt" concat_typed(list_2_map(const_day_14_30_60_90_, extend(clk_fav_ratio_hm_dis_v2_, extend(clk_fav_ratio_1m_dis_v2_, extend(clk_fav_ratio_2m_dis_v2_, clk_fav_ratio_3m_dis_v2_))))) Categorical
+0399	621878	GOODS	1860	"clk_fav_ratio_lt" concat_typed(list_2_map(const_day_180_365_500_, extend(clk_fav_ratio_6m_dis_v2_, extend(clk_fav_ratio_1y_dis_v2_, clk_fav_ratio_500d_dis_v2_)))) Categorical
+0400	6224	GOODS	1597	"serv_tag_list_x_brand_rate" concat_typed(hash(serv_tag_list), brand_rate_d) Categorical
+0401	6501	ITEM_CONTEXT	1358	"ad_id" key(i64(ITEM_CONTEXT.ad_id)) Categorical
+0402	6802	GOODS	1598	"pic_rev_cnt_x_dis_new" dis2xf3_i(i64(nfk_ndflt_nmlc_valid_chck_pass_pic_rev_cnt_std)) discrete_key=nfk_ndflt_nmlc_valid_chck_pass_pic_rev_cnt_std Categorical
+0403	6804	GOODS	1599	"desc_rev_scr_x_dis_new" dis2xf3_i(i64(avg_nfk_ndflt_nmlc_valid_chck_pass_desc_rev_scr_std)) discrete_key=avg_nfk_ndflt_nmlc_valid_chck_pass_desc_rev_scr_std Categorical
+0404	6811	GOODS	1600	"neg_count_x_dis_new" dis2xf3_i(i64(neg_count)) discrete_key=neg_count Categorical
+0405	6852	GOODS	1558	"max_cpn_rate_30d_dis" dis2xf3_i(i64(max_cpn_rate_30d)) discrete_key=max_cpn_rate_30d Categorical
+0406	6859	GOODS	1559	"avg_ordr_amt" value2key_i(round(log2(i64(avg_ordr_amt)))) Categorical
+0407	6870	GOODS	1560	"title_x_sku_word" cross_concat_i(goods_title_term_hash_, hash(sku_word_)) Categorical
+0408	6871	GOODS	1561	"query_word_x_sku_word" cross_concat_i(i64(CONTEXT.query_seg_ner_word),hash(sku_word_)) Categorical
+0409	6888	GOODS	1562	"sku_word" key(hash(sku_word_)) Categorical
+0410	6892	GOODS	1563	"title_x_propertys_word" cross_concat_i(goods_title_term_hash_, propertys_ner_term_hash_) Categorical
+0411	6893	GOODS	1564	"query_word_x_propertys_word" cross_concat_i(i64(CONTEXT.query_seg_ner_word), propertys_ner_term_hash_) Categorical
+0412	6894	GOODS	1565	"propertys_word" key(propertys_ner_term_hash_) Categorical
+0413	6914	USER_COMMON	241	"u_buy_sku_ner_word_30d_top30_x_goods_id" list_concat_typed(hash(u_buy_sku_ner_word_30d_top30),i64(ITEM_CONTEXT.goods_id)) Categorical
+0414	7001	CAT	2134	"cat_id" key(i64(ITEM_CONTEXT.cat_id)) Categorical
+0415	7002	CAT	2141	"c_all_1d" concat_typed(d_cat_all_impr_seg_1d,d_cat_all_view_seg_1d,d_cat_all_order_seg_1d) Categorical
+0416	7007708	USER_COMMON	627	"gpage_1y_cs_pctgt_st" default_key_i(gpage_1y_cs_pctgt_st_) Categorical default_key=-1
+0417	7007710	USER_COMMON	649	"gpage_1y_qv2tgt_tg_x_actv2" default_key_i(concat_typed(gpage_1y_qv2tgt_tg_log_,gpage_1y_qv2tgt_actv2_)) Categorical default_key=-1
+0418	7007711	USER_COMMON	655	"gpage_1y_qv2tgt_tgdf_x_dr" default_key_i(concat_typed(gpage_1y_qv2tgt_tgdf_log_,gpage_1y_qv2tgt_dr_xf_)) Categorical default_key=-1
+0419	7007713	USER_COMMON	659	"gpage_1y_ptgt_actions" default_key_i(gpage_1y_ptgt_actions_) Categorical default_key=-1
+0420	7007714	USER_COMMON	660	"gpage_1y_ptgt_stay_time" default_key_i(gpage_1y_ptgt_stay_time_) Categorical default_key=-1
+0421	7007715	USER_COMMON	663	"" default_key_i(list_index_typed(gpage_1y_actions_extend_uniq_,gpage_1y_cat_ids_match_c_idx_)) Categorical default_key=-1
+0422	7007716	USER_COMMON	664	"" default_key_i(list_index_typed(gpage_1y_actions_extend_uniq_,gpage_1y_cat_ids_match_c2c_idx_)) Categorical default_key=-1
+0423	7501	MALL	2195	"mall_id" key(i64(ITEM_CONTEXT.mall_id)) Categorical
+0424	7502	MALL	2199	"m_all_7d" concat_typed(d_mall_all_impr_seg_7d,d_mall_all_view_seg_7d,d_mall_all_order_seg_7d) Categorical
+0425	33758666	USER_CONTEXT	5026	"id_v4_hit_clk_cnt" key_size_v3(clk_id_v4_hit_clk_index_fgin_) Categorical
+0426	780011	ITEM_CONTEXT	1431	"item_context_cpn_type" key_distinct(ITEM_CONTEXT.cpn_type) Categorical
+0427	7806	GOODS	1566	"sku_word hit term_ordr_seg3" hit_no_value(hash(QUERY.term_ordr_seg3),hash(sku_word_)) Categorical
+0428	7809	GOODS	1567	"sku_word hit ner_term_list" hit_no_value(hash(QUERY.ner_term_list),hash(sku_word_)) Categorical
+0429	794005	QUERY	5517	"top200_goods_ctr_hit_i2i_cnt_v1" key_size_v3(hit_no_value(value2key_i(GOODS.related_goods_ids), value2key_i(USER_CONTEXT.top200_goods_ctr))) Categorical
+0430	794007	QUERY	5518	"top200_goods_ctr_hit_i2i_cnt_v3" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list_by_u2i), value2key_i(USER_CONTEXT.top200_goods_ctr))) Categorical
+0431	794021	QUERY	5527	"top200_goods_cvr_hit_i2i_cnt_v1" key_size_v3(hit_no_value(value2key_i(GOODS.related_goods_ids), value2key_i(USER_CONTEXT.top200_goods_cvr))) Categorical
+0432	794022	QUERY	5528	"top200_goods_cvr_hit_i2i_cnt_v2" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list), value2key_i(USER_CONTEXT.top200_goods_cvr))) Categorical
+0433	794023	QUERY	5529	"top200_goods_cvr_hit_i2i_cnt_v3" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list_by_u2i), value2key_i(USER_CONTEXT.top200_goods_cvr))) Categorical
+0434	794165	QUERY	5505	"" default_key_i(rankV2_i(key(value2key_i(USER_CONTEXT.dnn_vprice)),ITEM_CONTEXT.price)) Categorical max_length=10 default_key=-1
+0435	794169	QUERY	5506	"recall_goods_hit_i2i_cnt_v1" key_size_v3(hit_no_value(value2key_i(GOODS.related_goods_ids), value2key_i(USER_CONTEXT.dnn_goods))) Categorical
+0436	794170	QUERY	5507	"recall_goods_hit_i2i_cnt_v2" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list), value2key_i(USER_CONTEXT.dnn_goods))) Categorical
+0437	794171	QUERY	5508	"recall_goods_hit_i2i_cnt_v3" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list_by_u2i), value2key_i(USER_CONTEXT.dnn_goods))) Categorical
+0438	794201	QUERY	5709	"" default_key_i(rankV2_i(key(top200_vprice_), ITEM_CONTEXT.price)) Categorical max_length=10 default_key=-1
+0439	794202	QUERY	5710	"top200_score_goods_hit_i2i_v1" hit_no_value(value2key_i(GOODS.related_goods_ids), top200_recall_goods_) Categorical
+0440	794203	QUERY	5711	"top200_score_goods_hit_i2i_v2" hit_no_value(value2key_i(GOODS.i2i_list), top200_recall_goods_) Categorical
+0441	794204	QUERY	5712	"top200_score_goods_hit_i2i_v3" hit_no_value(value2key_i(GOODS.i2i_list_by_u2i), top200_recall_goods_) Categorical
+0442	794205	QUERY	5713	"top200_score_goods_hit_i2i_cnt_v1" key_size_v3(hit_no_value(value2key_i(GOODS.related_goods_ids),top200_recall_goods_)) Categorical
+0443	794206	QUERY	5714	"top200_score_goods_hit_i2i_cnt_v2" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list), top200_recall_goods_)) Categorical
+0444	794207	QUERY	5715	"top200_score_goods_hit_i2i_cnt_v3" key_size_v3(hit_no_value(value2key_i(GOODS.i2i_list_by_u2i), top200_recall_goods_)) Categorical
+0445	794211	QUERY	5719	"top200_score_index" default_key_i(list_in_list_index_typed(top200_recall_goods_, i64(ITEM_CONTEXT.goods_id))) default_key=-1 Categorical
+0446	794212	QUERY	5723	"top200_score_price_rank" key(top200_score_price_rank) Categorical
+0447	794213	QUERY	5728	"top200_score_pred_price_pre_rank_x_index" concat_typed(top200_score_pre_index_price_rank, default_key_i(top200_score_goods_index_)) Categorical default_key=-1
+0448	810103	GOODS_HOUR	2084	"goods_search_order_24h" goods_search_order_24h_ Categorical
+0449	810107	GOODS_HOUR	2086	"goods_all_cvr_24h" value2key_i(multi_const_v2(i64(goods_all_cvr_24h_))) multiplier=100 Categorical
+0450	810109	GOODS_HOUR	2088	"goods_search_cvr_24h" value2key_i(multi_const_v2(i64(goods_search_cvr_24h_))) multiplier=100 Categorical
+0451	810132	GOODS_HOUR	2091	"goods_age_grp_order_24h_hit_dis" goods_age_grp_order_24h_hit_dis_ Categorical
+0452	8501	ITEM_CONTEXT	1363	"title_word_" key(title_word_) Categorical
+0453	8502	ITEM_CONTEXT	1364	"title_tag" key(goods_title_tag_hash_) Categorical
+0454	860066	USER_CONTEXT	3207	"log_goods_hit_user_gd_staytime_cut1" value2key_i(round(multi_const_v2(i64(log_with_base(div_num(goods_hit_user_gd_staytime_cut1_)))))) lwb_base=2.0 lwb_offset=1.0 multiplier=10 divisor=1000 Categorical
+0455	860076	USER_CONTEXT	3212	"max_num_i2i_v1_hit_user_gd_code" filter_by_key3_i(i2i_v1_hit_user_gd_num_, i2i_v1_hit_user_gd_num_max_, i2i_v1_hit_user_gd_code_) Categorical
+0456	860090	USER_CONTEXT	3217	"max_num_i2i_v3_hit_user_gd_code" filter_by_key3_i(i2i_v3_hit_user_gd_num_, i2i_v3_hit_user_gd_num_max_, i2i_v3_hit_user_gd_code_) Categorical
+0457	861060	USER_CONTEXT	3754	"product_id_v2_trigger_user_impr_timegap" default_key_i(product_id_v2_trigger_long_impr_timegap_dis_) default_key=-1 Categorical
+0458	861124	USER_CONTEXT	3759	"trixi_cluster_id_v3_trigger_user_buy_timediff" default_key_i(trixi_cluster_id_v3_trigger_user_buy_timediff_dis_) default_key=-1 Categorical
+0459	861201	USER_CONTEXT	3761	"cat_ixi_trigger_user_buy_trixi_cluster_id_v3" key(cat_ixi_trigger_user_buy_trixi_cluster_id_v3_) max_length=200 Categorical
+0460	861213	USER_CONTEXT	3763	"log_sum_trixi_cluster_id_v3_trigger_user_gd_stay_time" value2key_i(log_with_base(div_num(sum_value(k2v_f(trixi_cluster_id_v3_trigger_user_gd_stay_time_))))) divisor=1000 lwb_base=1.2 lwb_offset=1.0 Categorical
+0461	861219	USER_CONTEXT	3765	"trixi_cluster_id_v3_trigger_user_gd_acty_type_merged" key(trixi_cluster_id_v3_trigger_user_gd_acty_type_merged_) max_length=200 Categorical
+0462	861504	USER_COMMON	511	"cat1_trigger_user_history_afs_lst_rsn_code" list_index_typed(user_history_afs_lst_rsn_code_, cat1_trigger_user_history_afs_index_) Categorical
+0463	861534	USER_CONTEXT	3806	"long_impr_hit_asso_p2p_rank" long_impr_hit_asso_p2p_indices_ Categorical
+0464	861540	USER_COMMON	512	"cat_ixi_trigger_user_history_afs_lst_rsn_code" list_index_typed(user_history_afs_lst_rsn_code_, cat_ixi_trigger_user_history_afs_index_) Categorical
+0465	861612	USER_CONTEXT	3773	"count_pid2_trigger_user_refund" key_size_v3(pid2_trigger_user_refund_index_) Categorical
+0466	862388	USER_CONTEXT	3890	"i2i_trigger_user_gd_after_last_buy_type_merged" key(lconcatp_typed(i2i_trigger_user_gd_after_last_buy_type_merged_)) max_length=400 Categorical
+0467	862391	USER_CONTEXT	3893	"c2c_trigger_user_gd_after_last_buy_type_merged" key(lconcatp_typed(c2c_trigger_user_gd_after_last_buy_type_merged_)) max_length=400 Categorical
+0468	862616	USER_CONTEXT	3902	"goods_text_user_impr_text_mmd_sim_cut20" goods_text_user_impr_text_mmd_sim_cut20_ Categorical
+0469	862844	USER_CONTEXT	3911	"goods_text_user_buy_text_mmd_sim_max" goods_text_user_buy_text_mmd_sim_max_ Categorical
+0470	863009	USER_CONTEXT	3700	"user_impr_x_clk_nlp_sim_goods_map_7d_sum" concat_typed(user_impr_nlp_sim_goods_map_7d_sum_,user_clk_nlp_sim_goods_map_7d_sum_) Categorical
+0471	863047	USER_COMMON	782	"user_impr_x_clk_sim_goods_map_7d_sum" concat_typed(502483_,502482_) Categorical
+0472	863054	USER_COMMON	786	"" gs_im_ck_15dlg_ Categorical
+0473	863056	GOODS	1813	"nfk_nlk_nddpf_ordr_pay_ordr_cnt_1w3m" concat_typed(default_key_i(502120_remake_), default_key_i(502122_remake_)) Categorical default_key=-1
+0474	863060	GOODS	1814	"top2_sold_sku_price" dis2xf3_i(v2v_f(GOODS.top2_sold_sku_price)) Categorical discrete_key=price_0330
+0475	863062	GOODS	1816	"goods_impr_page_el_sn_map_30d_key_val" concat_typed(i64(goods_impr_page_el_sn_map_30d), goods_impr_page_el_sn_map_30d_) Categorical
+0476	863069	GOODS	1817	"rev_clk_cnt_avg" dis2xf3_i(rev_clk_cnt_avg) Categorical discrete_key=rev_clk_cnt_avg
+0477	863087	ITEM_CONTEXT	1423	"target_goods_impr_tg_adjacent_seq_30d_hp_dis" target_goods_impr_tg_adjacent_seq_30d_hp_dis_ Categorical
+0478	863132	USER_COMMON	494	"goods_hit_user_life_clk_cnt" goods_hit_user_life_clk_cnt_ Categorical
+0479	863133	USER_COMMON	497	"trixi100_hit_user_lfie_clk_cnt" trixi100_hit_user_lfie_clk_cnt_ Categorical
+0480	863210	USER_CONTEXT	3703	"nlp_sim_hit_user_life_clk_cnt" nlp_sim_hit_user_life_clk_cnt_ Categorical
+0481	863286	ITEM_CONTEXT	1430	"target_cat_impr_tg_adjacent_seq_30d_hp_dis_cut1k" default_key_i(target_cat_impr_tg_adjacent_seq_30d_hp_dis_cut1k_) default_key=-1 Categorical
+0482	863780	USER_CONTEXT	3937	"cat1_trigger_user_view_g_ordr_crt_usr_ratio_1m" cat1_trigger_user_view_g_ordr_crt_usr_ratio_1m_ Categorical
+0483	863802	USER_CONTEXT	3945	"i2i_trigger_user_view_log_g_impr_cnt_1m" i2i_trigger_user_view_log_g_impr_cnt_1m_ Categorical
+0484	863808	USER_CONTEXT	3946	"i2i_trigger_user_view_log_g_cnslt_cnt_1m" i2i_trigger_user_view_log_g_cnslt_cnt_1m_ Categorical
+0485	863811	USER_CONTEXT	3947	"i2i_trigger_user_view_log_g_stay_gt20s_cnt_1m" i2i_trigger_user_view_log_g_stay_gt20s_cnt_1m_ Categorical
+0486	864132	USER_CONTEXT	3915	"goods_text_user_view_text_mmd_sim_cnt" concat_typed(log_with_base(count_key(goods_text_user_view_text_mmd_sim_dis_))) lwb_base=1.1 Categorical
+0487	864157	USER_CONTEXT	3918	"goods_text_user_view_text_mmd_sim_thre_td" uniq_typed(value2key_i(log_with_base(v2v_f(goods_text_user_view_text_mmd_sim_thre_timediff_)))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0488	864215	USER_CONTEXT	3921	"goods_text_user_buy_text_mmd_sim_thre_td" uniq_typed(value2key_i(log_with_base(v2v_f(goods_text_user_buy_text_mmd_sim_thre_timediff_)))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0489	864219	USER_CONTEXT	3922	"goods_text_user_gd_text_mmd_sim_x_type_cut20" slice_v3_typed{start=0,end=20}(concat_typed(div_k2k(goods_text_user_gd_text_mmd_sim_dis_), user_gd_acty_type_merged_)) div_factor=10 Categorical
+0490	864386	USER_CONTEXT	3929	"goods_img_q2i_img_mmd_sim_max" goods_img_q2i_img_mmd_sim_max_ Categorical
+0491	864410	USER_CONTEXT	3930	"goods_img_q2i_img_mmd_sim_cnt" concat_typed(log_with_base(count_key(goods_img_q2i_img_mmd_sim_dis_))) lwb_base=1.1 Categorical
+0492	864553	USER_CONTEXT	3955	"user_impr_img_hashkey_hm_dist_top20" user_impr_img_hashkey_hm_dist_top20_ Categorical
+0493	864578	USER_CONTEXT	3956	"i2i_hit_user_impr_img_hashkey_hm_dist" list_index_v2_typed(user_impr_img_hashkey_hm_dist_all_, i2i_hit_user_impr_index_) Categorical
+0494	864738	USER_CONTEXT	3993	"i2i_hit_user_view_dssm_hashkey_hm_dist" list_index_v2_typed(user_view_dssm_hashkey_hm_dist_all_, i2i_hit_user_view_index_) Categorical
+0495	864743	USER_CONTEXT	3959	"user_view_img_hashkey_hm_dist_cut1" key(user_view_img_hashkey_hm_dist_all_) max_length=1 Categorical
+0496	864744	USER_CONTEXT	3961	"user_view_img_hashkey_hm_dist_cut20" user_view_img_hashkey_hm_dist_cut20_ Categorical
+0497	864770	USER_CONTEXT	3965	"user_view_img_hashkey_hm_dist_leq8_td" value2key_i(log_with_base(v2v_f(user_view_img_hashkey_hm_dist_leq8_timediff_))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0498	864774	USER_CONTEXT	3966	"user_view_img_hashkey_hm_dist_leq8_pagesn" list_index_typed(user_view_pagesn_all_, user_view_img_hashkey_hm_dist_leq8_index_) Categorical
+0499	865093	USER_CONTEXT	3973	"user_history_buy_dssm_hashkey_hm_dist_top20" user_history_buy_dssm_hashkey_hm_dist_top20_ Categorical
+0500	865118	USER_CONTEXT	3974	"user_history_buy_img_hashkey_hm_dist_max_sim" max_key(user_history_buy_img_hashkey_hm_dist_) Categorical
+0501	865275	USER_CONTEXT	3977	"user_gd_img_hashkey_hm_dist_x_staytime_cut20" key(concat_typed(user_gd_img_hashkey_hm_dist_, user_gd_stay_time_dis_)) max_length=20 Categorical
+0502	865341	USER_COMMON	681	"gpage_1y_dssm_hashkey_hm_dist_top50_clk_cnts" gpage_1y_dssm_hashkey_hm_dist_top50_clk_cnts_ Categorical
+0503	865342	USER_COMMON	682	"gpage_1y_dssm_hashkey_hm_dist_top50_stay_times" gpage_1y_dssm_hashkey_hm_dist_top50_stay_times_ Categorical
+0504	865344	USER_COMMON	683	"gpage_1y_dssm_hashkey_hm_dist_top50_actions_bits_ors" hash(str(gpage_1y_dssm_hashkey_hm_dist_top50_actions_bits_ors_)) strict=0 Categorical
+0505	865349	USER_COMMON	684	"gpage_1y_dssm_hashkey_hm_dist_top50_sim_x_actions" concat_typed(gpage_1y_dssm_hashkey_hm_dist_top50_, gpage_1y_dssm_hashkey_hm_dist_top50_actions_) Categorical
+0506	865416	USER_COMMON	688	"gpage_1y_img_hashkey_hm_dist_leq8_stay_times" list_index_typed(gpage_1y_stay_times_dis_, gpage_1y_img_hashkey_hm_dist_leq8_index_) Categorical
+0507	865420	USER_COMMON	689	"i2i_hit_gpage_1y_img_hashkey_hm_dist" list_index_v2_typed(gpage_1y_img_hashkey_hm_dist_, i2i_hit_gpage_1y_index_) Categorical
+0508	865421	USER_COMMON	690	"c2c_hit_gpage_1y_img_hashkey_hm_dist" list_index_v2_typed(gpage_1y_img_hashkey_hm_dist_, c2c_hit_gpage_1y_index_) Categorical
+0509	865618	USER_CONTEXT	4378	"p2pv3_hit_user_impr_tg" dis2xf3_i(k2v_f(list_key_diff{default_val=-1}(p2pv3_hit_long_impr_time_))) discrete_key=pidv3_user_impr_tg Categorical
+0510	865682	USER_CONTEXT	4381	"pidv3_hit_user_gd_stay_time_sum" dis2xf3_i(k2v_f(div_k2k(key_sum_typed(pidv3_hit_user_gd_stay_time_)))) div_factor=1000 discrete_key=pidv3_user_gd_stay_time_sum Categorical
+0511	865711	USER_CONTEXT	4384	"pidv3_hit_gpage_1y_stay_times_sum" dis2xf3_i(k2v_f(div_k2k(key_sum_typed(pidv3_hit_gpage_1y_stay_times_)))) div_factor=1000 discrete_key=pidv3_user_gpage_1y_stay_times_sum Categorical
+0512	865726	USER_CONTEXT	4386	"p2pv3_hit_gpage_1y_actions_bits_ors" hash(str(list_index_typed(gpage_1y_actions_bits_ors_, p2pv3_hit_gpage_1y_index_))) strict=0 Categorical
+0513	33866909	USER_CONTEXT	4986	"trixi_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_dis" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_dis_, trixi_hit_sku_clk_v4_index_) Categorical
+0514	33866912	USER_CONTEXT	4988	"cat_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_dis" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_dis_, cat_hit_sku_clk_v4_index_) Categorical
+0515	33866914	USER_CONTEXT	4990	"c2c_hit_sku_clk_v4_sku_trixi_cluster_id_x_timediff" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_timediff_, c2c_hit_sku_clk_v4_index_) Categorical
+0516	33866915	USER_CONTEXT	4991	"c2c_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_dis" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_dis_, c2c_hit_sku_clk_v4_index_) Categorical
+0517	33866919	USER_CONTEXT	4993	"goods_sku_cluster_hit_sku_clk_v4_index" goods_sku_cluster_hit_sku_clk_v4_index_ Categorical
+0518	33866925	USER_CONTEXT	4994	"goods_sku_cluster_hit_sku_clk_v4_timediff" list_index_v2_typed(sku_clk_v4_timediff_, goods_sku_cluster_hit_sku_clk_v4_index_) Categorical
+0519	33866926	USER_CONTEXT	4995	"goods_sku_cluster_hit_sku_clk_v4_price_dis" list_index_v2_typed(sku_clk_v4_price_dis_, goods_sku_cluster_hit_sku_clk_v4_index_) Categorical
+0520	867638	USER_CONTEXT	4451	"i2i_hit_cpv3_tag_list_hashs" list_index_v2_typed(cpv3_tag_list_hashs_, i2i_hit_cpv3_idx_) Categorical
+0521	867665	USER_CONTEXT	4475	"cat_hit_gd_impr_prices_discount_info" list_index_v2_typed(gd_impr_prices_discount_info_, cat_hit_gd_impr_idx_) Categorical
+0522	867685	USER_CONTEXT	4468	"i2i_hit_gd_impr_prices_discount_info" list_index_v2_typed(gd_impr_prices_discount_info_, i2i_hit_gd_impr_idx_) Categorical
+0523	867689	USER_CONTEXT	4469	"i2i_hit_gd_impr_type_list_hashs" list_index_v2_typed(gd_impr_type_list_hashs_, i2i_hit_gd_impr_idx_) Categorical
+0524	868029	USER_COMMON	835	"ho_aftcpn_prcs_diff_disc_cut" key(ho_aftcpn_prcs_diff_disc_) max_length=800 Categorical
+0525	868036	USER_COMMON	847	"ho_hit_cnt_info_v2" lconcatp_typed(extend(count_pdcls_hit_ho_, extend(count_trixi_hit_ho_, extend(count_pidv2_hit_ho_, count_pidv3_hit_ho_)))) Categorical
+0526	868291	USER_COMMON	849	"pidv3_hit_ho_aftcpn_prcs_diff_disc" pidv3_hit_ho_aftcpn_prcs_diff_disc_ Categorical
+0527	868486	USER_COMMON	820	"cat1_hit_user_c2b_7d_c2b_timegaps" list_index_v2_typed(user_c2b_7d_c2b_timegaps_, cat1_hit_user_c2b_index_) Categorical
+0528	868500	USER_COMMON	821	"cat1_hit_user_c2b_7d_srch_clk_cnts" list_index_v2_typed(user_c2b_7d_srch_clk_cnts_, cat1_hit_user_c2b_index_) Categorical
+0529	868513	USER_COMMON	822	"cat1_hit_user_c2b_7d_clk_cmt_cnts" list_index_v2_typed(user_c2b_7d_clk_cmt_cnts_, cat1_hit_user_c2b_index_) Categorical
+0530	33868929	USER_CONTEXT	4937	"cat_hit_sku_clk_v4_sku_pidv3" list_index_v2_typed(sku_clk_v4_sku_product_id_v3_, cat_hit_sku_clk_v4_index_) Categorical
+0531	33868943	USER_CONTEXT	4939	"goods_sku_pidv3_hit_sku_clk_v4_index" goods_sku_pidv3_hit_sku_clk_v4_index_ Categorical
+0532	33868950	USER_CONTEXT	4940	"goods_sku_pidv3_hit_sku_clk_v4_timediff" list_index_v2_typed(sku_clk_v4_timediff_, goods_sku_pidv3_hit_sku_clk_v4_index_) Categorical
+0533	33868952	USER_CONTEXT	4941	"goods_sku_pidv3_hit_sku_clk_v4_price_diff_v1" list_index_v2_typed(sku_clk_v4_price_diff_v1_, goods_sku_pidv3_hit_sku_clk_v4_index_) Categorical
+0534	33868953	USER_CONTEXT	4942	"goods_sku_pidv3_hit_sku_clk_v4_price_diff_v2" list_index_v2_typed(sku_clk_v4_price_diff_v2_, goods_sku_pidv3_hit_sku_clk_v4_index_) Categorical
+0535	33868954	USER_CONTEXT	4943	"goods_sku_pidv3_hit_sku_clk_v4_platform_promotion" list_index_v2_typed(sku_clk_v4_platform_promotion_info_, goods_sku_pidv3_hit_sku_clk_v4_index_) Categorical
+0536	33868961	USER_CONTEXT	4946	"trixi_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2_, trixi_hit_sku_clk_v4_index_) Categorical
+0537	33868965	USER_CONTEXT	4947	"nlp_sim_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2_, nlp_sim_hit_sku_clk_v4_index_) Categorical
+0538	33868969	USER_CONTEXT	4948	"cat_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2_, cat_hit_sku_clk_v4_index_) Categorical
+0539	33868970	USER_CONTEXT	4949	"cat_hit_sku_clk_v4_sku_trixi_cluster_id_x_platform_promotion" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_platform_promotion_, cat_hit_sku_clk_v4_index_) Categorical
+0540	33868973	USER_CONTEXT	4950	"c2c_hit_sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2" list_index_v2_typed(sku_clk_v4_sku_trixi_cluster_id_x_price_diff_v2_, c2c_hit_sku_clk_v4_index_) Categorical
+0541	33868976	USER_CONTEXT	4951	"goods_sku_cluster_hit_sku_clk_v4_price_diff_v1" list_index_v2_typed(sku_clk_v4_price_diff_v1_, goods_sku_cluster_hit_sku_clk_v4_index_) Categorical
+0542	33868977	USER_CONTEXT	4952	"goods_sku_cluster_hit_sku_clk_v4_price_diff_v2" list_index_v2_typed(sku_clk_v4_price_diff_v2_, goods_sku_cluster_hit_sku_clk_v4_index_) Categorical
+0543	33868978	USER_CONTEXT	4953	"goods_sku_cluster_hit_sku_clk_v4_platform_promotion" list_index_v2_typed(sku_clk_v4_platform_promotion_info_, goods_sku_cluster_hit_sku_clk_v4_index_) Categorical
+0544	869300	USER_CONTEXT	3717	"product_id_v2_hit_long_view_idx_cut1" product_id_v2_hit_long_view_idx_cut1_ Categorical
+0545	870001	GOODS	1806	"goods_rev_eff_pic_cnt_his" default_key_i(goods_rev_eff_pic_cnt_his_) Categorical default_key=-1
+0546	870008	USER_COMMON	483	"trixi_cat_trigger_his_rev_acty_types" default_key_i(trixi_cat_trigger_his_rev_acty_types_) Categorical default_key=-1
+0547	870012	USER_COMMON	487	"trixi100_trigger_his_rev_acty_types_x_timegap" default_key_i(concat_typed(his_rev_tg_x_trixi100_,his_rev_acty_types_x_trixi100_)) Categorical default_key=-1
+0548	870128	USER_CONTEXT	3491	"target_goods_impr_pagesn_tg_seq" default_key_i(list_index_typed(page_tg_impr_seq_, goods_trigger_user_impr_index_)) Categorical default_key=-1
+0549	870166	USER_CONTEXT	3495	"sim_g_last_impr_pagesn" default_key_i(list_index_typed(goods_last_impr_pagesn_seq_,trixi_last_impr_index_)) Categorical default_key=-1
+0550	870177	USER_CONTEXT	3500	"sim_g_last_impr_tg_list_sec_disc" default_key_i(sim_g_last_impr_tcbg_list_sec_disc_) Categorical default_key=-1
+0551	870195	USER_CONTEXT	3503	"cat1_trigger_user_uniq_view_1y_timegap" default_key_i(value2key_i(log_with_base(k2v_f(cat1_trigger_user_uniq_view_1y_timegap_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0552	870250	USER_CONTEXT	3507	"cat1_trigger_user_uniq_view_1y_pagesn" default_key_i(list_index_typed(user_uniq_view_1y_pagesn_, cat1_trigger_user_uniq_view_1y_index_)) Categorical default_key=-1
+0553	870257	USER_CONTEXT	3511	"view_times_seq_1y_filter_trixcb100" default_key_i(view_times_seq_1y_filter_trixcb100_) Categorical default_key=-1
+0554	870263	USER_CONTEXT	3534	"goods_impr_view_tg_cat1" default_key_i(list_index_typed(goods_impr_view_tg_, goods_impr_view_inter_cat1_index_)) Categorical default_key=-1
+0555	870264	USER_CONTEXT	3537	"goods_impr_view_tg_cat" default_key_i(list_index_typed(goods_impr_view_tg_,goods_impr_view_inter_cat_index_)) Categorical default_key=-1
+0556	870270	USER_CONTEXT	3628	"goods_view_buy_tg_cat1" default_key_i(list_index_typed(goods_view_buy_tg_, goods_view_buy_inter_cat1_index_)) Categorical default_key=-1
+0557	870279	USER_CONTEXT	3556	"clk_buy_all_cat_ids_6m_extend_hit_c_adjacent" default_key_i(slice_v3_typed{start=0,end=500}(clk_buy_all_cat_ids_6m_extend_hit_c_adjacent_)) Categorical default_key=-1
+0558	870283	USER_CONTEXT	3559	"count_clk_buy_all_goods_6m_extend_hit_i2i_v1" key_size_v3(clk_buy_all_goods_6m_extend_hit_i2i_v1_index_) Categorical
+0559	870303	USER_CONTEXT	3564	"trixcb_goods_trigger_gd_acty_type" default_key_i(hash(str(list_index_v2_typed(user_gd_acty_type_, trixcb_w3_sim_goods_hit_gd_index_)))) Categorical default_key=-1 strict=0
+0560	870310	USER_CONTEXT	3566	"gd_acty_type_cat1" default_key_i(hash(str(list_index_v2_typed(user_gd_acty_type_, cat1_hit_gd_index_)))) Categorical default_key=-1 strict=0
+0561	870313	USER_CONTEXT	3572	"view_sim_g_stay_sum_seq_disc" default_key_i(view_sim_g_stay_sum_seq_disc_) Categorical default_key=-1
+0562	870315	USER_CONTEXT	3578	"view_pid_v2_stay_sum_seq_disc" default_key_i(view_pid_v2_stay_sum_seq_disc_) Categorical default_key=-1
+0563	870340	USER_CONTEXT	3644	"cat1_trigger_user_history_buy_timegap" default_key_i(value2key_i(log_with_base(k2v_f(cat1_trigger_user_history_buy_timegap_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0564	870357	USER_CONTEXT	3647	"cat_ixi_trigger_user_history_buy_timediff" default_key_i(value2key_i(log_with_base(v2v_f(cat_ixi_trigger_user_history_buy_timediff_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0565	870373	USER_CONTEXT	3650	"cat_ixi_trigger_user_fav_2y_timediff" default_key_i(value2key_i(log_with_base(v2v_f(cat_ixi_trigger_user_fav_2y_timediff_)))) lwb_base=1.2 lwb_offset=1.0 default_key=-1 Categorical
+0566	870402	USER_CONTEXT	3740	"swing_i2i_hit_user_impr_view_td_f_cnt_crs" concat_typed(swing_i2i_hit_user_impr_td_f_cnt_crs_,swing_i2i_hit_user_view_td_f_cnt_crs_) Categorical
+0567	881025	USER_CONTEXT	4116	"rtordr_v2_hit_cnt_info" lconcatp_typed(extend(count_cat_hit_rtordr_v2_crt_, extend(count_pidv3_hit_rtordr_v2_crt_, extend(count_trixi_hit_rtordr_v2_crt_, extend(count_i2i_hit_rtordr_v2_crt_, count_c2c_hit_rtordr_v2_crt_))))) Categorical
+0568	881108	USER_CONTEXT	4140	"rtordr_v2_aftcpn_prc_diff_x_td_pay" rtordr_v2_aftcpn_prc_diff_x_td_pay_ Categorical
+0569	881220	USER_CONTEXT	4173	"goods_hit_acv2_pgsn_x_elsn" default_key_i(uniq_typed(goods_hit_acv2_pgsn_x_elsn_)) Categorical default_key=-1
+0570	881221	USER_CONTEXT	4174	"goods_hit_acv2_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(goods_hit_acv2_pgsn_x_elsn_)) Categorical default_key=-1
+0571	881226	USER_CONTEXT	4175	"goods_hit_acv2_page_sect_hashs_x_td" default_key_i(uniq_typed(goods_hit_acv2_page_sect_hashs_x_td_)) Categorical default_key=-1
+0572	881237	USER_CONTEXT	4176	"goods_hit_acv2_page_sect_hashs_x_td_x_idx" default_key_i(lconcatp_typed(goods_hit_acv2_page_sect_hashs_x_td_)) Categorical default_key=-1
+0573	881265	USER_CONTEXT	4180	"cat1_hit_acv2_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(cat1_hit_acv2_pgsn_x_elsn_)) Categorical default_key=-1
+0574	881267	USER_CONTEXT	4181	"cat1_hit_acv2_pgsn_x_elsn_x_td" default_key_i(uniq_typed(cat1_hit_acv2_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0575	881284	USER_CONTEXT	4182	"cat1_hit_acv2_pgsn_x_elsn_x_sect" default_key_i(uniq_typed(cat1_hit_acv2_pgsn_x_elsn_x_sect_)) Categorical default_key=-1
+0576	881309	USER_CONTEXT	4184	"trixi_hit_acv2_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(trixi_hit_acv2_pgsn_x_elsn_)) Categorical default_key=-1
+0577	881331	USER_CONTEXT	4186	"i2i_hit_acv2_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(i2i_hit_acv2_pgsn_x_elsn_)) Categorical default_key=-1
+0578	881353	USER_CONTEXT	4188	"c2c_hit_acv2_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(c2c_hit_acv2_pgsn_x_elsn_)) Categorical default_key=-1
+0579	881634	USER_CONTEXT	4190	"last_goods_hit_acv2_pgsn" default_key_i(slice_v3_typed{start=0,end=1}(goods_hit_acv2_pgsn_)) default_key=-1 Categorical
+0580	881681	USER_CONTEXT	4207	"goods_hit_acv2_pgsn_x_elsn_x_td_10015" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_td_, goods_hit_acv2_10015_index_))) Categorical default_key=-1
+0581	881705	USER_CONTEXT	4210	"goods_hit_acv2_pgsn_x_elsn_x_td_10002" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_td_, goods_hit_acv2_10002_index_))) Categorical default_key=-1
+0582	881709	USER_CONTEXT	4211	"goods_hit_acv2_page_sect_hashs_x_td_10002" default_key_i(uniq_typed(list_index_v2_typed(acv2_page_sect_hashs_x_td_, goods_hit_acv2_10002_index_))) Categorical default_key=-1
+0583	881717	USER_CONTEXT	4213	"goods_hit_acv2_pgsn_x_elsn_x_td_10034" default_key_i(uniq_typed(list_index_v2_typed(acv2_pgsn_x_elsn_x_td_, goods_hit_acv2_10034_index_))) Categorical default_key=-1
+0584	881721	USER_CONTEXT	4214	"goods_hit_acv2_page_sect_hashs_x_td_10034" default_key_i(uniq_typed(list_index_v2_typed(acv2_page_sect_hashs_x_td_, goods_hit_acv2_10034_index_))) Categorical default_key=-1
+0585	881733	USER_CONTEXT	4215	"goods_hit_acv2_page_sect_hashs_x_td_10007" default_key_i(uniq_typed(list_index_v2_typed(acv2_page_sect_hashs_x_td_, goods_hit_acv2_10007_index_))) Categorical default_key=-1
+0586	881757	USER_CONTEXT	4217	"goods_hit_acv2_page_sect_hashs_x_td_10038" default_key_i(uniq_typed(list_index_v2_typed(acv2_page_sect_hashs_x_td_, goods_hit_acv2_10038_index_))) Categorical default_key=-1
+0587	2015493	QUERY	5781	"7001703" default_key_i(key(extend_keys(sess_gpage_v2_1y_s30s_goods_ids_hit_simg_v2_,off_gpage_v2_d_3m_s30s_goods_ids_hit_simg_v2_))) Categorical max_length=400 default_key=-1
+0588	2022429	QUERY	5797	"precpn_start_time_tg_gtgt" default_key_i(precpn_start_time_tg_gtgt_) Categorical default_key=-1
+0589	33795609	USER_CONTEXT	5040	"max_his_sku_pid_clk_v4_price_max_diff_r_" dis2xf3_i(max_his_sku_pid_clk_v4_price_max_diff_r_) Categorical discrete_key=price_diff_rate
+0590	33795608	USER_CONTEXT	5037	"min_his_sku_pid_clk_v4_price_diff_r_" dis2xf3_i(min_his_sku_pid_clk_v4_price_diff_r_) Categorical discrete_key=price_diff_rate
+0591	33795610	USER_CONTEXT	5043	"mid_his_sku_pid_clk_v4_price_diff_r_" dis2xf3_i(mid_his_sku_pid_clk_v4_price_diff_r_) Categorical discrete_key=price_diff_rate
+0592	882385	USER_CONTEXT	4753	"trixi_hit_all_impr_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(trixi_hit_all_impr_pgsn_x_elsn_)) Categorical default_key=-1
+0593	882401	USER_CONTEXT	4755	"i2i_hit_all_impr_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(i2i_hit_all_impr_pgsn_x_elsn_)) Categorical default_key=-1
+0594	882417	USER_CONTEXT	4759	"c2c_hit_all_impr_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(c2c_hit_all_impr_pgsn_x_elsn_)) Categorical default_key=-1
+0595	882369	USER_CONTEXT	4750	"pidv3_hit_all_impr_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(pidv3_hit_all_impr_pgsn_x_elsn_)) Categorical default_key=-1
+0596	882353	USER_CONTEXT	4746	"cat1_hit_all_impr_pgsn_x_elsn_x_idx" default_key_i(lconcatp_typed(cat1_hit_all_impr_pgsn_x_elsn_)) Categorical default_key=-1
+0597	882419	USER_CONTEXT	4760	"c2c_hit_all_impr_pgsn_x_elsn_x_td" default_key_i(uniq_typed(c2c_hit_all_impr_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0598	882354	USER_CONTEXT	4747	"cat1_hit_all_impr_pgsn_x_elsn_x_index" default_key_i(concat_typed(cat1_hit_all_impr_pgsn_x_elsn_, cat1_hit_all_impr_index_)) Categorical default_key=-1
+0599	882416	USER_CONTEXT	4758	"c2c_hit_all_impr_pgsn_x_elsn" default_key_i(uniq_typed(c2c_hit_all_impr_pgsn_x_elsn_)) Categorical default_key=-1
+0600	882326	USER_CONTEXT	4744	"keycnt_goods_hit_all_impr_pgsn_x_elsn_log" default_key_i(uniq_typed(keycnt_goods_hit_all_impr_pgsn_x_elsn_log_)) Categorical default_key=-1
+0601	882371	USER_CONTEXT	4751	"pidv3_hit_all_impr_pgsn_x_elsn_x_td" default_key_i(uniq_typed(pidv3_hit_all_impr_pgsn_x_elsn_x_td_)) Categorical default_key=-1
+0602	882223	USER_CONTEXT	4705	"log_sum_goods_mix_user_gd_mix_mmd128_sim_gt_940_stay_time" log_sum_goods_mix_user_gd_mix_mmd128_sim_gt_940_stay_time_ Categorical
+0603	882227	USER_CONTEXT	4707	"goods_mix_user_view_mix_mmd128_sim_cnt" concat_typed(log_with_base(count_key(goods_mix_user_view_mix_mmd128_sim_dis_))) lwb_base=1.1 Categorical
+0604	882233	USER_CONTEXT	4708	"goods_mix_user_buy_mix_mmd128_sim_cnt" concat_typed(log_with_base(count_key(goods_mix_user_buy_mix_mmd128_sim_dis_))) lwb_base=1.1 Categorical
+0605	882225	USER_CONTEXT	4706	"goods_mix_user_impr_mix_mmd128_sim_x_pgsn_cut20" concat_typed(div_k2k(goods_mix_user_impr_mix_mmd128_sim_cut20_), user_impr_pagesn_cut20_) div_factor=10 Categorical
+0606	880448	USER_CONTEXT	4685	"i2i_hit_user_history_buy_mmd128_img_hashkey_hm_dist" list_index_v2_typed(user_history_buy_mmd128_img_hashkey_hm_dist_, i2i_hit_user_history_buy_index_) Categorical
+0607	882235	USER_CONTEXT	4711	"goods_mix_user_buy_mix_mmd128_sim_thre_td" uniq_typed(value2key_i(log_with_base(v2v_f(goods_mix_user_buy_mix_mmd128_sim_thre_timediff_)))) lwb_base=1.1 lwb_offset=1.0 Categorical
+0608	622316	GOODS	1879	"weighted_goods_cpn_fair_diff_rate" dis2xf3_i(div(sub(default_value(GOODS.weighted_goods_cpn_price), default_value(GOODS.weighted_goods_fair_price)), default_value(GOODS.weighted_goods_cpn_price))) discrete_key=price_diff Categorical
+0609	622533	GOODS	1886	"nowttd_sku_prc_p10_rk_x_p" default_key_i(nowttd_sku_prc_p10_rk_x_p_) Categorical default_key=-1
+0610	622530	GOODS	1885	"tdtp30d_sku_prc_p10_diff" default_key_i(tdtp30d_sku_prc_p10_diff_) Categorical default_key=-1
+0611	622496	GOODS	1875	"p_rec_mall_goods_impr_cnt_90d" default_key_i(p_rec_mall_goods_impr_cnt_90d_) Categorical default_key=-1
+0612	33203607	USER_CONTEXT	5020	"count_goods_sku_p_cluster_hit_sku_clk_v4" key_size_v3(goods_sku_p_cluster_hit_sku_clk_v4_index_) Categorical
+0613	203708	USER_CONTEXT	4577	"user_history_buy_pay_price_diff_dis_cut20" user_history_buy_pay_price_diff_dis_cut20_ Categorical
+0614	203742	USER_CONTEXT	4589	"c2c_hit_user_history_buy_sku_img_hashkey_hm_dist_x_timediff" list_index_v2_typed(user_history_buy_sku_img_hashkey_hm_dist_x_timediff_, c2c_hit_user_history_buy_index_) Categorical
+0615	203797	USER_CONTEXT	4595	"count_goods_sku_pidv3_hit_sku_buy" key_size_v3(goods_sku_pidv3_hit_sku_buy_index_) Categorical
+0616	33204162	USER_CONTEXT	5002	"sku_clk_v4_text_sim_64d_top10" sku_clk_v4_text_sim_64d_top10_ Categorical
+0617	33204180	USER_CONTEXT	5009	"sku_clk_v4_text_sim_64d_geq_800_count_concat" default_key_i(concat_typed(count_key(sku_clk_v4_text_sim_64d_geq_800_))) default_key=-1 Categorical
+0618	33204181	USER_CONTEXT	5010	"sku_clk_v4_pay_price_diff_dis_text_64d_geq_800" default_key_i(sku_clk_v4_pay_price_diff_dis_text_64d_geq_800_) default_key=-99999999 Categorical
+0619	33204182	USER_CONTEXT	5011	"sku_clk_v4_text_sim_64d_geq_800_idx_x_pos" default_key_i(lconcatp_typed(sku_clk_v4_text_sim_64d_geq_800_index_)) default_key=-1 Categorical
+0620	33204185	USER_CONTEXT	5012	"sku_clk_v4_price_diff_v1_text_64d_geq_800" default_key_i(sku_clk_v4_price_diff_v1_text_64d_geq_800_) default_key=-1 Categorical
+0621	33204186	USER_CONTEXT	5013	"sku_clk_v4_price_diff_v2_text_64d_geq_800" default_key_i(sku_clk_v4_price_diff_v2_text_64d_geq_800_) default_key=-1 Categorical
+0622	33204187	USER_CONTEXT	5014	"sku_clk_v4_platform_promt_text_64d_geq_800" default_key_i(sku_clk_v4_platform_promt_text_64d_geq_800_) default_key=-1 Categorical
+0623	33204196	USER_CONTEXT	5017	"sku_clk_v4_price_diff_v2_text_64d_geq_900" default_key_i(sku_clk_v4_price_diff_v2_text_64d_geq_900_) default_key=-1 Categorical
+0624	204202	USER_CONTEXT	4584	"user_history_buy_text_sim_64d_top10" user_history_buy_text_sim_64d_top10_ Categorical
+0625	204242	USER_CONTEXT	4592	"user_history_buy_sku_text_hashkey_hm_dist_uniq" key_distinct(user_history_buy_sku_text_hashkey_hm_dist_) Categorical
+0626	4418001	QUERY	5875	"" default_key_i(concat_typed(gd_3m_act_trixa100_staysum_dist_keys_,gd_3m_act_trixa100_staysum_dist_vals_)) Categorical default_key=-1
+0627	4418073	QUERY	5884	"7007703" default_key_i(gd_d_1y_v2_tgt_simg_stay_sum_) Categorical default_key=-1
+0628	4418101	QUERY	5890	"i2b_gpage_d_1y_view_stay_time_dis_v3" default_key_i(extend_keys(gd_3m_act_i2btgt_stay_disc_v3_, off_gd_d_3m_1y_v2_i2btgt_st_disc_v3_)) Categorical default_key=-1
+0629	160033	USER_CONTEXT	4820	"i2i_rerank_top20_insec_top200_index_" i2i_rerank_top20_insec_top200_index_ Categorical
+0630	160043	USER_CONTEXT	4815	"top800_i2i_v5_index_dis" default_key_i(dis2xf3_i(k2v_i(list_in_list_index_typed(top800_goods_,trixi_w3_sim_goods_list_top20_)))) discrete_key=top800_index_dis default_key=-1 Categorical
+0631	160044	USER_CONTEXT	4827	"top800_i2i_v6_index_dis" default_key_i(dis2xf3_i(k2v_i(list_in_list_index_typed(top800_goods_,trixi_w3_sim_goods_list_top100_)))) discrete_key=top800_index_dis default_key=-1 Categorical
+0632	160049	USER_CONTEXT	4818	"i2i_nlp_clk_x_buy_goods_id_top5_hit_cnt2_" concat_typed(i2i_nlp_view_goods_id_top5_hit_cnt2_, i2i_nlp_buy_goods_id_top5_hit_cnt2_) Categorical
+0633	160063	GOODS	1907	"g_sess_pay_ordr_cnt_1d" default_key_i(g_sess_pay_ordr_cnt_1d_) Categorical default_key=-1
+0634	160065	GOODS	1910	"same_goods_avg_ordr_price_v3_compare_x_size" default_key_i(concat_typed(same_goods_avg_ordr_price_v3_compare_, same_goods_ids_v3_size_)) Categorical default_key=-1
+0635	160067	GOODS	1911	"avg_desc_cp" default_key_i(dis2xf3_i(GOODS.avg_desc_cp)) Categorical default_key=-1 discrete_key=avg_desc_cp
+0636	33205180	USER_CONTEXT	5053	"sku_clk_v4_s_clip_tts_64d_geq_900_count_concat" default_key_i(concat_typed(count_key(sku_clk_v4_s_clip_tts_64d_geq_900_))) default_key=-1 Categorical
+0637	33205186	USER_CONTEXT	5054	"sku_clk_v4_price_diff_v2_s_clip_tts_64d_geq_900" default_key_i(sku_clk_v4_price_diff_v2_s_clip_tts_64d_geq_900_) default_key=-1 Categorical
+0638	33205227	USER_CONTEXT	5059	"sku_clk_v4_platform_promt_g_clip_iis_64d_geq_800" default_key_i(sku_clk_v4_platform_promt_g_clip_iis_64d_geq_800_) default_key=-1 Categorical
+0639	206201	USER_CONTEXT	4641	"user_view_clip_iis_64d_top10" user_view_clip_iis_64d_top10_ Categorical
+0640	206206	USER_CONTEXT	4644	"user_view_clip_iis_64d_top20_pg_x_elsn_x_sim" user_view_clip_iis_64d_top20_pg_x_elsn_x_sim_ Categorical
+0641	206301	USER_CONTEXT	4650	"user_buy_clip_iis_64d_top10" user_buy_clip_iis_64d_top10_ Categorical
+0642	206310	USER_CONTEXT	4652	"user_buy_clip_iis_64d_top10_payprc_diff" user_buy_clip_iis_64d_top10_payprc_diff_ Categorical
+0643	206389	USER_CONTEXT	4657	"user_acv2_pg_x_elsn_x_tg_clip_iis_64d_geq_90" default_key_i(user_acv2_pg_x_elsn_x_tg_clip_iis_64d_geq_90_) default_key=-1 Categorical
+0644	206510	USER_CONTEXT	4663	"user_buy_clip_tts_64d_top10_payprc_diff" user_buy_clip_tts_64d_top10_payprc_diff_ Categorical
+0645	206550	USER_CONTEXT	4668	"user_gd_clip_tts_64d_top20_acty_type" hash(str(user_gd_clip_tts_64d_top20_acty_type_)) Categorical
+0646	206563	USER_CONTEXT	4672	"user_gd_stay_time_x_sim_clip_tts_64d_geq_80" concat_typed(user_gd_stay_time_clip_tts_64d_geq_80_,user_gd_clip_tts_64d_geq_80_) Categorical
+0647	206585	USER_CONTEXT	4677	"user_acv2_pg_x_elsn_x_tg_clip_tts_64d_geq_80" default_key_i(user_acv2_pg_x_elsn_x_tg_clip_tts_64d_geq_80_) default_key=-1 Categorical
+0648	208000	USER_CONTEXT	2230	"user_history_buy_price_tpid2_mpp_diff" key(user_history_buy_price_tpid2_mpp_diff_) max_length=600 Categorical
+0649	208011	USER_CONTEXT	4536	"cpv3_price_tpid2_mpp_diff" default_key_i(cpv3_price_tpid2_mpp_diff_) Categorical default_key=-1
+0650	208012	USER_CONTEXT	4537	"cpv3_price_tpid3_mpp_diff" default_key_i(cpv3_price_tpid3_mpp_diff_) Categorical default_key=-1
+0651	208013	USER_CONTEXT	4538	"cpv3_price_tpcid_mpp_diff" default_key_i(cpv3_price_tpcid_mpp_diff_) Categorical default_key=-1
+0652	208014	USER_CONTEXT	4539	"cpv3_price_ttcidv3_mpp_diff" default_key_i(cpv3_price_ttcidv3_mpp_diff_) Categorical default_key=-1
+0653	208015	USER_CONTEXT	4540	"cpv3_price_tqtmv2_mpp_diff" default_key_i(cpv3_price_tqtmv2_mpp_diff_) Categorical default_key=-1
+0654	208030	USER_CONTEXT	4486	"gd_impr_tpid2_pdp_mpp_diff" default_key_i(gd_impr_tpid2_pdp_mpp_diff_) Categorical default_key=-1
+0655	208034	USER_CONTEXT	4487	"gd_impr_tqtmv2_pdp_mpp_diff" default_key_i(gd_impr_tqtmv2_pdp_mpp_diff_) Categorical default_key=-1
+0656	241215001	GOODS	1915	"ibs_gen" default_key_i(value2key_i(GOODS.ibs_gen)) Categorical default_key=-1
+0657	241215011	GOODS	1919	"user_hit_ibs_pid_ratio" default_key_i(value2key_i(hit(i64(ibs_pid_key_value_ratio_),i64(USER_COMMON.prov_id)))) Categorical default_key=-1
+0658	241215038	GOODS	1921	"ibs_daycnt_" default_key_i(ibs_daycnt_) Categorical default_key=-1
+0659	241215065	GOODS	1923	"ibs_discsns_" ibs_discsns_ Categorical
+0660	241215127	GOODS	1925	"ivs_dayoffset_" default_key_i(ivs_dayoffset_) Categorical default_key=-1
+0661	24808118	USER_CONTEXT	4829	key(goods_srch_term_hit_query_cvr_30d) Categorical
+0662	274471	GOODS	1721	"sku_min_acty_plat_prc_b_his_rt_diff" value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(sku_min_acty_plat_prc_b_his_rt_diff_))) Categorical
+0663	276351	CONTEXT	1265	"min_promo_price_discount" dis2xf3_i(min_promo_price_discount_) Categorical discrete_key=price_disc_rate
+0664	302302	USER_CONTEXT	4825	"long_fav_goods_f_sg_size_" long_fav_goods_f_sg_size_ Categorical
+0665	302342	USER_CONTEXT	4806	"long_stay_goods_f_sg_idx_" long_stay_goods_f_sg_idx_ Categorical
+0666	302502	GOODS	1902	"ibs_buypw" default_key_i(dis2xf_i(GOODS.ibs_buypw)) Categorical discrete_key=ibs_buypw default_key=-1
+0667	302503	GOODS	1903	"ivs_cn" default_key_i(dis2xf_i(GOODS.ivs_cn)) Categorical discrete_key=ivs_cn default_key=-1
+0668	302554	USER_COMMON	941	"history_buy_sku_w_filter_x_g_sku_w_index" history_buy_sku_w_filter_x_g_sku_w_index_ Categorical
+0669	3029611	USER_COMMON	946	"user_life_clk_cat_x_st_f_c2c" key(concat_typed(user_life_clk_cat_f_c2c_,user_life_clk_staytime_dis_f_c2c_)) max_length=600 Categorical
+0670	304393	USER_CONTEXT	4835	"lt_ordr_trixi100_cat_cnt_x_weight" concat_typed(value2key_i(user_cat_ordr_2y_trixi_cat100_),value2key_i(user_ordr_trixi100_cat_weight_)) Categorical
+0671	304394	USER_CONTEXT	4838	"lt_view_trixi100_cat_cnt_x_weight" concat_typed(value2key_i(user_cat_clk_2y_trixi_cat100_),value2key_i(user_clk_trixi100_cat_weight_)) Categorical
+0672	304395	USER_CONTEXT	4841	"lt_impr_trixi100_cat_cnt_x_weight" concat_typed(value2key_i(user_cat_impr_2y_trixi_cat100_),value2key_i(user_impr_trixi100_cat_weight_)) Categorical
+0673	3044501	USER_CONTEXT	4845	"user_life_clk_cnt_f_new_i2i_log" user_life_clk_cnt_f_new_i2i_log_ Categorical
+0674	304952	USER_COMMON	966	"user_gpage_tgDiff_1y_f_trixi100_log" key(user_gpage_tgDiff_1y_f_trixi100_log_) max_length=500 Categorical
+0675	310585	USER_CONTEXT	4855	"top800_goods_f_trixcb_idx" top800_goods_f_trixcb_idx_ Categorical
+0676	310586	USER_CONTEXT	4856	"top800_goods_f_sg_idx" top800_goods_f_sg_idx_ Categorical
+0677	310601	USER_CONTEXT	4860	"top800_price_f_trixcb" dis2xf3_i(k2v_f(top800_price_f_trixcb_)) Categorical discrete_key=new_price
+0678	310602	USER_CONTEXT	4861	"top800_price_f_sg" dis2xf3_i(k2v_f(top800_price_f_sg_)) Categorical discrete_key=new_price
+0679	310604	USER_CONTEXT	4862	"top800_price_f_new_i2i" dis2xf3_i(k2v_f(top800_price_f_new_i2i_)) Categorical discrete_key=new_price
+0680	37616	USER_COMMON	929	"user_impr_term_1m_hit_goods_cnt" i64(user_impr_term_1m_hit_goods_cnt_) Categorical
+0681	37617	USER_COMMON	930	"user_clk_term_1y_hit_goods_cnt" i64(user_clk_term_1y_hit_goods_cnt_) Categorical
+0682	37618	USER_COMMON	931	"user_buy_term_2y_hit_goods_cnt" i64(user_buy_term_2y_hit_goods_cnt_) Categorical
+0683	4061	USER_CONTEXT	4789	"i2i_wbcos_impr_goods_id_top5_hit_cnt" default_key_i(dis2xf_i(key_size_v3(intersection_typed(trixi_w3_sim_goods_list_top100_, key_distinct(value2key_i(impr_goods_sw_i2i_)))))) Categorical discrete_key=i2i_wbcos_goods_id_top5_hit_cnt default_key=-1
+0684	500103	ITEM_CONTEXT	1479	"sku_grp_prcs_diff" sku_grp_prcs_diff_ Categorical
+0685	500120	ITEM_CONTEXT	1455	"sku_plat_disc_amts" sku_plat_disc_amts_ Categorical
+0686	500121	ITEM_CONTEXT	1467	"sku_min_acty_plat_prc_discount_v1_dis" dis2xf3_i(sku_min_acty_plat_prc_discount_v1_) Categorical discrete_key=price_disc_rate
+0687	500134	ITEM_CONTEXT	1471	"sku_acty_plat_prcs_discount_min" sku_acty_plat_prcs_discount_min_ Categorical
+0688	500135	ITEM_CONTEXT	1472	"sku_acty_plat_prcs_discount_max" sku_acty_plat_prcs_discount_max_ Categorical
+0689	500136	ITEM_CONTEXT	1475	"sku_max_prc_acty_plat_discount" sku_max_prc_acty_plat_discount_ Categorical
+0690	500137	ITEM_CONTEXT	1476	"sku_min_prc_acty_plat_discount" sku_min_prc_acty_plat_discount_ Categorical
+0691	500150	ITEM_CONTEXT	1484	"sku_grp_prc_cnts" default_key_i(uniq_typed(sku_grp_prc_cnts_)) Categorical default_key=-1
+0692	500151	ITEM_CONTEXT	1485	"sku_grp_prc_cnts_kv" default_key_i(sku_grp_prc_cnts_kv_) Categorical default_key=-1
+0693	500158	ITEM_CONTEXT	1491	"sku_acty_prcs_v2_dis" default_key_i(sku_acty_prcs_v2_dis_) Categorical default_key=-1
+0694	500159	ITEM_CONTEXT	1493	"sku_acty_prcs_v2_dis_top2" default_key_i(sku_acty_prcs_v2_dis_top2_) Categorical default_key=-1
+0695	622555	GOODS	1893	"promo_price_diff_t1_xf_signed" default_key_i(promo_price_diff_t1_xf_signed_) Categorical default_key=-1
+0696	868030	USER_COMMON	838	"ho_aftcpn_prcs_b_min_prm_prc_diff_disc_cut" key(ho_aftcpn_prcs_b_min_prm_prc_diff_disc_) max_length=600 Categorical
+0697	87560127	GOODS	1901	"goods_srch_term_ordr_30d_hit_query_cnt" key_size_v3(goods_srch_term_ordr_cnt_30d_hit_query_kv_) Categorical
+0698	87560220	USER_CONTEXT	4791	"top800_i2i_v6_index_dis" default_key_i(dis2xf3_i(k2v_i(list_in_list_index_typed(value2key_i(USER_CONTEXT.dnn_goods),trixi_w3_sim_goods_list_top100_)))) discrete_key=top800_index_dis default_key=-1 Categorical
+0699	87580093	USER_CONTEXT	4867	"long_clk_seq_u2i_i2i_top5_x_50_goods_ids_hit_cnt_" concat_typed(long_view_seq_u2i_i2i_top5_goods_ids_hit_cnt_v2_, view_seq_u2i_i2i_top50_goods_ids_hit_cnt_v2_) Categorical
+0700	900017	USER_CONTEXT	4795	"rn_i2i_click_rcvr_avg_v2" rn_i2i_click_rcvr_avg_v2 Categorical
+0701	900647	USER_CONTEXT	4814	"top200_i2i_goods_pp_avg_x_diff" concat_typed(top200_i2i_goods_pp_avg_dis,top200_i2i_goods_pp_avg_diff_dis) Categorical
+0702	909043	USER_CONTEXT	4849	"user_impr_i2i_v5_idx_log_x_pagesn" concat_typed(user_impr_i2i_v5_idx_log, user_impr_i2i_v5_pagesn_) Categorical
+0703	110041	USER_CONTEXT	4877	"coupon_use_tc2c_sdchnl_type" key(default_key_i(coupon_use_tc2c_sdchnl_type_)) max_length=600 default_key=-1 Categorical
+0704	8112	CONTEXT	1293	"ori_q_goods_seg_word_intersec_cnt" concat_typed(key_size_v3(intersection_typed(yrt_goods_seg_word_hash_uniq_, ori_q_word_seg_hash_uniq_)), ori_q_word_seg_hash_uniq_size_) Categorical
+0705	14237	GOODS	1926	"p2p_o_list" value2key_i(GOODS.p2p_o_list) Categorical
+0706	909116	USER_CONTEXT	5115	"user_view_i2i_v5_idx_log_x_pagesn" concat_typed(user_view_i2i_v5_idx_log, user_view_i2i_v5_pagesn_) Categorical
+0707	302552	USER_COMMON	972	"hb_tgt_riid_c_dgdf_" hb_tgt_riid_c_dgdf_ Categorical
+0708	302987	USER_COMMON	990	"goods_clk_cnt_seq_life_f_new_i2i_" goods_clk_cnt_seq_life_f_new_i2i_ Categorical
+0709	87560205	QUERY	5921	"q2i_hit_i2i_u2i_idx" i64(q2i_hit_i2i_u2i_idx_) Categorical
+0710	302185	GOODS	1933	"sim_l_goods_ids_21_" sim_l_goods_ids_21_ Categorical
+0711	87560133	GOODS	1927	"goods_srch_term_clk_30d_hit_query_sum" dis2xf3_i(sum_value(goods_srch_term_clk_cnt_30d_hit_query_kv_)) discrete_key=goods_srch_term_clk_30d_hit_query_sum_dis Categorical
+0712	1602601	USER_CONTEXT	5108	"user_view_mall_simc_fix_" list_index_typed(value2key_i(user_view_mall_all),user_view_goods_simc_idx_fix_) Categorical
+0713	160070	GOODS	1932	"uv_cfr_30d" default_key_i(dis2xf3_i(GOODS.uv_cfr_30d)) Categorical default_key=-1 discrete_key=uv_cfr_30d
+0714	341102	GOODS	1930	"gs_clk_buy_all_and_buy_rate" default_key_i(_clk_buy_all_and_buy_rate_log) Categorical default_key=-1
+0715	900086	USER_CONTEXT	5105	"history_buy_cat_price_avg_x_mall" concat_typed(history_buy_i2i_v1_price_avg_dis,i64(ITEM_CONTEXT.mall_id)) Categorical
+0716	302595	USER_COMMON	987	"user_gd_v1_actions_x_tg_hour_f_c2c" list_index_typed(user_gd_v1_actions_x_tg_hour_,user_gd_cat_f_c2c_index_) Categorical
+0717	1602631	USER_CONTEXT	5109	"user_impr_mall_simc_fix_" list_index_typed(value2key_i(user_impr_mall_all),user_impr_goods_simc_idx_fix_) Categorical
+0718	6052	GOODS_HOUR	2096	"g_srch_view_cnt_info" concat_typed(g_srch_view_1h_cnt_dis_yrt_, g_srch_view_2h_cnt_dis_yrt_, g_srch_view_3h_cnt_dis_yrt_, g_srch_view_4h_cnt_dis_yrt_) Categorical
+0719	310588	USER_CONTEXT	5117	"top800_goods_f_new_i2i_idx_1" top800_goods_f_new_i2i_idx_1 Categorical
+0720	304456	USER_CONTEXT	5111	"i2i_mid" i2i_mid_ Categorical
+0721	37615	USER_COMMON	1000	"user_buy_term_2y_hit_goods" key(user_buy_term_2y_hit_goods_kv_) Categorical
+0722	341103	GOODS	1931	"gs_sku_clk_and_buy_rate_norm" default_key_i(_sku_clk_and_buy_rate_norm_log) Categorical default_key=-1
+0723	341105	QUERY	5927	"query_ner_term2_hit_ratio" dis2xf3_i(div_v2(key_size_v3(query_hit_goods_ner_terms2_), key_size_v3(query_ner_terms2_hash_))) discrete_key=query_ner_term2_hit_ratio_dis Categorical
+0724	304451	USER_COMMON	994	"goods_clk_cnt_seq_life_f_rlgd_log_" goods_clk_cnt_seq_life_f_rlgd_log_ Categorical
+0725	341104	USER_CONTEXT	5089	"rec_b2b_top64_" key(rec_b2b_) Categorical
+0726	304946	USER_COMMON	979	"user_gpage_actions_v2_1y_f_trixi100_hash" hash(str(user_gpage_actions_v2_1y_f_trixi100_)) Categorical
+0727	302190	GOODS	1934	"trixi_w3_sim_goods_list_top100_" trixi_w3_sim_goods_list_top100_ Categorical
+0728	304452	USER_COMMON	998	"goods_clk_cnt_seq_life_f_trixa_log_" goods_clk_cnt_seq_life_f_trixa_log_ Categorical
+0729	304913	USER_COMMON	984	"user_gpage_action_cnt_1y_f_c1_" user_gpage_action_cnt_1y_f_c1_ Categorical
+0730	304911	USER_COMMON	983	"user_gpage_actions_1y_f_c1_hash" hash(str(user_gpage_actions_1y_f_c1_)) Categorical
+0731	241125018	USER_CONTEXT	5147	"last_long_stay_mall_time_hit_i2im" last_long_stay_mall_time_hit_i2im_ Categorical
+0732	241215027	GOODS	1939	"ibs_dayoffset_" default_key_i(ibs_dayoffset_) Categorical default_key=-1
+0733	241215101	GOODS	1938	"ivs_gen" default_key_i(value2key_i(GOODS.ivs_gen)) Categorical default_key=-1
+0734	247030061	USER_CONTEXT	5159	"recall_merge_i2i_cut30_" recall_merge_i2i_cut30_ Categorical
+0735	340116	USER_COMMON	1064	"ac_uniq_1y_ext_page_sn_x_elsn_match_img_cluster" default_key_i(list_index_typed(ac_uniq_1y_ext_page_sn_x_elsn_,ac_uniq_1y_ext_img_cluster_id_hash_match_img_idx_)) Categorical default_key=-1
+0736	3400731	USER_CONTEXT	5172	"buy_b2b_idxs_fix_dis" default_key_i(dis2xf_i(k2v_f(buy_b2b_idxs_fix_))) Categorical default_key=-1 discrete_key=buy_b2b_idxs
+0737	3401321	USER_CONTEXT	5167	"f2f_iid_gd_stay_7d_fix" default_key_i(list_index_v2_typed(session_ups_stay_time_disc_,list_in_list_index_typed(session_gd_goods_ids_, f2f_iid_cut30_))) Categorical default_key=-1
+0738	3401371	USER_CONTEXT	5169	"b2b_g_last_impr_pagesn_list_cut64" default_key_i(list_index_typed(goods_last_impr_pagesn_seq_,b2b_last_impr_index_cut64_)) Categorical default_key=-1
+0739	3401661	USER_COMMON	1066	"ac_uniq_1y_ext_page_sn_x_elsn_match_pid3" default_key_i(list_index_typed(ac_uniq_1y_ext_page_sn_x_elsn_,ac_uniq_1y_ext_product_id_v3_match_merge_pid3_idx_fix_)) Categorical default_key=-1
+0740	340100	USER_COMMON	1024	"qryseq_90d_match_cp_words" default_key_i(qryseq_90d_match_cp_words_) Categorical default_key=-1
+0741	340028	USER_COMMON	1042	"gpv_index_filter_c1_fix_gvst" default_key_i{default_key=-1}(concat_typed(log_with_base_v2_typed{need_ceil=1,lwb_base=1.1,lwb_up_bound=200}(count_key(gpv_index_filter_c1_fix_gvst_)))) Categorical
+0742	340044	USER_COMMON	1020	"buy_term_b2b_all_ranks" default_key_i(buy_term_b2b_all_ranks_) Categorical default_key=-1
+0743	3400141	USER_COMMON	1018	"tg_b2b_all_term_clk_cnt_seq" default_key_i(tg_b2b_all_term_clk_cnt_seq_) Categorical default_key=-1
+0744	340296	USER_CONTEXT	5177	"user_gdclk_pagesn_x_pageelsn_6m_f_new_i2i_" user_gdclk_pagesn_x_pageelsn_6m_f_new_i2i_ Categorical
+0745	340317	USER_CONTEXT	5183	"user_gdclk_pagesn_x_pageelsn_6m_f_sg_" user_gdclk_pagesn_x_pageelsn_6m_f_sg_ Categorical
+0746	340321	USER_CONTEXT	5184	"user_gdclk_pagesn_x_pageelsn_x_tgdiff_6m_f_sg" concat_typed(user_gdclk_pagesn_x_pageelsn_6m_f_sg_,user_gdclk_tgdiff_6m_f_sg_) Categorical
+0747	3403491	USER_CONTEXT	5196	"user_gdclk_pagesn_x_pageelsn_x_tgdiff_6m_f_trixi100_c" concat_typed(user_gdclk_pagesn_x_pageelsn_6m_f_trixi100_c_,user_gdclk_tgdiff_6m_f_trixi100_c_) Categorical
+0748	340335	USER_CONTEXT	5190	"user_gdclk_pagesn_x_pageelsn_x_tgdiff_6m_f_merge_p2" concat_typed(user_gdclk_pagesn_x_pageelsn_6m_f_merge_p2_,user_gdclk_tgdiff_6m_f_merge_p2_) Categorical
+0749	160077	USER_COMMON	953	"buy_compic_diffs_filter_c1" default_key_i(dis2xf3_i(v2v_f(sub_key_typed(value2key_i(i64(GOODS.compic_p)), bslo2_cmps_filter_pst0_c1_)))) Categorical default_key=-1 discrete_key=buy_compic_diffs_filter_c1
+0750	1600912	USER_COMMON	937	"bslo2_trixi_c_bds_x_psts" default_key_i(concat_typed(dis2xf3_i(k2v_f(bslo2_trixi_c_bds_)), bslo2_trixi_c_psts_)) Categorical default_key=-1 discrete_key=bslo2_simc_bds
+0751	2022444	QUERY	5798	"precpn_source_type_ptgt" default_key_i(precpn_source_type_ptgt_) Categorical default_key=-1
+0752	302533	USER_COMMON	916	"c3_buy_power_lvl_3m_fusion_X_gprc" list_concat_typed(c3_buy_power_lvl_3m_fusion_,npo_avg_goods_prc_lvl_3m_) Categorical
+0753	87560214	CONTEXT	1300	"ori_q_goods_ner_term_intersec_cnt2" concat_typed(key_size_v3(intersection_typed(yrt_goods_ner_term_hash_uniq_, ori_q_ner_term_hash_uniq_)), ori_q_ner_term_hash_uniq_size_, u_c_goods_ori_q_ner_intersec_cnt_,search_met_) Categorical
+0754	340483	QUERY	5930	"goods_ner_terms_merge_hit_g_clk_ner_term_hash_idx" list_in_list_index_typed(i64(query_merge_g_clk_ner_term_hash_), i64(goods_title_term_)) Categorical
+0755	340856	USER_CONTEXT	5223	"top800_goods_f_trixa100_idx_" dis2xf3_i(k2v_i(top800_goods_f_trixa100_idx_)) discrete_key=top800_index_dis Categorical
+0756	340827	USER_CONTEXT	5220	"top200_qlt_score_rk_tar_gd_" top200_qlt_score_rk_tar_gd_ Categorical
+0757	340824	USER_CONTEXT	5218	"ranklist_price_hit_sg_avg_x_item_diff" concat_typed(ranklist_price_hit_sg_avg_dis_, ranklist_price_hit_sg_avg_diff_dis_) Categorical
+0758	340756	USER_CONTEXT	5233	"view_seq_trixi_top50_goods_ids_hit_cnt" view_seq_trixi_top50_goods_ids_hit_cnt_ Categorical
+0759	340761	USER_CONTEXT	5234	"rn_noclk_seq_trixi_top50_goods_ids_hit_cnt_" rn_noclk_seq_trixi_top50_goods_ids_hit_cnt_ Categorical
+0760	820000	GOODS_YRT	2098	"impr_338788_icon_list" hash(value2key_s(GOODS_YRT.icon_list)) Categorical
+0761	820001	GOODS_YRT	2099	"impr_5049756_cp_desc_list_v2" hash(value2key_s(GOODS_YRT.cp_desc_list)) Categorical
+0762	820003	GOODS_YRT	2101	"sales_tip_num_log" sales_tip_num_log_ Categorical
+0763	820004	GOODS_YRT	2102	"tag_hash_list" value2key_i(GOODS_YRT.site_tag_list_hash) Categorical
+0764	820007	GOODS_YRT	2103	"seq_pidx_list" value2key_i(GOODS_YRT.site_pidx) Categorical
+0765	820025	GOODS_YRT	2114	"site_cba_per_clk_raw_1000_log" site_cba_per_clk_raw_1000_log_ Categorical
+0766	820027	GOODS_YRT	2118	"site_clk_st5s_time_rt_seq_per_clk_raw_1000_log" site_clk_st5s_time_rt_seq_per_clk_raw_1000_log_ Categorical
+0767	820028	GOODS_YRT	2122	"site_clk_st30s_time_rt_seq_per_clk_raw_1000_log" site_clk_st30s_time_rt_seq_per_clk_raw_1000_log_ Categorical
+0768	820029	GOODS_YRT	2126	"site_clk_values_time_rt_seq_per_clk_raw_1000_log" site_clk_values_time_rt_seq_per_clk_raw_1000_log_ Categorical
+0769	820035	GOODS_YRT	2129	"site_clk_values_time_rt_seq_per_clk_raw_1000_log_x_td" concat_typed(site_clk_values_time_rt_seq_per_clk_raw_1000_log_, site_clk_td_log_) Categorical
+0770	820061	GOODS_YRT	2132	"site_clk_info_tg_log" site_clk_info_tg_log_ Categorical
+0771	212402	USER_CONTEXT	4965	"sku_clk_v4_vit_128d_sim_top10" sku_clk_v4_vit_128d_sim_top10_ Categorical
+0772	212422	USER_CONTEXT	4967	"sku_clk_v4_vit_128d_sim_geq_800_idx_x_pos" default_key_i(lconcatp_typed(sku_clk_v4_vit_128d_sim_geq_800_index_)) default_key=-1 Categorical
+0773	212432	USER_CONTEXT	4969	"sku_clk_v4_vit_128d_sim_geq_900_idx_x_pos" default_key_i(lconcatp_typed(sku_clk_v4_vit_128d_sim_geq_900_index_)) default_key=-1 Categorical
+0774	212502	USER_CONTEXT	4973	"sku_clk_v4_vit_128d_hashkey_hm_dist_uniq" key_distinct(sku_clk_v4_vit_128d_hashkey_hm_dist_) Categorical
+0775	208001	USER_CONTEXT	2231	"user_history_buy_price_tpcid_mpp_diff" user_history_buy_price_tpcid_mpp_diff_ Categorical
+0776	341265	USER_COMMON	1133	"buy_pid2_mmd_txt_sim_score_f_c1_geq_650_" buy_pid2_mmd_txt_sim_score_f_c1_geq_650_ Categorical
+0777	341320	USER_COMMON	1097	"user_buy_term_2y_kv_hit_i2q_w_v_" user_buy_term_2y_kv_hit_i2q_w_v_ Categorical
+0778	341353	USER_COMMON	1099	"i2q_w_x_pre_query_ner_size_x_ori_size2" concat_typed(pre_norm_query_ner_kstringset_size_, i2q_w_size_, key_size_v3(i2q_w_x_pre_query_ner_)) Categorical
+0779	341358	USER_COMMON	1102	"i2q_w_x_pre_query_ner_size_x_ori_size4" concat_typed(query_ner_term_hash_size_, i2q_w_hit_query_size, i2q_w_size_, key_size_v3(i2q_w_x_pre_query_ner_), pre_norm_query_ner_kstringset_size_) Categorical
+0780	341421	USER_COMMON	1104	"user_buy_goods_3d_hit_i2q_merge_" user_buy_goods_3d_hit_i2q_merge_ Categorical
+0781	341888	USER_COMMON	1121	"user_gpage_all_session_1h_action_1y_f_c_l_" user_gpage_all_session_1h_action_1y_f_c_l_ Categorical
+0782	304383	USER_CONTEXT	5096	"user_view_page_sns_x_tg_1y_uniq_f_i2i_iid_" concat_typed(user_view_page_sns_1y_uniq_f_i2i_iid_,user_view_timegap_1y_uniq_f_i2i_iid_) Categorical
+0783	3402761	USER_COMMON	1072	"user_clk_term_map_1y_kv_hit_sim_goods_v_fix_" user_clk_term_map_1y_kv_hit_sim_goods_v_fix_ Categorical
+0784	208016	USER_CONTEXT	4542	"cpv3_price_tags_tpid2" default_key_i(cpv3_price_tags_tpid2_) Categorical default_key=-1
+0785	247031681	USER_CONTEXT	5163	"user_impr_goods_hit_i2i_ex6_timegap_fix_" user_impr_goods_hit_i2i_ex6_timegap_fix_ Categorical
+0786	900643	USER_CONTEXT	5100	"predicted_price_rankin_top200_i2i_goods_pp" default_key_i(rankV2_i(value2key_i(top200_i2i_goods_pp),i64(ITEM_CONTEXT.predicted_price))) default_key=-1 Categorical
+0787	340096	GOODS	1946	"g_sess_impr_cnt_1d" default_key_i(g_sess_impr_cnt_1d_) Categorical default_key=-1
+0788	2015723	QUERY	5757	key(fcpa_brdc1_c1_hit_tag_) Categorical max_length=400
+0789	340859	USER_CONTEXT	5224	"top800_goods_f_recall_i2i_idx_" dis2xf3_i(k2v_i(top800_goods_f_recall_i2i_idx_)) discrete_key=top800_index_dis Categorical
+0790	340076	GOODS	1944	"ivs_uid" default_key_i(value2key_i(GOODS.ivs_uid)) Categorical default_key=-1
+0791	340070	USER_COMMON	1031	"trgt_trixi_cat_impr_tg_adjacent_seq_30d_28x_dis" trgt_trixi_cat_impr_tg_adjacent_seq_30d_28x_dis_ Categorical
+0792	302374	USER_CONTEXT	5099	"long_stay_stimes_sum_f_sg_" long_stay_stimes_sum_f_sg_ Categorical
+0793	500300	ITEM_CONTEXT	1496	"wide_clk_item_explore" wide_clk_item_explore_ Categorical
+0794	500301	ITEM_CONTEXT	1497	"wide_clk_c3_explore" wide_clk_c3_explore_ Categorical
+0795	500302	ITEM_CONTEXT	1498	"wide_clk_c3_x_item_explore" concat_typed(wide_clk_item_explore_,wide_clk_c3_explore_) Categorical
+0796	600200	GOODS	1960	"gpstat_page_sn" gpstat_page_sn_ Categorical
+0797	600202	GOODS	1962	"gpstat_pgsn_x_elsn" gpstat_pgsn_x_elsn_ Categorical
+0798	600201	GOODS	1961	"gpstat_page_el_sn" gpstat_page_el_sn_ Categorical
+0799	600255	GOODS	1971	"pgstat_pgsn_x_elsn_x_crt_cvr_dis" pgstat_pgsn_x_elsn_x_crt_cvr_dis_ Categorical
+0800	600233	GOODS	1963	"gpstat_crt_cvr_dis" gpstat_crt_cvr_dis_ Categorical
+0801	600253	GOODS	1969	"pgstat_pgsn_x_elsn_x_uv_ctr_dis" pgstat_pgsn_x_elsn_x_uv_ctr_dis_ Categorical
+0802	600254	GOODS	1970	"pgstat_pgsn_x_elsn_x_usr_ctr_dis" pgstat_pgsn_x_elsn_x_usr_ctr_dis_ Categorical
+0803	600249	GOODS	1968	"pgstat_pgsn_x_elsn_x_ldord_pay_cnt_dis" pgstat_pgsn_x_elsn_x_ldord_pay_cnt_dis_ Categorical
+0804	212611	GOODS	1976	"upstat_pgsn_x_elsn_hit_gpstat_ldord_crt_top3_kv" concat_typed(count_key(upstat_pgsn_x_elsn_hit_gpstat_ldord_crt_top3_)) Categorical
+0805	770583	USER_CONTEXT	5327	"tgp_impr_seq_30d_hp28x_f_product_id_v2" mergekey(tgp_impr_seq_30d_f_product_id_v2_,tgp_impr_seq_30d_28x_f_product_id_v2_) Categorical
+0806	770592	USER_CONTEXT	5366	"long_stay_time_uniq_hit_i2i_product" long_stay_time_uniq_hit_i2i_product_ Categorical
+0807	770626	USER_CONTEXT	5282	"saqem_imp_x_clk_mid_40d_hit_cnt" concat_typed(saqem_impr_mid_1d_hit_cnt2, saqem_clk_mid_40d_hit_cnt) Categorical
+0808	770521	GOODS	1503	"diff_min_group_price_n_avg_ordr_price_n10_new" dis2xf3_i(sub(i64(ITEM_CONTEXT.price),i64(GOODS.avg_ordr_price))) Categorical discrete_key=difference_avg_ordr_btwn_min_group_price_n10
+0809	770607	USER_CONTEXT	5375	"time_gap_view_trunc_seq_mmd_img_ic1_sim_top20" value2key_i(multi_const(str(log_with_base(div_num(k2v_f(list_key_diff{default_val=-10000}(extend(v2v_i(request_time_i), time_view_trunc_seq_mmd_img_ic1_sim_top20_)))))))) Categorical order=1 factor=1 divisor=60000 lwb_base=2.0 lwb_offset=1.0 multiplier=10
+0810	770584	USER_CONTEXT	5330	"qry_cnt_90d_match_cp_words" dis2xf_i(k2v_f(qry_cnt_90d_match_cp_words_)) Categorical discrete_key=qry_cnt_90d_match_cp_words
+0811	770591	USER_CONTEXT	5361	"long_impr_time_uniq_hit_i2i_product_diff" long_impr_time_uniq_hit_i2i_product_diff_ Categorical
+0812	770590	USER_CONTEXT	5355	"user_view_all_uniq_hit_i2i_product_mall_cnt" key_size_v3(key_distinct(long_view_product_uniq_hit_i2i_product_)) Categorical
+0813	770627	USER_CONTEXT	5300	"sag_siq_imp_clk_x_has_saq_x_timegap_dis2" concat_typed(samg_simq_last_rn_timegap_dis2, samg_samq_imp_1d_cnt2, samg_simq_imp_1d_cnt2, samg_samq_clk_1d_cnt2, samg_simq_clk_1d_cnt2) Categorical
+0814	770560	USER_CONTEXT	5309	"user_fav_g_x_asso_iid_cnt" key_size_v3(user_fav_goods_x_asso_iid_idx_) Categorical
+0815	770587	USER_CONTEXT	5350	"last_user_impr_mall_all_hit_i2im_index_gap" last_user_impr_mall_all_hit_i2im_index_gap_ Categorical
+0816	770570	USER_CONTEXT	5317	"click_side_info_cat1_hit_rank_idx_cut50" slice_v3_typed{start=0,end=50}(value2key_i(click_side_info_cat1_hit_rank_idx_)) Categorical
+0817	770568	USER_CONTEXT	5314	"goods_id_hit_dnn_goods_rele_score_v2" goods_id_hit_dnn_goods_rele_score_v2_ Categorical
+0818	770630	USER_CONTEXT	5307	"samq_imp_clk_x_samq_samg_imp_clk_raw" concat_typed(samq_imp_cnt_1d_2,samq_clk_cnt_1d_af_f_imp2,samg_samq_imp_1d_cnt2,samg_samq_clk_1d_cnt2) Categorical
+0819	770571	USER_CONTEXT	5319	"click_side_info_goods_hit_rank_idx_cut50" slice_v3_typed{start=0,end=50}(value2key_i(click_side_info_goods_hit_rank_idx_)) Categorical
+0820	770588	USER_CONTEXT	5351	"last_user_impr_mall_time_gap_all_hit_i2im" last_user_impr_mall_time_gap_all_hit_i2im_ Categorical
+0821	770459	USER_CONTEXT	5249	"goods_clk_cnt_seq_life_f_sg_" goods_clk_cnt_seq_life_f_sg_ Categorical
+0822	7704581	USER_CONTEXT	5243	"user_view_i2i_v5_f2f_idx_log_x_pagesn_fix" concat_typed(user_view_i2i_v5_f2f_idx_log_fix_, user_view_i2i_v5_f2f_pagesn_fix_) Categorical
+0823	770460	USER_CONTEXT	5250	"sg_gd_stay_7d" default_key_i(list_index_v2_typed(session_ups_stay_time_disc_,list_in_list_index_typed(session_gd_goods_ids_, same_goods_ids_))) Categorical default_key=-1
+0824	770471	USER_CONTEXT	5270	"user_his_buy_price_rec_b2b_diff_" key(user_his_buy_price_rec_b2b_diff_) max_length=600 Categorical
+0825	770468	USER_CONTEXT	5267	"goods_clk_cnt_seq_life_f_rec_b2b_" goods_clk_cnt_seq_life_f_rec_b2b_ Categorical
+0826	770470	USER_CONTEXT	5269	"user_history_buy_prices_f_rec_b2b_" dis2xf3_i(k2v_f(user_history_buy_prices_f_rec_b2b_)) Categorical discrete_key=new_price
+0827	770461	USER_CONTEXT	5251	"user_history_buy_prices_f_sg_" dis2xf3_i(k2v_f(user_history_buy_prices_f_sg_)) Categorical discrete_key=new_price
+0828	770462	USER_CONTEXT	5252	"user_his_buy_price_sg_diff_" key(user_his_buy_price_sg_diff_) max_length=600 Categorical
+0829	770472	USER_CONTEXT	5271	"user_gdclk_pagesn_x_pageelsn_6m_f_rec_b2b_" key(user_gdclk_pagesn_x_pageelsn_6m_f_rec_b2b_) max_length=600 Categorical
+0830	770473	USER_CONTEXT	5272	"user_gdclk_pagesn_x_pageelsn_6m_f_rec_b2b_x_tg" key(concat_typed(user_gdclk_pagesn_x_pageelsn_6m_f_rec_b2b_, user_gdclk_tgdiff_6m_f_rec_b2b_)) max_length=600 Categorical
+0831	7704561	USER_CONTEXT	5239	"long_stay_stimes_sum_f_f2f_fix_" long_stay_stimes_sum_f_f2f_fix_ Categorical
+0832	770467	USER_CONTEXT	5256	"user_view_mall_i2i_mid_idx_log_x_pagesn" concat_typed(user_view_mall_i2i_mid_idx_log, user_view_mall_i2i_mid_pagesn_) Categorical
+0833	770469	USER_CONTEXT	5268	"rec_b2b_gd_stay_7d" default_key_i(list_index_v2_typed(session_ups_stay_time_disc_,list_in_list_index_typed(session_gd_goods_ids_, rec_b2b_))) Categorical default_key=-1
+0834	770656	ITEM_CONTEXT	1500	"rele5_final_rele_level" i64(ITEM_CONTEXT.rele5_final_rele_level) Categorical
+0835	770657	ITEM_CONTEXT	1501	"rele5_final_rele_logits_dis" rele5_final_rele_logits_dis Categorical
+
+------------------------------------------------------------------------------------------------------------------------
+【creative 桶】共 14 个字段
+------------------------------------------------------------------------------------------------------------------------
+桶内序号	特征ID	USER_COM分区	USER_COM行号	字段语义
+0001	780110	CREATIVE	1336	"pre_release_coupon_nat_50log" pre_release_coupon_nat_50log_ Categorical
+0002	780111	CREATIVE	1339	"afcpn_price_v1_discount" afcpn_price_v1_discount_p100_ Categorical
+0003	780112	CREATIVE	1340	"afcpn_price_v2_discount" afcpn_price_v2_discount_p100_ Categorical
+0004	780113	CREATIVE	1341	"afcpn_price_v2_discount_x_cat_id" concat_typed(afcpn_price_v2_discount_p100_,i64(ITEM_CONTEXT.cat_id)) Categorical
+0005	780117	CREATIVE	1351	"afcpn_price_f2_discount_x_coupon" concat_typed(afcpn_price_f2_discount_p100_,value2key_i(pre_release_coupon_mao_)) Categorical
+0006	8001	CREATIVE	1305	"image_id" key(i64(image_id)) Categorical
+0007	8002	CREATIVE	1306	"is_generated" key(i64(is_generated)) Categorical
+0008	8003	CREATIVE	1307	"pic_id" key(hash(pic_id)) Categorical
+0009	8007	CREATIVE	1308	"unique_image_id" key(i64(unique_image_id)) Categorical
+0010	8310	CREATIVE	1355	"cpn_types" i64(CREATIVE.cpn_types) Categorical
+0011	500157	ITEM_CONTEXT	1489	"sku_acty_prcs_v2_prcpn_dis" default_key_i(sku_acty_prcs_v2_prcpn_dis_) Categorical default_key=-1
+0012	900137	QUERY	5919	"q2i_price_list_diff_v4" default_key_i(value2key_i(floor2{sig=0,f_down_bound=-100000000,f_up_bound=100000000}(dis_price{power=10,sig=1}(q_price_diff_v4)))) Categorical
+0013	8203	CREATIVE	1309	"pic_id_nat" i64(pic_id_nat) Categorical
+0014	8207	CREATIVE	1310	"unique_image_id_nat" i64(unique_image_id_nat) Categorical
+
+========================================================================================================================
+清单结束：共 1,234 个三桶输入字段。
+========================================================================================================================
