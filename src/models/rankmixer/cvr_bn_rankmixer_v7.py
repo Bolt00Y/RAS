@@ -2,11 +2,12 @@
 # RankMixer v7 基于 v3 升级：
 # 1. 完整保留 v3 的三桶语义分组、16 Token、两层 RankMixer、Gated Pooling、Bucket Cross、
 #    训练目标和 rm_out_v2 输出 scope，不引入 v4/v5/v6 的其他结构变化。
-# 2. 在 v3 Residual Fusion 得到的 context [B, 768] 与 rm_out_v2 之间新增门控残差 MLP Task Adapter：
-#    768 -> Dense(256) -> GELU2 -> Dense(768) -> LayerNorm -> sigmoid(gate) -> Residual Add -> LayerNorm。
-# 3. Task Adapter gate_logit 默认初始化为 -3.0，初始门控约 0.0474；从 v3 checkpoint 热启时，
-#    可使 v7 从已验证的 v3 表示附近开始训练。
-# 4. 默认配置新增 397,313 个固定稠密可训练参数；固定稠密参数从 95,809,126 增至 96,206,439。
+# 2. 保留 v3 的 rm_out_v2 作为 base_logit，并新增与 Base 对齐的并行深度任务头：
+#    768 -> 2048 -> 2048 -> 256 -> 1，每个隐藏层使用 BatchNorm + GELU2。
+# 3. 新任务头的 delta_out 权重与偏置默认零初始化，最终输出为 base_logit + delta_logit；
+#    因此初始化时严格保持 v3 主路径，同时避免旧版 Task Adapter 额外 Fusion LayerNorm 的扰动。
+# 4. 默认配置新增 6,304,769 个固定稠密可训练参数；固定稠密参数从 95,809,126
+#    增至 102,113,895。
 # 5. 本文件是 v7 的完整独立实现，不导入、不继承其他 RankMixer 版本。
 import os
 import math
@@ -164,13 +165,16 @@ class MLPModel(ModelBase):
         self.rm_use_bucket_cross = bool(_kwargs.get('rm_use_bucket_cross', True))
         self.rm_cross_gate_init = float(_kwargs.get('rm_cross_gate_init', -2.0))
 
-        # v7 gated residual MLP task adapter conf
-        self.rm_use_task_adapter = bool(_kwargs.get('rm_use_task_adapter', True))
-        self.rm_task_adapter_dim = int(_kwargs.get('rm_task_adapter_dim', 256))
-        self.rm_task_adapter_act = _kwargs.get('rm_task_adapter_act', 'gelu_2')
-        self.rm_task_adapter_gate_init = float(_kwargs.get('rm_task_adapter_gate_init', -3.0))
-        if self.rm_task_adapter_dim <= 0:
-            raise ValueError('rm_task_adapter_dim must be positive')
+        # v7 Base-aligned residual deep task head conf.
+        self.rm_use_deep_task_head = bool(_kwargs.get('rm_use_deep_task_head', True))
+        self.rm_deep_task_layers = [
+            int(value) for value in _kwargs.get('rm_deep_task_layers', [2048, 2048, 256])
+        ]
+        self.rm_deep_task_act = _kwargs.get('rm_deep_task_act', 'gelu_2')
+        self.rm_deep_task_use_bn = bool(_kwargs.get('rm_deep_task_use_bn', True))
+        self.rm_deep_task_zero_init = bool(_kwargs.get('rm_deep_task_zero_init', True))
+        if not self.rm_deep_task_layers or any(value <= 0 for value in self.rm_deep_task_layers):
+            raise ValueError('rm_deep_task_layers must contain positive dimensions')
 
         unsupported_buckets = {
             'coupon': self.fea_conf_obj.coupon_fea_map,
@@ -221,7 +225,8 @@ class MLPModel(ModelBase):
         logging.info(
             'Semantic-Cross RankMixer v7: fields=%s, bucket_tokens=%s, T=%d, H=%d, '
             'D=%d, L=%d, k=%d, token_proj_act=%s, senet=%s, gated_pool=%s, bucket_cross=%s, '
-            'task_adapter=%s, task_adapter_dim=%d, task_adapter_act=%s, task_adapter_gate_init=%f',
+            'deep_task_head=%s, deep_task_layers=%s, deep_task_act=%s, deep_task_use_bn=%s, '
+            'deep_task_zero_init=%s',
             field_counts,
             self.rm_bucket_token_counts,
             self.rm_token_num,
@@ -233,10 +238,11 @@ class MLPModel(ModelBase):
             self.use_senet,
             self.rm_use_gated_pool,
             self.rm_use_bucket_cross,
-            self.rm_use_task_adapter,
-            self.rm_task_adapter_dim,
-            self.rm_task_adapter_act,
-            self.rm_task_adapter_gate_init,
+            self.rm_use_deep_task_head,
+            self.rm_deep_task_layers,
+            self.rm_deep_task_act,
+            self.rm_deep_task_use_bn,
+            self.rm_deep_task_zero_init,
         )
 
         # dense 相关
@@ -808,8 +814,30 @@ class MLPModel(ModelBase):
         auc_summary = tf.summary.scalar(f'{mode}/auc', self[f'{mode}_auc'])
         loss_summary = tf.summary.scalar(f'{mode}/loss', self.loss)
         copc_summary = tf.summary.scalar(f'{mode}/copc', self[f'{mode}_copc'])
+        base_logit_rms_summary = tf.summary.scalar(
+            f'{mode}/rm_v7/base_logit_rms',
+            self[f'{mode}_base_logit_rms'],
+        )
+        delta_logit_rms_summary = tf.summary.scalar(
+            f'{mode}/rm_v7/delta_logit_rms',
+            self[f'{mode}_delta_logit_rms'],
+        )
+        delta_to_base_ratio_summary = tf.summary.scalar(
+            f'{mode}/rm_v7/delta_to_base_ratio',
+            self[f'{mode}_delta_to_base_ratio'],
+        )
 
-        self.eval_summary = tf.summary.merge([loss_summary, auc_summary, copc_summary], name='eval_summary')
+        self.eval_summary = tf.summary.merge(
+            [
+                loss_summary,
+                auc_summary,
+                copc_summary,
+                base_logit_rms_summary,
+                delta_logit_rms_summary,
+                delta_to_base_ratio_summary,
+            ],
+            name='eval_summary',
+        )
 
     def build_optimizer_op(self):
         """构建优化器操作，包括梯度计算和应用"""
@@ -1440,66 +1468,76 @@ class MLPModel(ModelBase):
             cross = tf.nn.sigmoid(gate_logit) * cross
         return cross
 
-    def _task_adapter(self, context, export):
-        """Gated residual MLP task adapter: [B,D] -> [B,A] -> [B,D]."""
-        if not self.rm_use_task_adapter:
-            return context
-
+    def _deep_task_delta(self, context, is_train, export):
+        """Base-aligned [2048,2048,256] tower that predicts a residual logit."""
         input_dim = context.shape[-1].value
         if input_dim is None:
-            raise ValueError('task adapter input dimension must be statically known')
+            raise ValueError('deep task head input dimension must be statically known')
         if input_dim != self.rm_hidden_dim:
             raise ValueError(
-                'task adapter input dimension={} must equal rm_hidden_dim={}'.format(
+                'deep task head input dimension={} must equal rm_hidden_dim={}'.format(
                     input_dim,
                     self.rm_hidden_dim,
                 )
             )
 
+        hidden = context
         with tf.variable_scope(
-            'rm_task_adapter',
+            'rm_deep_task_head',
             reuse=tf.AUTO_REUSE,
             partitioner=self.partitioner,
         ):
-            hidden = tf.contrib.layers.fully_connected(
-                inputs=context,
-                num_outputs=self.rm_task_adapter_dim,
-                activation_fn=self.get_act_func(self.rm_task_adapter_act),
-                weights_initializer=self.get_init(input_dim),
-                weights_regularizer=tf.contrib.layers.l2_regularizer(self.l2_deep),
-                biases_initializer=tf.zeros_initializer(),
-                scope='down_projection',
+            for layer_idx, layer_size in enumerate(self.rm_deep_task_layers):
+                layer_input_dim = hidden.shape[-1].value
+                if layer_input_dim is None:
+                    raise ValueError('deep task layer input dimension must be statically known')
+                hidden = tf.contrib.layers.fully_connected(
+                    inputs=hidden,
+                    num_outputs=layer_size,
+                    activation_fn=None,
+                    weights_initializer=self.get_init(layer_input_dim),
+                    weights_regularizer=tf.contrib.layers.l2_regularizer(self.l2_deep),
+                    biases_initializer=tf.zeros_initializer(),
+                    scope='mlp{}'.format(layer_idx),
+                )
+                if self.rm_deep_task_use_bn:
+                    hidden = ModelBase.batch_norm_layer_v2(
+                        x=hidden,
+                        train_phase=is_train,
+                        scope_bn='bn_{}'.format(layer_idx),
+                        batch_norm_decay=self.batch_norm_decay,
+                        use_riemann_bn=self.use_riemann_bn,
+                        export=export,
+                    )
+                hidden = self.get_act_func(self.rm_deep_task_act)(hidden)
+
+            output_dim = hidden.shape[-1].value
+            if output_dim is None:
+                raise ValueError('deep task output dimension must be statically known')
+            delta_initializer = (
+                tf.zeros_initializer()
+                if self.rm_deep_task_zero_init
+                else self.get_init(output_dim)
             )
-            residual = tf.contrib.layers.fully_connected(
+            delta_logit = tf.contrib.layers.fully_connected(
                 inputs=hidden,
-                num_outputs=self.rm_hidden_dim,
+                num_outputs=1,
                 activation_fn=tf.identity,
-                weights_initializer=self.get_init(self.rm_task_adapter_dim),
+                weights_initializer=delta_initializer,
                 weights_regularizer=tf.contrib.layers.l2_regularizer(self.l2_deep),
                 biases_initializer=tf.zeros_initializer(),
-                scope='up_projection',
-            )
-            residual = layer_norm(residual, name='residual_ln', export=export)
-            gate_logit = tf.get_variable(
-                'gate_logit',
-                shape=[],
-                initializer=tf.constant_initializer(self.rm_task_adapter_gate_init),
-            )
-            residual = tf.nn.sigmoid(gate_logit) * residual
-            adapted_context = layer_norm(
-                context + residual,
-                name='fusion_ln',
-                export=export,
+                scope='delta_out',
             )
 
         logging.info(
-            'RankMixer v7 task adapter: context=%s, hidden=%s, residual=%s, output=%s',
+            'RankMixer v7 deep task head: context=%s, layers=%s, hidden=%s, delta_logit=%s, zero_init=%s',
             context.get_shape(),
+            self.rm_deep_task_layers,
             hidden.get_shape(),
-            residual.get_shape(),
-            adapted_context.get_shape(),
+            delta_logit.get_shape(),
+            self.rm_deep_task_zero_init,
         )
-        return adapted_context
+        return delta_logit
 
     def model_fn(self, features, labels, timestamps=None, mode="train", export=False):
         del timestamps
@@ -1614,11 +1652,9 @@ class MLPModel(ModelBase):
                 with tf.variable_scope("rm_fusion_norm", reuse=tf.AUTO_REUSE):
                     context = layer_norm(context + cross_residual, name="ln", export=export)
 
-            context = self._task_adapter(context, export)
-
             with tf.device("/job:ps/task:0"):
-                # 保留 v3 输出 scope 和 [768,1] 形状，使已有 rm_out_v2 权重可以继续恢复。
-                output = tf.contrib.layers.fully_connected(
+                # 完整保留 v3 的线性输出路径。
+                base_logit = tf.contrib.layers.fully_connected(
                     inputs=context,
                     num_outputs=1,
                     activation_fn=tf.identity,
@@ -1627,13 +1663,29 @@ class MLPModel(ModelBase):
                     scope="rm_out_v2",
                 )
 
+            if self.rm_use_deep_task_head:
+                delta_logit = self._deep_task_delta(context, is_train, export)
+            else:
+                delta_logit = tf.zeros_like(base_logit, name='rm_deep_task_head_disabled')
+
+            # delta_out 默认零初始化，因此初始化时严格等价于 v3 的 base_logit 路径。
+            output = tf.add(base_logit, delta_logit, name='rm_v7_residual_logit')
+            base_logit_rms = tf.sqrt(tf.reduce_mean(tf.square(base_logit)) + 1e-8)
+            delta_logit_rms = tf.sqrt(tf.reduce_mean(tf.square(delta_logit)) + 1e-8)
+            self[f'{mode}_base_logit_rms'] = base_logit_rms
+            self[f'{mode}_delta_logit_rms'] = delta_logit_rms
+            self[f'{mode}_delta_to_base_ratio'] = delta_logit_rms / (base_logit_rms + 1e-8)
+
             logits = tf.clip_by_value(tf.reshape(output, shape=[-1], name=mode), -self.clip_val, self.clip_val)
             predictions = tf.sigmoid(logits, name=mode)
 
         logging.info(
-            "Semantic-Cross RankMixer v7 output: input_tokens=%s, hidden_tokens=%s, context=%s",
+            "Semantic-Cross RankMixer v7 output: input_tokens=%s, hidden_tokens=%s, context=%s, "
+            "base_logit=%s, delta_logit=%s",
             input_tokens.get_shape(),
             hidden_tokens.get_shape(),
             context.get_shape(),
+            base_logit.get_shape(),
+            delta_logit.get_shape(),
         )
         return {"logits": logits, "pred": predictions}
