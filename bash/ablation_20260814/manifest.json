@@ -1,0 +1,108 @@
+{
+  "title": "RankMixer 2026-08-14 dense-cold L-shaped bridge ablation",
+  "status": "pre_registered_not_submitted",
+  "submission_side_effects": false,
+  "protocol": {
+    "train_dates": "2026-08-14:2026-08-14",
+    "test_date": "2026-08-15:2026-08-15",
+    "additional_checkpoint_dates": "2026-08-13:2026-08-13",
+    "dense_checkpoint_ignored": true,
+    "dense_warmup": false,
+    "sparse_checkpoint_shared": true,
+    "checkpoint_import_dir": "hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint"
+  },
+  "primary_contrasts": [
+    {
+      "name": "width_at_v5_grouping",
+      "formula": "AUC(E2_RANDOM_D512) - AUC(E1_RANDOM_D1024)"
+    },
+    {
+      "name": "semantic_grouping_at_D512",
+      "formula": "AUC(E3_SEMANTIC_D512) - AUC(E2_RANDOM_D512)"
+    },
+    {
+      "name": "rankmixer_vs_base",
+      "formula": "AUC(best_of_E1_E2_E3) - AUC(E0_BASE)"
+    }
+  ],
+  "prediction_analysis": {
+    "tool": "src/models/rankmixer/tools/paired_auc_analysis.py",
+    "finalization_tool": "src/models/rankmixer/tools/finalize_ablation_report.py",
+    "input_columns": [
+      "search_id",
+      "example_id",
+      "label",
+      "prediction"
+    ],
+    "sample_integrity_gate": "per-search-hash-group counts, positives, XOR fingerprint, and SUM fingerprint",
+    "paired_inference": "delete-one-search-hash-group jackknife",
+    "official_point_metric": "production validator fst_CVR AUC",
+    "note": "The tool's histogram AUC is an approximation used for paired deltas and CI; do not replace the validator AUC in the final report."
+  },
+  "experiments": [
+    {
+      "train_dates": "2026-08-14:2026-08-14",
+      "test_date": "2026-08-15:2026-08-15",
+      "additional_checkpoint_dates": "2026-08-13:2026-08-13",
+      "checkpoint_import_dir": "hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint",
+      "dense_start": "cold",
+      "save_predictions": true,
+      "id": "E0_BASE",
+      "task_name": "abl0814_base_dcnm",
+      "file": "00-base-dcnm-args.txt",
+      "module": "models.seq_model.cvr_bn_senet_dcnm_fst.MLPModel",
+      "grouping": null,
+      "hidden_dim": null,
+      "dense_params": 90341785,
+      "role": "same-day absolute anchor"
+    },
+    {
+      "train_dates": "2026-08-14:2026-08-14",
+      "test_date": "2026-08-15:2026-08-15",
+      "additional_checkpoint_dates": "2026-08-13:2026-08-13",
+      "checkpoint_import_dir": "hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint",
+      "dense_start": "cold",
+      "save_predictions": true,
+      "id": "E1_RANDOM_D1024",
+      "task_name": "abl0814_rm_random_d1024",
+      "file": "10-rm-v5-balanced-random-d1024-args.txt",
+      "module": "models.rankmixer.cvr_bn_rankmixer_v5.MLPModel",
+      "grouping": "v5 frozen balanced hash grouping",
+      "hidden_dim": 1024,
+      "dense_params": 348432486,
+      "role": "upper-left endpoint of the bridge"
+    },
+    {
+      "train_dates": "2026-08-14:2026-08-14",
+      "test_date": "2026-08-15:2026-08-15",
+      "additional_checkpoint_dates": "2026-08-13:2026-08-13",
+      "checkpoint_import_dir": "hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint",
+      "dense_start": "cold",
+      "save_predictions": true,
+      "id": "E2_RANDOM_D512",
+      "task_name": "abl0814_rm_random_d512",
+      "file": "11-rm-v5-balanced-random-d512-args.txt",
+      "module": "models.rankmixer.cvr_bn_rankmixer_v5.MLPModel",
+      "grouping": "v5 frozen balanced hash grouping",
+      "hidden_dim": 512,
+      "dense_params": 177217126,
+      "role": "width-only bridge; new args-only arm"
+    },
+    {
+      "train_dates": "2026-08-14:2026-08-14",
+      "test_date": "2026-08-15:2026-08-15",
+      "additional_checkpoint_dates": "2026-08-13:2026-08-13",
+      "checkpoint_import_dir": "hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint",
+      "dense_start": "cold",
+      "save_predictions": true,
+      "id": "E3_SEMANTIC_D512",
+      "task_name": "abl0814_rm_semantic_d512",
+      "file": "12-rm-v6-semantic-d512-args.txt",
+      "module": "models.rankmixer.cvr_bn_rankmixer_v6.MLPModel",
+      "grouping": "v6 frozen semantic-balanced grouping",
+      "hidden_dim": 512,
+      "dense_params": 177217126,
+      "role": "grouping-only endpoint of the bridge"
+    }
+  ]
+}

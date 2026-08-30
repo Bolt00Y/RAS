@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "batch_id": "rankmixer_first_batch_20260814",
+  "purpose": "decompose_v6_and_v10",
+  "train_date": "2026-08-14",
+  "test_date": "2026-08-15",
+  "dense_start": "cold_start",
+  "shared_controls": {
+    "feature_version": "data.cvr.cvr_fea_v10_base_cold",
+    "embedding_size": 17,
+    "optimizer": "flood_adam",
+    "learning_rate": 0.00002,
+    "batch_size": 2048,
+    "epochs": 1,
+    "ignore_dense_checkpoint": true,
+    "ignore_sparse_checkpoint": false,
+    "save_predict_result": true
+  },
+  "experiments": [
+    {
+      "id": "E0_BASE",
+      "role": "same_day_endpoint_anchor",
+      "module": "models.seq_model.cvr_bn_senet_dcnm_fst.MLPModel",
+      "args_file": "00-e0-base-args.txt",
+      "expected_dense_params": 90341785,
+      "expected_extended_flops_per_sample": 180923051
+    },
+    {
+      "id": "E1_V6",
+      "role": "v6_anchor",
+      "module": "models.rankmixer.cvr_bn_rankmixer_v6.MLPModel",
+      "args_file": "01-e1-v6-args.txt",
+      "expected_dense_params": 177217126,
+      "expected_extended_flops_per_sample": 358638942
+    },
+    {
+      "id": "E2_TML_FLAT_RMS",
+      "role": "readout_bridge",
+      "module": "models.rankmixer.cvr_bn_rankmixer_v6_e2.MLPModel",
+      "args_file": "02-e2-tml-flat-rms-args.txt",
+      "rm_norm_type": "rms_norm",
+      "expected_dense_params": 176799333,
+      "expected_extended_flops_per_sample": 353811199
+    },
+    {
+      "id": "E3_V10_BUDGET",
+      "role": "norm_bridge",
+      "module": "models.rankmixer.cvr_bn_rankmixer_v6_e3.MLPModel",
+      "args_file": "03-e3-v10-budget-args.txt",
+      "rm_norm_type": "layer_norm",
+      "expected_dense_params": 176708197,
+      "expected_extended_flops_per_sample": 354204415
+    }
+  ],
+  "pre_registered_contrasts": [
+    {
+      "name": "readout_bundle",
+      "left": "E2_TML_FLAT_RMS",
+      "right": "E1_V6",
+      "delta": "AUC(left)-AUC(right)",
+      "allowed_interpretation": "PureFlat+narrow-head versus enhanced-readout+wide-head under a matched total parameter budget",
+      "forbidden_interpretation": "Q/K pooling alone"
+    },
+    {
+      "name": "norm_only",
+      "left": "E3_V10_BUDGET",
+      "right": "E2_TML_FLAT_RMS",
+      "delta": "AUC(left)-AUC(right)",
+      "changed_model_arg_keys": [
+        "rm_norm_type"
+      ],
+      "entrypoint_change_is_naming_only": true,
+      "allowed_interpretation": "all five normalization sites changed from v6 RMSNorm to v10 LayerNorm"
+    }
+  ],
+  "non_causal_endpoint_comparison": {
+    "left": "best_of_E1_E2_E3_by_pre_registered_rule",
+    "right": "E0_BASE",
+    "purpose": "report end-to-end position only"
+  }
+}

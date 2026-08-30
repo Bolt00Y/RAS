@@ -1,0 +1,5 @@
+experiment_id,train_date,test_date,dense_start,git_commit,task_id,model_dir,checkpoint_import_dir,additional_checkpoint_date,dense_params,train_wall_time_min,step_time_ms,peak_memory_gb,auc,copc,pr_auc,bucket_error,prediction_path,status,notes
+E0_BASE,2026-08-14,2026-08-15,cold,,,,hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint,2026-08-13,90341785,,,,,,,,,not_run,
+E1_RANDOM_D1024,2026-08-14,2026-08-15,cold,,,,hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint,2026-08-13,348432486,,,,,,,,,not_run,
+E2_RANDOM_D512,2026-08-14,2026-08-15,cold,,,,hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint,2026-08-13,177217126,,,,,,,,,not_run,
+E3_SEMANTIC_D512,2026-08-14,2026-08-15,cold,,,,hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint,2026-08-13,177217126,,,,,,,,,not_run,
