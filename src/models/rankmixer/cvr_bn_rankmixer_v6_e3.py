@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-# RankMixer v6-E3：v6-E2 全链路改用 LayerNorm 的完整独立实现。
+# RankMixer v6-E3：修正后的 v6-E2 全链路改用 LayerNorm 的严格单变量 Norm 消融。
 # 1. 输入塔保持 Base/v6 的三桶 BN、Hierarchical SENet 和冻结的 31 组语义字段映射。
 # 2. 31 个 Local Token 与 1 个 Global Token 均投影为 D=512；投影后、两个 RankMixer
 #    Block 的 PreNorm 位置以及最终输出全部使用 v10 标准 LayerNorm。
 # 3. 主干保持 H=T=32、L=2、Mixing/Reverting 和 M=704 的双 Per-token SwiGLU。
 # 4. 删除 Global-conditioned Pool、压缩 Flatten、scalar gate 和所有读出分支；最终
-#    [B,32,512] 直接展平为 [B,16384]，进入 [896,896,256] 单任务头。
-# 5. 固定 Dense 可训练参数量为 176,708,197；不包含稀疏 Embedding 表、优化器状态、
+#    [B,32,512] 直接展平为 [B,16384]，进入与 E2 相同的 [2048,2048,256] 单任务头。
+# 5. Dense 可训练参数量为 199,275,877；该数值仅用于防止实现漂移，不作为实验约束；
+#    不包含稀疏 Embedding 表、优化器状态、
 #    指标变量和 BN moving statistics。
 # 6. 本文件是完整独立实现，不导入、不继承任何旧 RankMixer Python 实现。
 import os
@@ -39,8 +40,7 @@ from utils import learning_rate as learning_rate_utils
 class MLPModel(ModelBase):
     _BUCKET_NAMES = ('common', 'item', 'creative')
     _EXPECTED_FIELD_COUNTS = (385, 835, 14)
-    _EXPECTED_DENSE_TRAINABLE_PARAMS = 176708197
-    _DENSE_TRAINABLE_PARAM_LIMIT = 178000000
+    _EXPECTED_DENSE_TRAINABLE_PARAMS = 199275877
     _GROUP_VERSION = 'rankmixer_v6_semantic_balanced_v1'
     _GROUP_CHECKSUMS = {
         'common': '61602847a993a6103b9c21b4d6ff2d1817a848d8717e7b201eea4be6fc29bda3',
@@ -154,7 +154,7 @@ class MLPModel(ModelBase):
         self.use_senet_bn = _kwargs.get('use_senet_bn', False)
 
         # cvr model conf
-        self.cvr_layers = [int(value) for value in _kwargs.get('cvr_layers', [896, 896, 256])]
+        self.cvr_layers = [int(value) for value in _kwargs.get('cvr_layers', [2048, 2048, 256])]
         if not self.cvr_layers or any(value <= 0 for value in self.cvr_layers):
             raise ValueError('cvr_layers must contain positive dimensions')
         self.opt_goal = _kwargs.get('opt_goal', 'first_cvr')
@@ -289,8 +289,8 @@ class MLPModel(ModelBase):
                     tuple(field_counts),
                 )
             )
-        if self.cvr_layers != [896, 896, 256]:
-            raise ValueError('RankMixer v6-E3 requires cvr_layers=[896, 896, 256]')
+        if self.cvr_layers != [2048, 2048, 256]:
+            raise ValueError('RankMixer v6-E3 requires cvr_layers=[2048, 2048, 256]')
         if not self.use_senet or not self.use_senet_bn or not self.batch_norm:
             raise ValueError(
                 'RankMixer v6-E3 requires use_senet/use_senet_bn/batch_norm all true'
@@ -311,13 +311,6 @@ class MLPModel(ModelBase):
                     self.rm_expected_dense_trainable_params,
                 )
             )
-        if self.rm_dense_trainable_param_count >= self._DENSE_TRAINABLE_PARAM_LIMIT:
-            raise ValueError(
-                'RankMixer v6-E3 dense trainable parameters must remain below {}'.format(
-                    self._DENSE_TRAINABLE_PARAM_LIMIT
-                )
-            )
-
         logging.info(
             'RankMixer v6-E3: group_version=%s, fields=%s, local_bucket_tokens=%s, '
             'T=%d, H=%d, D=%d, L=%d, swiglu_hidden=%d, down_init_scale=%s, '
@@ -399,7 +392,7 @@ class MLPModel(ModelBase):
 
     @staticmethod
     def _build_semantic_feature_groups():
-        """Return the frozen v10 semantic-balanced field groups."""
+        """Return the frozen v6 semantic-balanced field groups."""
         # Runtime never hashes or reshuffles fields. Token order and membership are model ABI.
         return {
             'common': [
@@ -1521,7 +1514,7 @@ class MLPModel(ModelBase):
         return common_out, item_out, creative_out
 
     def _rm_norm(self, inputs, scope, export, per_token):
-        """Fixed v10 LayerNorm path; per_token is implicit in the input rows."""
+        """Fixed v10 LayerNorm path; legacy v6 scope labels are retained for control parity."""
         del per_token
         return layer_norm(inputs, name=scope, export=export)
 
@@ -1607,7 +1600,7 @@ class MLPModel(ModelBase):
             local_tokens = tf.stack(tokens, axis=1)
             local_tokens = self._rm_norm(
                 local_tokens,
-                scope='local_token_norm',
+                scope='local_token_rms_norm',
                 export=export,
                 per_token=True,
             )
@@ -1657,7 +1650,7 @@ class MLPModel(ModelBase):
             )
             global_token = self._rm_norm(
                 global_token,
-                scope='norm',
+                scope='rms_norm',
                 export=export,
                 per_token=False,
             )
@@ -1697,7 +1690,7 @@ class MLPModel(ModelBase):
         return mixed
 
     def _rm_revert_tokens(self, mixed):
-        """Exact inverse of _rm_mix_tokens for the v10 H=T layout."""
+        """Exact inverse of _rm_mix_tokens for the v6 H=T layout."""
         head_num = mixed.shape[1].value
         mixed_dim = mixed.shape[2].value
         head_dim = self.rm_hidden_dim // self.rm_head_num
@@ -1789,7 +1782,7 @@ class MLPModel(ModelBase):
             mixed = self._rm_mix_tokens(inputs)
             mixed_norm = self._rm_norm(
                 mixed,
-                scope='mixed_norm',
+                scope='mixed_rms_norm',
                 export=export,
                 per_token=True,
             )
@@ -1802,7 +1795,7 @@ class MLPModel(ModelBase):
             reverted = self._rm_revert_tokens(mixed_hidden)
             original_norm = self._rm_norm(
                 reverted,
-                scope='original_norm',
+                scope='original_rms_norm',
                 export=export,
                 per_token=True,
             )
@@ -1831,7 +1824,7 @@ class MLPModel(ModelBase):
         return output
 
     def _task_head(self, context, is_train, export):
-        """Parameter-matched [896,896,256] single-task prediction tower."""
+        """Base-aligned [2048,2048,256] single-task prediction tower."""
         hidden = context
         for layer_idx, layer_size in enumerate(self.cvr_layers):
             input_dim = hidden.shape[-1].value
@@ -1843,13 +1836,13 @@ class MLPModel(ModelBase):
                 activation_fn=None,
                 weights_initializer=self.get_init(input_dim),
                 biases_initializer=tf.zeros_initializer(),
-                scope='rm_v6_ablation_mlp{}'.format(layer_idx),
+                scope='rm_v5_mlp{}'.format(layer_idx),
             )
             if self.batch_norm:
                 hidden = ModelBase.batch_norm_layer_v2(
                     x=hidden,
                     train_phase=is_train,
-                    scope_bn='rm_v6_ablation_bn_{}'.format(layer_idx),
+                    scope_bn='rm_v5_bn_{}'.format(layer_idx),
                     batch_norm_decay=self.batch_norm_decay,
                     use_riemann_bn=self.use_riemann_bn,
                     export=export,
@@ -1863,7 +1856,7 @@ class MLPModel(ModelBase):
                 activation_fn=tf.identity,
                 weights_initializer=self.get_init(hidden.shape[-1].value),
                 biases_initializer=tf.zeros_initializer(),
-                scope='rm_v6_ablation_out',
+                scope='rm_v5_out',
             )
         return output
 
@@ -1989,7 +1982,7 @@ class MLPModel(ModelBase):
             hidden_tokens = self._rm_stack(input_tokens, export)
             final_tokens = self._rm_norm(
                 hidden_tokens,
-                scope='rm_final_norm',
+                scope='rm_final_rms_norm',
                 export=export,
                 per_token=True,
             )

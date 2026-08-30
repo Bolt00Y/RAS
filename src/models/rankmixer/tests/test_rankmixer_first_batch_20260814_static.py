@@ -17,11 +17,11 @@ CONFIG_PATHS = {
     'E0_BASE': BATCH_DIR / '00-e0-base-args.txt',
     'E1_V6': BATCH_DIR / '01-e1-v6-args.txt',
     'E2_TML_FLAT_RMS': BATCH_DIR / '02-e2-tml-flat-rms-args.txt',
-    'E3_V10_BUDGET': BATCH_DIR / '03-e3-v10-budget-args.txt',
+    'E3_FLAT_LN': BATCH_DIR / '03-e3-flat-ln-args.txt',
 }
 TOP_LEVEL_CONFIG_PATHS = {
     'E2_TML_FLAT_RMS': ROOT / 'bash/set-rankmixer-v6-e2-args.txt',
-    'E3_V10_BUDGET': ROOT / 'bash/set-rankmixer-v6-e3-args.txt',
+    'E3_FLAT_LN': ROOT / 'bash/set-rankmixer-v6-e3-args.txt',
 }
 
 
@@ -133,7 +133,7 @@ def _parameter_total(norm_type):
 
     task_head = 0
     previous = token_num * hidden_dim
-    for width in (896, 896, 256):
+    for width in (2048, 2048, 256):
         task_head += previous * width + width + 2 * width
         previous = width
     task_head += previous + 1
@@ -176,9 +176,9 @@ def _extended_flops(norm_type):
     mixer = mixer_layers * (2 * one_stage + 2 * token_num * hidden_dim)
     final_norm = token_num * norm_flops
     task_head = (
-        2 * (token_num * hidden_dim) * 896 + 4 * 896 + 9 * 896
-        + 2 * 896 * 896 + 4 * 896 + 9 * 896
-        + 2 * 896 * 256 + 4 * 256 + 9 * 256
+        2 * (token_num * hidden_dim) * 2048 + 4 * 2048 + 9 * 2048
+        + 2 * 2048 * 2048 + 4 * 2048 + 9 * 2048
+        + 2 * 2048 * 256 + 4 * 256 + 9 * 256
         + 2 * 256 + 1
     )
     return sum([
@@ -292,20 +292,20 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
         _, _, e3_class = _model_ast(E3_MODEL_PATH)
         self.assertEqual(
             _class_literal(e2_class, '_EXPECTED_DENSE_TRAINABLE_PARAMS'),
-            176799333,
+            199367013,
         )
         self.assertEqual(
             _class_literal(e3_class, '_EXPECTED_DENSE_TRAINABLE_PARAMS'),
-            176708197,
+            199275877,
         )
-        self.assertEqual(_parameter_total('rms_norm'), 176799333)
-        self.assertEqual(_parameter_total('layer_norm'), 176708197)
+        self.assertEqual(_parameter_total('rms_norm'), 199367013)
+        self.assertEqual(_parameter_total('layer_norm'), 199275877)
         self.assertEqual(
             _parameter_total('layer_norm') - _parameter_total('rms_norm'),
             -91136,
         )
-        self.assertEqual(_extended_flops('rms_norm'), 353811199)
-        self.assertEqual(_extended_flops('layer_norm'), 354204415)
+        self.assertEqual(_extended_flops('rms_norm'), 398962687)
+        self.assertEqual(_extended_flops('layer_norm'), 399355903)
 
     def test_norm_paths_are_fixed_and_cannot_be_misconfigured(self):
         e2_source, _, e2_class = _model_ast(E2_MODEL_PATH)
@@ -393,11 +393,21 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
                 source,
                 _method(model_class, '__init__'),
             )
-            self.assertIn('self.cvr_layers != [896, 896, 256]', init_source)
+            self.assertIn('self.cvr_layers != [2048, 2048, 256]', init_source)
+            self.assertNotIn('_DENSE_TRAINABLE_PARAM_LIMIT', source)
+
+            task_head_source = ast.get_source_segment(
+                source,
+                _method(model_class, '_task_head'),
+            )
+            for v6_scope in ('rm_v5_mlp', 'rm_v5_bn_', 'rm_v5_out'):
+                self.assertIn(v6_scope, task_head_source)
+            self.assertNotIn('rm_v6_ablation_', task_head_source)
+            self.assertIn("scope='rm_final_rms_norm'", model_fn_source)
 
     def test_e2_e3_server_args_have_only_intended_differences(self):
         e2 = _load_config(CONFIG_PATHS['E2_TML_FLAT_RMS'])
-        e3 = _load_config(CONFIG_PATHS['E3_V10_BUDGET'])
+        e3 = _load_config(CONFIG_PATHS['E3_FLAT_LN'])
         self.assertEqual(
             e2['module'],
             'models.rankmixer.cvr_bn_rankmixer_v6_e2.MLPModel',
@@ -419,8 +429,8 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
             CONFIG_PATHS['E2_TML_FLAT_RMS'].read_bytes(),
         )
         self.assertEqual(
-            TOP_LEVEL_CONFIG_PATHS['E3_V10_BUDGET'].read_bytes(),
-            CONFIG_PATHS['E3_V10_BUDGET'].read_bytes(),
+            TOP_LEVEL_CONFIG_PATHS['E3_FLAT_LN'].read_bytes(),
+            CONFIG_PATHS['E3_FLAT_LN'].read_bytes(),
         )
 
     def test_all_four_jobs_share_outer_data_controls(self):
@@ -476,7 +486,7 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
         for key in frozen_core_keys:
             self.assertEqual(e1[key], e2[key], key)
         self.assertEqual(e1['cvr_layers'], [2048, 2048, 256])
-        self.assertEqual(e2['cvr_layers'], [896, 896, 256])
+        self.assertEqual(e2['cvr_layers'], [2048, 2048, 256])
         self.assertEqual(e2['rm_readout_type'], 'pure_flat')
         for removed_readout_arg in (
             'rm_pool_query_dim',
@@ -485,6 +495,18 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
         ):
             self.assertIn(removed_readout_arg, e1)
             self.assertNotIn(removed_readout_arg, e2)
+
+        _, _, v6_class = _model_ast(V6_MODEL_PATH)
+        _, _, e2_class = _model_ast(E2_MODEL_PATH)
+        _, _, e3_class = _model_ast(E3_MODEL_PATH)
+        self.assertEqual(
+            _normalized_method_dump(v6_class, '_task_head'),
+            _normalized_method_dump(e2_class, '_task_head'),
+        )
+        self.assertEqual(
+            _normalized_method_dump(e2_class, '_task_head'),
+            _normalized_method_dump(e3_class, '_task_head'),
+        )
 
     def test_manifest_and_introduce_design_match_implementation(self):
         manifest = json.loads(MANIFEST_PATH.read_text(encoding='utf-8'))
@@ -499,16 +521,16 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
             'models.rankmixer.cvr_bn_rankmixer_v6_e2.MLPModel',
         )
         self.assertEqual(
-            experiments['E3_V10_BUDGET']['module'],
+            experiments['E3_FLAT_LN']['module'],
             'models.rankmixer.cvr_bn_rankmixer_v6_e3.MLPModel',
         )
         self.assertEqual(
             experiments['E2_TML_FLAT_RMS']['expected_dense_params'],
-            176799333,
+            199367013,
         )
         self.assertEqual(
-            experiments['E3_V10_BUDGET']['expected_dense_params'],
-            176708197,
+            experiments['E3_FLAT_LN']['expected_dense_params'],
+            199275877,
         )
 
         design = DESIGN_PATH.read_text(encoding='utf-8')
@@ -517,8 +539,8 @@ class RankMixerFirstBatchStaticTest(unittest.TestCase):
             '2026-08-15',
             'cvr_bn_rankmixer_v6_e2.py',
             'cvr_bn_rankmixer_v6_e3.py',
-            '176,799,333',
-            '176,708,197',
+            '199,367,013',
+            '199,275,877',
             'ignore_dense_checkpoint=True',
         ):
             self.assertIn(required, design)

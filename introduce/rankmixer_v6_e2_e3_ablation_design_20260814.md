@@ -1,10 +1,12 @@
 # RankMixer v6-E2/E3 消融实验设计与服务器运行说明
 
+> **日报摘要：** 本次完成 v6→v10 第一批严格消融实验改造。E2 在保持 v6 Core、RMSNorm 和 `[2048,2048,256]` 任务塔不变的前提下，仅将增强 Readout 替换为 PureFlat；E3 在 E2 基础上仅将 RMSNorm 替换为 LayerNorm。训练统一采用 `2026-08-14` 数据进行 Dense 冷启动，参数量只用于记录和实现校验，不作为实验控制条件。
+>
 > 状态：E2/E3 两份完整独立模型及服务器参数已实现；未在本地训练。
 >
 > 训练：`2026-08-14` Dense 随机冷启动；测试：`2026-08-15`。
 >
-> 目标：用最少的两个桥接点回答“v10 相对 v6 到底改变了什么”，而不是直接比较两个同时跨越 Norm、读出和任务头容量的完整方案。
+> 目标：用两个严格单变量桥接点拆解 v6→v10：E1→E2 只替换完整 Readout，E2→E3 只替换 Norm。参数量只记录，不作为控制条件。
 
 ## 1. 四个任务分别是什么
 
@@ -12,8 +14,8 @@
 |---|---|---:|---|
 | E0_BASE | 现有 `SENet + 2×DCNM500 + MLP` Base | 90,341,785 | 同日端到端绝对锚点 |
 | E1_V6 | 现有 `cvr_bn_rankmixer_v6` | 177,217,126 | v6 结构锚点 |
-| E2_TML_FLAT_RMS | v6 TokenMixer-Large Core + RMSNorm + PureFlat-896 | 176,799,333 | 读出桥接点 |
-| E3_V10_BUDGET | E2 全链路 RMSNorm→LayerNorm | 176,708,197 | Norm 桥接点，即参数匹配 v10 |
+| E2_TML_FLAT_RMS | v6 TokenMixer-Large Core + RMSNorm + PureFlat，任务塔保持 2048 | 199,367,013 | Readout-only 桥接点 |
+| E3_FLAT_LN | E2 全链路 RMSNorm→LayerNorm，任务塔保持 2048 | 199,275,877 | Norm-only 桥接点，即 v10 结构端点 |
 
 本轮只需要新增并同时提交 E2、E3。E0/E1 已有完全相同训练日、测试日、特征和 Dense 冷启动口径的结果，直接作为既有对照，不重复训练。
 
@@ -53,7 +55,7 @@ E0～E3 的服务器控制变量统一为：
 
 Base 与 RankMixer 的网络结构本来就不同，因此 E1−E0 只能用于端到端位置判断，不是单因素模块消融。
 
-## 3. E1 → E2：改变整套读出与任务头容量分配
+## 3. E1 → E2：只替换完整 Readout 接口
 
 ### 3.1 E1 v6 保留什么
 
@@ -83,10 +85,10 @@ E2 保留 E1 的字段、SENet、Token、Global Token、两个 Block、Mixing/Re
 ```text
 [B,32,512]
 → 固定 Token 顺序直接 Flatten 为 [B,16384]
-→ 896 → 896 → 256 → 1
+→ 2048 → 2048 → 256 → 1
 ```
 
-前三个 FC 后仍使用与 v10 一致的 Task BatchNorm 和 GELU2。任务头共 15,718,657 个参数，其中包括三层 BN 的 4,096 个 trainable `gamma/beta`。
+三个 FC 后仍使用与 v6/v10 一致的 Task BatchNorm 和 GELU2。任务头共 38,286,337 个参数，其中包括三层 BN 的 8,704 个 trainable `gamma/beta`。任务塔隐藏层宽度、BN、激活、初始化和输出层均与 E1 保持一致；第一层输入维度由 Readout 输出接口自然决定。
 
 E2 明确删除：
 
@@ -99,14 +101,14 @@ E2 明确删除：
 参数变化：
 
 ```text
-E2 − E1 = 176,799,333 − 177,217,126 = −417,793（−0.236%）
+E2 − E1 = 199,367,013 − 177,217,126 = +22,149,887（+12.499%）
 ```
 
-这已经足够接近等参数，但解释必须写成：
+该参数变化不是实验控制目标，而是完整 Readout 输出从 1536 维变为 16384 维后，任务塔第一层权重形状变化的自然结果。解释必须写成：
 
-> “PureFlat + 896 窄塔”与“v6 增强读出 + 2048 宽塔”的整体读出/容量分配效应。
+> 在固定 v6 Core、RMSNorm 和 `[2048,2048,256]` 任务塔配置时，将完整增强 Readout 替换为 PureFlat 的端到端效应。
 
-不能写成“Q/K Pool 的独立效应”，因为任务头宽度也随参数预算一起改变。若要单独识别 Pool，至少还需要额外桥接任务，本批不做。
+不能写成“Q/K Pool 的独立效应”或“排除容量后的纯 Readout 机制效应”，因为本实验替换的是包含输出接口在内的整套 Readout。若要单独识别 Pool，需另做同输出维度的专门实验，本批不做。
 
 ## 4. E2 → E3：只改变 Norm
 
@@ -139,21 +141,21 @@ E3: "rm_norm_type":"layer_norm"
 
 ## 5. E3 与当前完整 v10 的关系
 
-E3 不是当前 199,275,877 参数的完整 v10。二者的 Token、LayerNorm、Block 和 PureFlat 完全一致，只是任务头不同：
+修正后的 E3 使用 `PureFlat + LayerNorm + [2048,2048,256]`，Dense 参数为 199,275,877，因此在算法拓扑、张量维度和参数量上已经到达当前完整 v10 端点：
 
 ```text
-E3 v10-Budget：16384 → 896  → 896  → 256 → 1
-当前完整 v10：16384 → 2048 → 2048 → 256 → 1
+E3：        16384 → 2048 → 2048 → 256 → 1
+当前 v10： 16384 → 2048 → 2048 → 256 → 1
 ```
 
-完整 v10 比 E3 多 22,567,680 个 Dense 参数。它不进入第一批；只有 E3 证明参数匹配 v10 至少不落后时，后续才运行完整 v10，以 `完整v10−E3` 单独回答任务头容量是否值得。
+E3 为了保证消融链路可审计，保留了 v6 的语义分组版本标签和部分 legacy variable scope；v10 使用不同的命名标签，但冻结字段 checksum、前向计算和 Dense 冷启动结构一致。因而无需再安排一个“扩宽任务塔”的补充任务。
 
 ## 6. 预注册比较与允许结论
 
 ### 6.1 两个主消融
 
 ```text
-C1  Readout bundle：AUC(E2) − AUC(E1)
+C1  Readout only：  AUC(E2) − AUC(E1)
 C2  Norm only：     AUC(E3) − AUC(E2)
 ```
 
@@ -182,7 +184,7 @@ C2  Norm only：     AUC(E3) − AUC(E2)
 
 只检查工程正确性，不用预检 AUC 选模型：
 
-1. E2/E3 图上 Dense 参数分别为 `176,799,333 / 176,708,197`；
+1. E2/E3 图上 Dense 参数分别为 `199,367,013 / 199,275,877`；
 2. E2 日志固定为 RMSNorm、E3 固定为 LayerNorm，且各自图参数断言通过；
 3. E2/E3 Dense 均为随机初始化，Sparse 来源与既有 E0/E1 一致；
 4. 无 NaN、OOM、变量未更新或错误 restore；
@@ -199,14 +201,14 @@ E2/E3 使用同一代码 commit、同一文件列表和同一集群规格并尽�
 |---|---|---|---:|---:|---:|---:|---:|---:|---|---|
 | E0_BASE |  |  | 90,341,785 |  |  |  |  |  |  |  |
 | E1_V6 |  |  | 177,217,126 |  |  |  |  |  |  |  |
-| E2_TML_FLAT_RMS |  |  | 176,799,333 |  |  |  |  |  |  |  |
-| E3_V10_BUDGET |  |  | 176,708,197 |  |  |  |  |  |  |  |
+| E2_TML_FLAT_RMS |  |  | 199,367,013 |  |  |  |  |  |  |  |
+| E3_FLAT_LN |  |  | 199,275,877 |  |  |  |  |  |  |  |
 
 主结果表：
 
 | 对比 | ΔAUC | paired 95% CI | 判定 | 允许的解释 |
 |---|---:|---|---|---|
-| E2−E1 |  |  |  | 读出/任务头容量分配组合效应 |
+| E2−E1 |  |  |  | 固定任务塔宽度后的完整 Readout 接口替换效应 |
 | E3−E2 |  |  |  | 全链路 Norm-only 效应 |
 
 ## 9. 已实现文件
@@ -217,8 +219,8 @@ E2/E3 使用同一代码 commit、同一文件列表和同一集群规格并尽�
 - E0：[`00-e0-base-args.txt`](../bash/rankmixer_first_batch_20260814/00-e0-base-args.txt)
 - E1：[`01-e1-v6-args.txt`](../bash/rankmixer_first_batch_20260814/01-e1-v6-args.txt)
 - E2：[`02-e2-tml-flat-rms-args.txt`](../bash/rankmixer_first_batch_20260814/02-e2-tml-flat-rms-args.txt)
-- E3：[`03-e3-v10-budget-args.txt`](../bash/rankmixer_first_batch_20260814/03-e3-v10-budget-args.txt)
+- E3：[`03-e3-flat-ln-args.txt`](../bash/rankmixer_first_batch_20260814/03-e3-flat-ln-args.txt)
 - E2 顶层启动参数：[`set-rankmixer-v6-e2-args.txt`](../bash/set-rankmixer-v6-e2-args.txt)
 - E3 顶层启动参数：[`set-rankmixer-v6-e3-args.txt`](../bash/set-rankmixer-v6-e3-args.txt)
 
-静态 FLOPs 估计沿用仓库现有扩展口径：E2 约 `353,811,199`、E3 约 `354,204,415` FLOPs/样本。FLOPs 不包含 Sparse lookup、反向、参数服务器通信和内存搬运，最终成本判断以服务器 step time、吞吐和峰值内存为准。
+静态 FLOPs 估计沿用仓库现有扩展口径：E2 约 `398,962,687`、E3 约 `399,355,903` FLOPs/样本。FLOPs 不包含 Sparse lookup、反向、参数服务器通信和内存搬运，最终成本判断以服务器 step time、吞吐和峰值内存为准。

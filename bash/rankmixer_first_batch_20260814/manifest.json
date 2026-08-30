@@ -35,42 +35,44 @@
     },
     {
       "id": "E2_TML_FLAT_RMS",
-      "role": "readout_bridge",
+      "role": "readout_only_bridge",
       "module": "models.rankmixer.cvr_bn_rankmixer_v6_e2.MLPModel",
       "args_file": "02-e2-tml-flat-rms-args.txt",
       "rm_norm_type": "rms_norm",
-      "expected_dense_params": 176799333,
-      "expected_extended_flops_per_sample": 353811199
+      "expected_dense_params": 199367013,
+      "expected_extended_flops_per_sample": 398962687
     },
     {
-      "id": "E3_V10_BUDGET",
-      "role": "norm_bridge",
+      "id": "E3_FLAT_LN",
+      "role": "norm_only_bridge",
       "module": "models.rankmixer.cvr_bn_rankmixer_v6_e3.MLPModel",
-      "args_file": "03-e3-v10-budget-args.txt",
+      "args_file": "03-e3-flat-ln-args.txt",
       "rm_norm_type": "layer_norm",
-      "expected_dense_params": 176708197,
-      "expected_extended_flops_per_sample": 354204415
+      "expected_dense_params": 199275877,
+      "expected_extended_flops_per_sample": 399355903
     }
   ],
   "pre_registered_contrasts": [
     {
-      "name": "readout_bundle",
+      "name": "readout_only",
       "left": "E2_TML_FLAT_RMS",
       "right": "E1_V6",
       "delta": "AUC(left)-AUC(right)",
-      "allowed_interpretation": "PureFlat+narrow-head versus enhanced-readout+wide-head under a matched total parameter budget",
-      "forbidden_interpretation": "Q/K pooling alone"
+      "changed_factor": "complete readout interface: enhanced readout [B,1536] to PureFlat [B,16384]",
+      "fixed_task_tower": [2048, 2048, 256],
+      "allowed_interpretation": "the end-to-end effect of replacing the complete enhanced readout with PureFlat while keeping the v6 core, RMSNorm, and task-tower widths fixed",
+      "forbidden_interpretation": "Q/K pooling alone or a capacity-independent readout mechanism effect"
     },
     {
       "name": "norm_only",
-      "left": "E3_V10_BUDGET",
+      "left": "E3_FLAT_LN",
       "right": "E2_TML_FLAT_RMS",
       "delta": "AUC(left)-AUC(right)",
       "changed_model_arg_keys": [
         "rm_norm_type"
       ],
       "entrypoint_change_is_naming_only": true,
-      "allowed_interpretation": "all five normalization sites changed from v6 RMSNorm to v10 LayerNorm"
+      "allowed_interpretation": "the seven instantiated normalization modules at five code locations changed from v6 RMSNorm to v10 LayerNorm"
     }
   ],
   "non_causal_endpoint_comparison": {
