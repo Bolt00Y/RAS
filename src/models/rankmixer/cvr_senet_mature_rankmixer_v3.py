@@ -27,7 +27,6 @@ from logging import FileHandler, Formatter, getLogger
 from pydoc import locate
 
 import logging
-import numpy as np
 import tensorflow as tf
 
 import flood
@@ -215,9 +214,13 @@ class MLPModel(ModelBase):
         self.save_predict_result = _kwargs.get('save_predict_result', False)
         self.ps_stage = _kwargs.get('ps_stage', 'update')
 
-        # The proven Base/Flood BN path is the default.  Phalanx remains an
-        # optional branch for compatibility with the mature implementation.
-        self.enable_phalanx = _kwargs.get('enable_phalanx', False)
+        # Only use the Base/Flood BN path already exercised by rankmixer v1-v10.
+        # Keep accepting the legacy flag without letting a stale args file pull
+        # an unavailable Phalanx package into graph construction.
+        if _kwargs.get('enable_phalanx', False):
+            logging.warning(
+                'legacy enable_phalanx=true is ignored; use Flood/Riemann BN')
+        self.enable_phalanx = False
         self.batch_norm = _kwargs.get('batch_norm', True)
         self.batch_norm_decay = float(_kwargs.get('batch_norm_decay', 0.9))
         self.use_riemann_bn = _kwargs.get('use_riemann_bn', True)
@@ -863,8 +866,8 @@ class MLPModel(ModelBase):
                 epsilon=1e-8,
             )
         if optimizer == 'flood_adam':
-            from flood.python.training.adam_optimizer import AdamOptimizer
-            return AdamOptimizer(
+            from flood.python.training.adam_optimizer import AdamOptimizer as FloodAdamOptimizer
+            return FloodAdamOptimizer(
                 learning_rate=learning_rate,
                 beta1=0.9,
                 beta2=0.999,
@@ -1033,7 +1036,7 @@ class MLPModel(ModelBase):
             if self.upload_log and worker_id == 0:
                 upload_hdfs(
                     'flood_worker_0.log',
-                    os.path.join(os.path.dirname(hdfs_path), 'flood_worker_0.log'),
+                    os.path.join(hdfs_dir, 'flood_worker_0.log'),
                     True,
                 )
         return result
@@ -1126,9 +1129,9 @@ class MLPModel(ModelBase):
     @staticmethod
     def _gelu(inputs):
         return 0.5 * inputs * (
-            1.0 + tf.tanh(
+            1.0 + tf.nn.tanh(
                 0.7978845608028654
-                * (inputs + 0.044715 * tf.pow(inputs, 3))
+                * (inputs + 0.044715 * inputs ** 3)
             )
         )
 
@@ -1144,7 +1147,7 @@ class MLPModel(ModelBase):
                 initializer=tf.ones_initializer(),
             )
         squared_mean = tf.reduce_mean(
-            tf.pow(inputs, 2.0),
+            tf.square(inputs),
             axis=-1,
             keepdims=True,
         )
@@ -1168,13 +1171,38 @@ class MLPModel(ModelBase):
                 initializer=tf.zeros_initializer(),
                 trainable=True,
             )
-            mean, variance = tf.nn.moments(
-                inputs,
-                axes=-1,
-                keep_dims=True,
-            )
+            mean = tf.reduce_mean(inputs, axis=-1, keepdims=True)
+            variance = tf.reduce_mean(
+                tf.square(inputs - mean), axis=-1, keepdims=True)
             normalized = (inputs - mean) / tf.sqrt(variance + epsilon)
             return gamma * normalized + beta
+
+    @staticmethod
+    def _dense(inputs, units, name, activation=None,
+               kernel_initializer=None, kernel_regularizer=None,
+               bias_initializer=None):
+        """TensorFlow-1.x Dense built from the proven get_variable/matmul path."""
+        input_dimension = inputs.get_shape().as_list()[-1]
+        if input_dimension is None:
+            raise ValueError('{} requires a static input dimension'.format(name))
+        if kernel_initializer is None:
+            kernel_initializer = tf.glorot_uniform_initializer()
+        if bias_initializer is None:
+            bias_initializer = tf.zeros_initializer()
+        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+            kernel = tf.get_variable(
+                'kernel',
+                shape=[input_dimension, units],
+                initializer=kernel_initializer,
+                regularizer=kernel_regularizer,
+            )
+            bias = tf.get_variable(
+                'bias',
+                shape=[units],
+                initializer=bias_initializer,
+            )
+            output = tf.matmul(inputs, kernel) + bias
+            return activation(output) if activation is not None else output
 
     @staticmethod
     def _mix_up(inputs, new_token_num, scope):
@@ -1196,7 +1224,7 @@ class MLPModel(ModelBase):
     @staticmethod
     def _add_weight(name, shape, initializer=None, dtype=tf.float32,
                     trainable=True, regularizer=None):
-        # Scope layout intentionally matches the mature fused/non-fused paths.
+        # Scope layout intentionally preserves the mature checkpoint names.
         with tf.variable_scope('mlp_mixer', reuse=tf.AUTO_REUSE):
             with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
                 return tf.get_variable(
@@ -1217,7 +1245,7 @@ class MLPModel(ModelBase):
         bias_shape = (token_num, 1, units)
         with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
             scale = 1.0 / max(1.0, float(token_dimension + units) / 2.0)
-            stddev = np.sqrt(scale) / 0.87962566103423978
+            stddev = math.sqrt(scale) / 0.87962566103423978
             kernel = self._add_weight(
                 name=name + 'kernel',
                 shape=kernel_shape,
@@ -1231,9 +1259,9 @@ class MLPModel(ModelBase):
             )
             return tf.matmul(inputs, kernel) + bias
 
-    def _per_token_swiglu_non_fused(self, inputs, layer_index, mode,
-                                    regularizer, residual_scale=1.0):
-        """Mature export/test path mathematically aligned with the fused op."""
+    def _per_token_swiglu(self, inputs, layer_index, regularizer,
+                          residual_scale=1.0):
+        """Mature SwiGLU expressed only with the proven TensorFlow-1.x ops."""
         normalized = self._layer_norm(
             inputs,
             scope='pre_ln_{}'.format(layer_index),
@@ -1248,10 +1276,7 @@ class MLPModel(ModelBase):
             hidden_dimension,
             regularizer,
         )
-        if mode == 'export':
-            gate = gate * tf.sigmoid(gate)
-        else:
-            gate = tf.nn.swish(gate)
+        gate = gate * tf.nn.sigmoid(gate)
         value = self._matmul_dense(
             'pwff_fc2_{}'.format(layer_index),
             transposed,
@@ -1267,12 +1292,11 @@ class MLPModel(ModelBase):
         token_num = transposed.get_shape().as_list()[0]
         with tf.variable_scope(
                 'pwff_fc3_{}'.format(layer_index), reuse=tf.AUTO_REUSE):
-            # The initializer is ignored when restoring the trained fused path;
-            # the variable name and shape are deliberately identical.
             kernel = tf.get_variable(
                 'kernel',
                 shape=(token_num, hidden_dimension, self.mixup_token_dim),
-                initializer=tf.zeros_initializer(),
+                initializer=tf.truncated_normal_initializer(
+                    stddev=1.0 / math.sqrt(float(hidden_dimension))),
                 regularizer=regularizer,
             )
             bias = tf.get_variable(
@@ -1281,93 +1305,6 @@ class MLPModel(ModelBase):
                 initializer=tf.zeros_initializer(),
             )
             output = tf.matmul(hidden, kernel) + bias
-        output = tf.transpose(output, perm=[1, 0, 2])
-        output = self._rms_norm(
-            output,
-            epsilon=1e-8,
-            scope='w3_output_rms_norm{}'.format(layer_index),
-        )
-        return shortcut + output * residual_scale
-
-    def _per_token_swiglu_fused(self, inputs, layer_index, regularizer,
-                                residual_scale=1.0):
-        """Exact mature Phalanx/Cayman training path."""
-        from cayman.python.custom_train_ops import swiglu
-
-        normalized = self._layer_norm(
-            inputs,
-            scope='pre_ln_{}'.format(layer_index),
-        )
-        shortcut = inputs
-        transposed = tf.transpose(normalized, perm=[1, 0, 2])
-        token_num = transposed.get_shape().as_list()[0]
-        token_dimension = self.mixup_token_dim
-        hidden_dimension = self.mixer_hidden_dim
-
-        scale = 1.0 / max(
-            1.0,
-            float(token_dimension + hidden_dimension) / 2.0,
-        )
-        stddev = np.sqrt(scale) / 0.87962566103423978
-        with tf.variable_scope(
-                'pwff_fc1_{}'.format(layer_index), reuse=tf.AUTO_REUSE):
-            gate_kernel = self._add_weight(
-                name='pwff_fc1_{}kernel'.format(layer_index),
-                shape=(token_num, token_dimension, hidden_dimension),
-                initializer=tf.truncated_normal_initializer(stddev=stddev),
-                regularizer=regularizer,
-            )
-            gate_bias = self._add_weight(
-                name='pwff_fc1_{}bias'.format(layer_index),
-                shape=(token_num, 1, hidden_dimension),
-                initializer=tf.zeros_initializer(),
-            )
-        with tf.variable_scope(
-                'pwff_fc2_{}'.format(layer_index), reuse=tf.AUTO_REUSE):
-            value_kernel = self._add_weight(
-                name='pwff_fc2_{}kernel'.format(layer_index),
-                shape=(token_num, token_dimension, hidden_dimension),
-                initializer=tf.truncated_normal_initializer(stddev=stddev),
-                regularizer=regularizer,
-            )
-            value_bias = self._add_weight(
-                name='pwff_fc2_{}bias'.format(layer_index),
-                shape=(token_num, 1, hidden_dimension),
-                initializer=tf.zeros_initializer(),
-            )
-        with tf.variable_scope(
-                'pwff_fc3_{}'.format(layer_index), reuse=tf.AUTO_REUSE):
-            down_kernel = tf.get_variable(
-                'kernel',
-                shape=(token_num, hidden_dimension, token_dimension),
-                initializer=tf.truncated_normal_initializer(
-                    stddev=1.0 / math.sqrt(float(hidden_dimension))),
-                regularizer=regularizer,
-            )
-            down_bias = tf.get_variable(
-                'bias',
-                shape=(token_num, 1, token_dimension),
-                initializer=tf.zeros_initializer(),
-            )
-        with tf.variable_scope(
-                'hidden_rms_norm_{}'.format(layer_index), reuse=tf.AUTO_REUSE):
-            rms_scale = tf.get_variable(
-                'scale',
-                shape=[1, 1, hidden_dimension],
-                initializer=tf.ones_initializer(),
-            )
-
-        output = swiglu(
-            transposed,
-            gate_kernel,
-            gate_bias,
-            value_kernel,
-            value_bias,
-            down_kernel,
-            down_bias,
-            rms_scale=rms_scale,
-            rms_epsilon=1e-8,
-        )
         output = tf.transpose(output, perm=[1, 0, 2])
         output = self._rms_norm(
             output,
@@ -1388,21 +1325,12 @@ class MLPModel(ModelBase):
                     self.mixup_token_num,
                     'mix_up{}'.format(suffix),
                 )
-                if mode == 'train':
-                    current = self._per_token_swiglu_fused(
-                        mixed,
-                        layer_index,
-                        regularizer,
-                        residual_scale=1.0,
-                    )
-                else:
-                    current = self._per_token_swiglu_non_fused(
-                        mixed,
-                        layer_index,
-                        mode,
-                        regularizer,
-                        residual_scale=1.0,
-                    )
+                current = self._per_token_swiglu(
+                    mixed,
+                    layer_index,
+                    regularizer,
+                    residual_scale=1.0,
+                )
             return self._layer_norm(
                 current,
                 scope='final_layer_norm',
@@ -1411,19 +1339,6 @@ class MLPModel(ModelBase):
     def _mature_batch_norm(self, inputs, is_train, export, scope, reuse):
         if not self.batch_norm:
             return inputs
-        if self.enable_phalanx:
-            from phalanx.tensorflow.sync_bn import batch_norm
-            return batch_norm(
-                inputs,
-                decay=self.batch_norm_decay,
-                center=True,
-                scale=True,
-                updates_collections=None,
-                is_training=is_train,
-                reuse=reuse,
-                scope=scope,
-                require_robust_algo=True,
-            )
         return ModelBase.batch_norm_layer_v2(
             x=inputs,
             train_phase=is_train,
@@ -1444,7 +1359,7 @@ class MLPModel(ModelBase):
                 'senet16_{}'.format(scope),
                 partitioner=self.partitioner,
                 reuse=tf.AUTO_REUSE):
-            squeeze = tf.layers.dense(
+            squeeze = self._dense(
                 input_layer,
                 units=lowrank,
                 activation=None,
@@ -1466,7 +1381,7 @@ class MLPModel(ModelBase):
             if str(self.senet_act_type).lower() == 'relu':
                 kernel_initializer = tf.glorot_uniform_initializer()
                 bias_initializer = tf.constant_initializer(0.01)
-            gate = tf.layers.dense(
+            gate = self._dense(
                 squeeze,
                 units=output_size,
                 activation=self.get_act_func(
@@ -1486,7 +1401,7 @@ class MLPModel(ModelBase):
         output_width = token_count * self.mixup_token_dim
         with tf.variable_scope(
                 scope, partitioner=self.partitioner, reuse=tf.AUTO_REUSE):
-            projected = tf.layers.dense(
+            projected = self._dense(
                 inputs=inputs,
                 units=output_width,
                 activation=self._gelu,
@@ -1516,14 +1431,14 @@ class MLPModel(ModelBase):
                 global_input,
                 scope='bottom_embedding_ln',
             )
-            hidden = tf.layers.dense(
+            hidden = self._dense(
                 inputs=global_input,
                 units=self.global_token_hidden_dim,
                 activation=self._gelu,
                 kernel_regularizer=regularizer,
                 name='bottom_mlp_hidden',
             )
-            token = tf.layers.dense(
+            token = self._dense(
                 inputs=hidden,
                 units=self.mixup_token_dim,
                 activation=None,
@@ -1547,7 +1462,7 @@ class MLPModel(ModelBase):
                 'mlp_mixer', reuse=tf.AUTO_REUSE, partitioner=self.partitioner):
             with tf.variable_scope(
                     'transform_creative', reuse=tf.AUTO_REUSE):
-                hidden = tf.layers.dense(
+                hidden = self._dense(
                     inputs=inputs,
                     units=self.creative_hidden_dim,
                     activation=None,
@@ -1563,7 +1478,7 @@ class MLPModel(ModelBase):
                 )
                 hidden = hidden * tf.nn.sigmoid(hidden_beta * hidden)
 
-                output = tf.layers.dense(
+                output = self._dense(
                     inputs=hidden,
                     units=self.creative_output_dim,
                     activation=None,
