@@ -199,8 +199,13 @@ class MLPModel(ModelBase):
         self.eval_batch_size = int(_kwargs.get('eval_batch_size', 2048))
         self.l2_deep = float(_kwargs.get('l2_deep', 0.000001))
         self.grad_clip_value = float(_kwargs.get('grad_clip_value', 15))
+        self.dropout = _kwargs.get('dropout', None)
         self.max_partitions = _kwargs.get('max_partitions', None)
+        self.act_type = _kwargs.get('act_type', 'relu')
+        self.init_type = _kwargs.get('init_type', 'xavier')
         self.embedding_size = int(_kwargs.get('embedding_size', 17))
+        self.pretrain_embedding_size = int(
+            _kwargs.get('pretrain_embedding_size', 64))
         self.log_nn_vars = _kwargs.get('log_nn_vars', False)
 
         self.tf_config = _kwargs.get('tf_config', None)
@@ -208,12 +213,29 @@ class MLPModel(ModelBase):
         self.is_chief = self.worker_id == 0
         self.task_index = self.worker_id
 
+        # Preserve the common runner attribute contract used by RankMixer v1-v10.
+        self.enable_dense_warmup = _kwargs.get('enable_dense_warmup', False)
+        self.enable_mlt_warmup = _kwargs.get('enable_mlt_warmup', False)
+        self.hooks = _kwargs.get('hooks', [])
+        self.skip_tensors = _kwargs.get('skip_tensors', '')
+        self.warm_up_tensors = _kwargs.get('warm_up_tensors', '')
+        self.warmup_type = _kwargs.get('warmup_type', 'default')
+        self.warm_mlp_layer = _kwargs.get('warm_mlp_layer', [])
+        self.use_mlp_gate = _kwargs.get('use_mlp_gate', False)
+        self.old_epoch_ckpt_import_dir = _kwargs.get(
+            'old_epoch_ckpt_import_dir', None)
+        self.ckpt_import_dir1 = _kwargs.get('ckpt_import_dir1', None)
+        self.ckpt_import_dir2 = _kwargs.get('ckpt_import_dir2', None)
+        self.warm_up_tensors1 = _kwargs.get('warm_up_tensors1', '')
+        self.dense_tuning = _kwargs.get('dense_tuning', False)
+
         self.model_dir = _kwargs.get('model_dir', None)
         self.predict_path = _kwargs.get('predict_path', None)
         self.timeout = int(_kwargs.get('timeout', 60 * 20) * 1000)
         self.upload_log = _kwargs.get('upload_log', False)
         self.save_predict_result = _kwargs.get('save_predict_result', False)
         self.ps_stage = _kwargs.get('ps_stage', 'update')
+        self.update_model_dir = _kwargs.get('update_model_dir', None)
 
         # Only use the Base/Flood BN path already exercised by rankmixer v1-v10.
         # Keep accepting the legacy flag without letting a stale args file pull
@@ -229,6 +251,7 @@ class MLPModel(ModelBase):
         self.embed_renorm_decay = float(_kwargs.get('embed_renorm_decay', 0.99))
         self.use_senet = _kwargs.get('use_senet', True)
         self.use_senet_bn = _kwargs.get('use_senet_bn', True)
+        self.senet_hidden_size = int(_kwargs.get('senet_hidden_size', 128))
         self.senet_act_type = _kwargs.get('senet_act_type', 'sigmoid')
         self.mlp_act_type = _kwargs.get('mlp_act_type', 'gelu_2')
         self.clip_val = float(_kwargs.get('clip_val', 50))
@@ -274,6 +297,13 @@ class MLPModel(ModelBase):
             feature_config=self.fea_conf_obj_old,
             default_embedding_size=self.embedding_size,
         )
+        self.default_sequence_len = int(
+            _kwargs.get('default_sequence_len', 100))
+
+        self.dense_scale = _kwargs.get('dense_scale', 0.01)
+        self.dense_global_norm = _kwargs.get('dense_global_norm', True)
+        self.dense_clip_threshold = _kwargs.get(
+            'dense_clip_threshold', [-2000000.0, 2000000.0])
 
         # Data path remains the Base path; no replay-specific correction exists.
         self.epochs = _kwargs.get('epochs', None)
@@ -288,9 +318,15 @@ class MLPModel(ModelBase):
         self.drop_last_files = int(_kwargs.get('drop_last_files', 2))
         self.slow_worker_timeout = int(_kwargs.get('slow_worker_timeout', 3600000))
         self.slow_worker_num_limit = int(_kwargs.get('slow_worker_num_limit', 0))
+        self.train_stage_param = _kwargs.get(
+            'train_stage_param', 'replay##dist2')
         self.sampler_label_name = _kwargs.get('sampler_label_name', '')
         self.sampler_positive_rate = float(_kwargs.get('sampler_positive_rate', 1.0))
         self.sampler_negative_rate = float(_kwargs.get('sampler_negative_rate', 1.0))
+        self.enable_neg_sampler = _kwargs.get('enable_neg_sampler', True)
+        self.filter_pass_values = _kwargs.get('filter_pass_values', '')
+        self.filter_label_names = _kwargs.get('filter_label_names', '')
+        self.filter_drop_values = _kwargs.get('filter_drop_values', '')
         self.filter_pass_empty = _kwargs.get('filter_pass_empty', True)
 
         self.strict_test_date = _kwargs.get('strict_test_date', False)
@@ -304,9 +340,11 @@ class MLPModel(ModelBase):
         self.num_ps = len(self.tf_config['cluster']['ps']) if self.tf_config else 1
         self.num_worker = len(self.tf_config['cluster']['worker']) if self.tf_config else 1
         self.fq_table_config = _kwargs.get('fq_table_config', 'shrink_only_config')
+        self.seq_add_dim = _kwargs.get('seq_add_dim', 0)
         self.dir2_all_tensor = _kwargs.get('dir2_all_tensor', 'None')
         self.second_epoch_ckpt_import_dir = _kwargs.get('second_epoch_ckpt_import_dir', '')
-        self.enable_dense_warmup = _kwargs.get('enable_dense_warmup', False)
+        self.ffn_version = _kwargs.get('ffn_version', 'v1')
+        self.scale_type = _kwargs.get('scale_type', 0)
 
         self._validate_architecture_args(_kwargs)
         self._validate_feature_contract()
@@ -757,7 +795,7 @@ class MLPModel(ModelBase):
                      flood_mode, mode, use_dynamic_files)
         dataset_op = self.get_dataset(
             data_paths,
-            mode,
+            flood_mode,
             use_dynamic_file=use_dynamic_files,
             take_batch_num=self.test_batch_num if mode == 'test' else 0,
         )
