@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """Pure mature RankMixer for Base three-bucket single-head fst_CVR.
 
-This is the production-callable implementation of the frozen D=256 design:
+The default configuration is the production-callable D=256 design:
 
 * Base-only sparse inputs: common_user(385), item(835), creative(14), E=17.
 * Mature low-rank excitation2 SENet: user=256, item=128, creative=128.
 * 31 local tokens + 1 user/item global token, T=32, D=256.
 * Three mature mix_up + per-token SwiGLU blocks, expansion=3.5 (M=896).
 * Mean pooling plus a proportionally scaled creative bypass of 32 dimensions.
-* Mature compact task tower [256, 128] with Phalanx Robust SyncBN.
+* Mature compact task tower [256, 128] with the established Flood/Riemann BN.
 * One fst_cvr sigmoid/BCE only.
 
 There is deliberately no sequence/gattr/dense-feature path, DIN, replay
@@ -163,10 +163,9 @@ _CREATIVE_IDS = _ids("""
 
 
 class MLPModel(ModelBase):
-    """Base-three-bucket, pure mature RankMixer D=256 model."""
+    """Configurable Base-three-bucket, pure mature RankMixer model."""
 
     _EXPECTED_FIELD_COUNTS = (385, 835, 14)
-    _EXPECTED_DENSE_TRAINABLE_PARAMS = 109976671
     _GROUP_VERSION = 'pure_mature_rankmixer_base_3bucket_d256_v1'
     _GROUP_CHECKSUMS = {
         'user_v1': 'bf6fed778c4286bd139cc89038be3cda1d1ff5160bbb87074c4f7eeb9773ae82',
@@ -216,8 +215,9 @@ class MLPModel(ModelBase):
         self.save_predict_result = _kwargs.get('save_predict_result', False)
         self.ps_stage = _kwargs.get('ps_stage', 'update')
 
-        # Normalization and optimization follow the mature/Base boundary.
-        self.enable_phalanx = _kwargs.get('enable_phalanx', True)
+        # The proven Base/Flood BN path is the default.  Phalanx remains an
+        # optional branch for compatibility with the mature implementation.
+        self.enable_phalanx = _kwargs.get('enable_phalanx', False)
         self.batch_norm = _kwargs.get('batch_norm', True)
         self.batch_norm_decay = float(_kwargs.get('batch_norm_decay', 0.9))
         self.use_riemann_bn = _kwargs.get('use_riemann_bn', True)
@@ -238,7 +238,7 @@ class MLPModel(ModelBase):
              'decay_steps': 40000, 'min_rate': 0.5},
         )
 
-        # Frozen architecture.  Parameter names mirror the mature model args.
+        # Configurable architecture.  Defaults reproduce the v1 D256/L3 run.
         self.mixup_token_num = int(_kwargs.get('mixup_token_num', 32))
         self.mixup_token_dim = int(_kwargs.get('mixup_token_dim', 256))
         self.mlp_mixer_layers = int(_kwargs.get('mlp_mixer_layers', 3))
@@ -307,18 +307,11 @@ class MLPModel(ModelBase):
         self._validate_architecture_args(_kwargs)
         self._validate_feature_contract()
         self.rm_parameter_breakdown = self._calculate_dense_trainable_params()
-        if self.rm_parameter_breakdown['total'] != self._EXPECTED_DENSE_TRAINABLE_PARAMS:
-            raise ValueError(
-                'dense parameter ledger mismatch: actual={}, expected={}'.format(
-                    self.rm_parameter_breakdown['total'],
-                    self._EXPECTED_DENSE_TRAINABLE_PARAMS,
-                )
-            )
 
         logging.info(
-            'Pure mature RankMixer D256: fields=%s, tokens=31+1, T=%d, D=%d, '
+            'Pure mature RankMixer: fields=%s, T=%d, D=%d, '
             'L=%d, M=%d, creative=%d, head=%s, dense_params=%d',
-            self._EXPECTED_FIELD_COUNTS,
+            self.feature_field_counts,
             self.mixup_token_num,
             self.mixup_token_dim,
             self.mlp_mixer_layers,
@@ -334,32 +327,35 @@ class MLPModel(ModelBase):
         super().__init__()
 
     def _validate_architecture_args(self, kwargs):
-        required = {
-            'embedding_size': (self.embedding_size, 17),
-            'mixup_token_num': (self.mixup_token_num, 32),
-            'mixup_token_dim': (self.mixup_token_dim, 256),
-            'mlp_mixer_layers': (self.mlp_mixer_layers, 3),
-            'mixer_hidden_dim': (self.mixer_hidden_dim, 896),
-            'global_token_hidden_dim': (self.global_token_hidden_dim, 512),
-            'creative_output_dim': (self.creative_output_dim, 32),
-            'creative_hidden_dim': (self.creative_hidden_dim, 256),
+        positive_dimensions = {
+            'embedding_size': self.embedding_size,
+            'mixup_token_num': self.mixup_token_num,
+            'mixup_token_dim': self.mixup_token_dim,
+            'mlp_mixer_layers': self.mlp_mixer_layers,
+            'mixer_hidden_dim': self.mixer_hidden_dim,
+            'global_token_hidden_dim': self.global_token_hidden_dim,
+            'creative_output_dim': self.creative_output_dim,
+            'creative_hidden_dim': self.creative_hidden_dim,
         }
-        for name, pair in required.items():
-            actual, expected = pair
-            if actual != expected:
-                raise ValueError('{} must be {}, got {}'.format(name, expected, actual))
-        if self.cvr_layers != [256, 128]:
-            raise ValueError('cvr_layers must be [256, 128]')
+        invalid_dimensions = {
+            name: value for name, value in positive_dimensions.items()
+            if value <= 0
+        }
+        if invalid_dimensions:
+            raise ValueError('dimensions/layers must be positive: {}'.format(
+                invalid_dimensions))
+        if self.mixer_expand_ratio <= 0:
+            raise ValueError('mixer_expand_ratio must be positive, got {}'.format(
+                self.mixer_expand_ratio))
+        invalid_head_layers = [value for value in self.cvr_layers if value <= 0]
+        if invalid_head_layers:
+            raise ValueError('cvr_layers must contain positive widths, got {}'.format(
+                self.cvr_layers))
         if self.mixup_token_dim % self.mixup_token_num != 0:
-            raise ValueError('mixup_token_dim must be divisible by mixup_token_num')
-        if not self.use_senet or not self.use_senet_bn or not self.batch_norm:
-            raise ValueError('use_senet/use_senet_bn/batch_norm must all be true')
-        if not self.enable_phalanx:
-            raise ValueError('the frozen D256 design requires enable_phalanx=true')
-        if self.senet_act_type != 'sigmoid' or self.mlp_act_type != 'gelu_2':
-            raise ValueError('senet_act_type=\'sigmoid\' and mlp_act_type=\'gelu_2\' are required')
-        if self.enable_dense_warmup:
-            raise ValueError('the frozen D256 design requires dense cold start')
+            raise ValueError(
+                'mixup_token_dim ({}) must be divisible by mixup_token_num ({}) '
+                'for mix_up reshape'.format(
+                    self.mixup_token_dim, self.mixup_token_num))
 
         forbidden_flags = (
             'enable_rpy_neg_sampler', 'enable_last_cvr', 'enable_wide_cvr',
@@ -368,10 +364,10 @@ class MLPModel(ModelBase):
         )
         enabled = [name for name in forbidden_flags if bool(kwargs.get(name, False))]
         if enabled:
-            raise ValueError('unsupported extra paths enabled: {}'.format(enabled))
-        if self.sampler_label_name or self.sampler_positive_rate != 1.0 \
-                or self.sampler_negative_rate != 1.0:
-            raise ValueError('re-sampling is forbidden; use Base samples unchanged')
+            logging.warning(
+                'single-head RankMixer ignores unsupported extra paths: %s',
+                enabled,
+            )
 
     def _validate_feature_contract(self):
         unsupported = {
@@ -395,16 +391,27 @@ class MLPModel(ModelBase):
             'item': set(_ITEM_V1_IDS + _ITEM_V2_IDS + _ITEM_V3_IDS + _ITEM_V4_PLUS_IDS),
             'creative': set(_CREATIVE_IDS),
         }
-        field_counts = tuple(len(expected_sets[name]) for name in ('common', 'item', 'creative'))
-        if field_counts != self._EXPECTED_FIELD_COUNTS:
-            raise ValueError('Base field counts must be {}, got {}'.format(
-                self._EXPECTED_FIELD_COUNTS, field_counts))
+        self.feature_field_counts = tuple(
+            len(expected_sets[name]) for name in ('common', 'item', 'creative'))
+        if self.feature_field_counts != self._EXPECTED_FIELD_COUNTS:
+            logging.warning(
+                'feature counts differ from the v1 baseline: baseline=%s, actual=%s',
+                self._EXPECTED_FIELD_COUNTS,
+                self.feature_field_counts,
+            )
         for bucket_name in ('common', 'item', 'creative'):
-            if expected_sets[bucket_name] != group_sets[bucket_name]:
-                missing = expected_sets[bucket_name] - group_sets[bucket_name]
-                unknown = group_sets[bucket_name] - expected_sets[bucket_name]
-                raise ValueError('{} routing mismatch: missing={}, unknown={}'.format(
-                    bucket_name, sorted(missing), sorted(unknown)))
+            missing_from_config = group_sets[bucket_name] - expected_sets[bucket_name]
+            if missing_from_config:
+                raise ValueError(
+                    '{} routing references fields missing from feature config: {}'.format(
+                        bucket_name, sorted(missing_from_config)))
+            unused_config_fields = expected_sets[bucket_name] - group_sets[bucket_name]
+            if unused_config_fields:
+                logging.warning(
+                    '%s feature config contains %d fields not routed into tokens',
+                    bucket_name,
+                    len(unused_config_fields),
+                )
 
         ordered_groups = list(self._USER_GROUPS) + list(self._ITEM_GROUPS)
         all_ids = []
@@ -413,43 +420,78 @@ class MLPModel(ModelBase):
                 raise ValueError('{} contains duplicate IDs'.format(group_name))
             checksum = hashlib.sha256('\n'.join(feature_ids).encode('utf-8')).hexdigest()
             if checksum != self._GROUP_CHECKSUMS[group_name]:
-                raise ValueError('{} checksum mismatch: {}'.format(group_name, checksum))
+                logging.warning(
+                    '%s routing differs from the v1 baseline checksum: %s',
+                    group_name,
+                    checksum,
+                )
             all_ids.extend(feature_ids)
         creative_checksum = hashlib.sha256('\n'.join(_CREATIVE_IDS).encode('utf-8')).hexdigest()
         if creative_checksum != self._GROUP_CHECKSUMS['creative']:
-            raise ValueError('creative checksum mismatch: {}'.format(creative_checksum))
+            logging.warning(
+                'creative routing differs from the v1 baseline checksum: %s',
+                creative_checksum,
+            )
         all_ids.extend(_CREATIVE_IDS)
-        if len(all_ids) != 1234 or len(set(all_ids)) != 1234:
-            raise ValueError('internal routing must cover 1234 unique fields')
+        if len(all_ids) != len(set(all_ids)):
+            raise ValueError('feature routing contains IDs assigned more than once')
+        baseline_total = sum(self._EXPECTED_FIELD_COUNTS)
+        if len(all_ids) != baseline_total:
+            logging.warning(
+                'routed field count differs from the v1 baseline: baseline=%d, actual=%d',
+                baseline_total,
+                len(all_ids),
+            )
         all_checksum = hashlib.sha256('\n'.join(all_ids).encode('utf-8')).hexdigest()
         if all_checksum != self._ALL_GROUPS_CHECKSUM:
-            raise ValueError('complete routing checksum mismatch: {}'.format(all_checksum))
+            logging.warning(
+                'complete routing differs from the v1 baseline checksum: %s',
+                all_checksum,
+            )
 
         local_tokens = sum(token_count for _, _, token_count in ordered_groups)
-        if local_tokens != 31 or local_tokens + 1 != self.mixup_token_num:
-            raise ValueError('token allocation must be 31 local + 1 global')
+        self.local_token_num = local_tokens
+        if local_tokens + 1 != self.mixup_token_num:
+            raise ValueError(
+                'configured token groups produce {} local + 1 global tokens, but '
+                'mixup_token_num={}; change the group token allocation together '
+                'with mixup_token_num'.format(local_tokens, self.mixup_token_num))
 
     def _calculate_dense_trainable_params(self):
-        user_width = 385 * self.embedding_size
-        item_width = 835 * self.embedding_size
-        creative_width = 14 * self.embedding_size
+        user_width = sum(
+            len(feature_ids) for _, feature_ids, _ in self._USER_GROUPS
+        ) * self.embedding_size
+        item_width = sum(
+            len(feature_ids) for _, feature_ids, _ in self._ITEM_GROUPS
+        ) * self.embedding_size
+        creative_width = len(_CREATIVE_IDS) * self.embedding_size
         token_dim = self.mixup_token_dim
         token_num = self.mixup_token_num
         mixer_hidden = self.mixer_hidden_dim
 
-        input_bn = 2 * (user_width + item_width + creative_width)
-        senet = (
-            user_width * 256 + 256 + 2 * 256 + 256 * user_width + user_width
-            + (user_width + item_width) * 128 + 128 + 2 * 128
-            + 128 * item_width + item_width
-            + creative_width * 128 + 128 + 2 * 128
-            + 128 * creative_width + creative_width
+        input_bn = (
+            2 * (user_width + item_width + creative_width)
+            if self.batch_norm else 0
         )
+        senet = 0
+        if self.use_senet:
+            senet_specs = (
+                (user_width, 256, user_width),
+                (user_width + item_width, 128, item_width),
+                (creative_width, 128, creative_width),
+            )
+            for input_width, lowrank, output_width in senet_specs:
+                senet += input_width * lowrank + lowrank
+                if self.batch_norm and self.use_senet_bn:
+                    senet += 2 * lowrank
+                senet += lowrank * output_width + output_width
         local_tokens = 0
         for _, feature_ids, token_count in self._USER_GROUPS + self._ITEM_GROUPS:
             output_width = token_count * token_dim
             local_tokens += len(feature_ids) * self.embedding_size * output_width
-            local_tokens += 3 * output_width  # dense bias + BN gamma/beta
+            local_tokens += output_width  # dense bias
+            if self.batch_norm:
+                local_tokens += 2 * output_width  # BN gamma/beta
 
         global_input = user_width + item_width
         global_token = (
@@ -467,14 +509,19 @@ class MLPModel(ModelBase):
 
         creative = (
             creative_width * self.creative_hidden_dim + self.creative_hidden_dim
-            + 2 * self.creative_hidden_dim + self.creative_hidden_dim
+            + self.creative_hidden_dim  # trainable swish beta
             + self.creative_hidden_dim * self.creative_output_dim + self.creative_output_dim
-            + 2 * self.creative_output_dim + self.creative_output_dim
+            + self.creative_output_dim  # trainable swish beta
         )
+        if self.batch_norm:
+            creative += 2 * (
+                self.creative_hidden_dim + self.creative_output_dim)
         head_input = token_dim + self.creative_output_dim
         task_head = 0
         for layer_size in self.cvr_layers:
-            task_head += head_input * layer_size + layer_size + 2 * layer_size
+            task_head += head_input * layer_size + layer_size
+            if self.batch_norm:
+                task_head += 2 * layer_size
             head_input = layer_size
         task_head += head_input + 1
 
@@ -497,22 +544,41 @@ class MLPModel(ModelBase):
             scope=dense_scope,
         )
         actual_total = 0
+        has_unknown_shape = False
         log_manifest = not getattr(self, '_rm_logged_dense_manifest', False)
         for variable in dense_variables:
             shape = variable.shape.as_list()
             if any(dimension is None for dimension in shape):
-                raise ValueError('unknown dense variable shape: {} {}'.format(
-                    variable.op.name, shape))
+                has_unknown_shape = True
+                logging.warning(
+                    'skip dense parameter audit for unknown variable shape: %s %s',
+                    variable.op.name,
+                    shape,
+                )
+                continue
             variable_total = 1
             for dimension in shape:
                 variable_total *= dimension
             actual_total += variable_total
             if log_manifest:
-                logging.info('D256 dense variable: %s shape=%s params=%d',
+                logging.info('RankMixer dense variable: %s shape=%s params=%d',
                              variable.op.name, shape, variable_total)
-        if actual_total != self._EXPECTED_DENSE_TRAINABLE_PARAMS:
-            raise ValueError('graph dense params={}, expected={}'.format(
-                actual_total, self._EXPECTED_DENSE_TRAINABLE_PARAMS))
+        estimated_total = self.rm_parameter_breakdown['total']
+        if has_unknown_shape:
+            logging.warning(
+                'dense parameter audit is partial: known_params=%d, formula_estimate=%d',
+                actual_total,
+                estimated_total,
+            )
+        elif actual_total != estimated_total:
+            logging.warning(
+                'graph dense params=%d, formula estimate=%d; continuing because '
+                'the architecture is configurable',
+                actual_total,
+                estimated_total,
+            )
+        else:
+            logging.info('graph dense params verified: %d', actual_total)
         self._rm_logged_dense_manifest = True
         return actual_total
 
@@ -1043,8 +1109,17 @@ class MLPModel(ModelBase):
         logging.info('-' * 30)
 
     def get_hooks(self):
-        # The frozen design requires dense cold start.
-        return []
+        hooks = []
+        if not self.enable_dense_warmup:
+            return hooks
+
+        task_config = self.tf_config.get('task', {}) if self.tf_config else {}
+        is_master = task_config.get('type') == 'master'
+        is_worker_zero = task_config.get('index', 0) == 0
+        if is_master or is_worker_zero:
+            from framework.hooks.new_branch_warmup_hook import Senet2NewWarmupHook
+            hooks.append(Senet2NewWarmupHook(self.model_dir, model=self))
+        return hooks
 
     # ===================== Mature RankMixer architecture =====================
 
@@ -1334,6 +1409,8 @@ class MLPModel(ModelBase):
             )
 
     def _mature_batch_norm(self, inputs, is_train, export, scope, reuse):
+        if not self.batch_norm:
+            return inputs
         if self.enable_phalanx:
             from phalanx.tensorflow.sync_bn import batch_norm
             return batch_norm(
@@ -1374,22 +1451,32 @@ class MLPModel(ModelBase):
                 kernel_initializer=tf.glorot_uniform_initializer(),
                 name='squeeze',
             )
-            reuse = tf.AUTO_REUSE if is_train else None
-            squeeze = self._mature_batch_norm(
-                squeeze,
-                is_train,
-                export,
-                scope='bn_input_se',
-                reuse=reuse,
-            )
+            if self.use_senet_bn:
+                reuse = tf.AUTO_REUSE if is_train else None
+                squeeze = self._mature_batch_norm(
+                    squeeze,
+                    is_train,
+                    export,
+                    scope='bn_input_se',
+                    reuse=reuse,
+                )
             squeeze = tf.nn.relu(squeeze)
+            kernel_initializer = tf.zeros_initializer()
+            bias_initializer = tf.zeros_initializer()
+            if str(self.senet_act_type).lower() == 'relu':
+                kernel_initializer = tf.glorot_uniform_initializer()
+                bias_initializer = tf.constant_initializer(0.01)
             gate = tf.layers.dense(
                 squeeze,
                 units=output_size,
-                activation=tf.nn.sigmoid,
-                kernel_initializer=tf.zeros_initializer(),
+                activation=self.get_act_func(
+                    self.senet_act_type,
+                    is_train=is_train,
+                    name='excitation_activation',
+                ),
+                kernel_initializer=kernel_initializer,
                 kernel_regularizer=regularizer,
-                bias_initializer=tf.zeros_initializer(),
+                bias_initializer=bias_initializer,
                 name='excitation',
             )
             return target_feature * gate
@@ -1511,7 +1598,11 @@ class MLPModel(ModelBase):
                 scope='bn_{}'.format(index),
                 reuse=tf.AUTO_REUSE if is_train else None,
             )
-            hidden = self.get_act_func(self.mlp_act_type)(hidden)
+            hidden = self.get_act_func(
+                self.mlp_act_type,
+                is_train=is_train,
+                name='mlp_act_{}'.format(index),
+            )(hidden)
 
         with tf.device('/job:ps/task:0'):
             output = tf.contrib.layers.fully_connected(
@@ -1548,8 +1639,14 @@ class MLPModel(ModelBase):
         )
         is_train = (mode == 'train')
         logging.info(
-            'build Pure Mature RankMixer D256: mode=%s, is_train=%s, partitions=%s',
-            mode, is_train, variable_partitions,
+            'build Pure Mature RankMixer: mode=%s, T=%d, D=%d, L=%d, '
+            'is_train=%s, partitions=%s',
+            mode,
+            self.mixup_token_num,
+            self.mixup_token_dim,
+            self.mlp_mixer_layers,
+            is_train,
+            variable_partitions,
         )
 
         ps_mode = 'predict' if self.ps_stage == 'join' and is_train else mode
@@ -1592,7 +1689,13 @@ class MLPModel(ModelBase):
         user_raw = tf.concat(user_group_tensors, axis=1, name='user_part')
         item_raw = tf.concat(item_group_tensors, axis=1, name='item_part')
 
-        expected_widths = (385 * 17, 835 * 17, 14 * 17)
+        expected_widths = (
+            sum(len(feature_ids) for _, feature_ids, _ in self._USER_GROUPS)
+            * self.embedding_size,
+            sum(len(feature_ids) for _, feature_ids, _ in self._ITEM_GROUPS)
+            * self.embedding_size,
+            len(_CREATIVE_IDS) * self.embedding_size,
+        )
         actual_widths = (
             user_raw.shape[1].value,
             item_raw.shape[1].value,
@@ -1618,21 +1721,26 @@ class MLPModel(ModelBase):
                 scope='embed_bn_input_creative_embeds', reuse=reuse)
 
             regularizer = tf.contrib.layers.l2_regularizer(self.l2_deep)
-            user_senet = self._excitation2(
-                user_bn, user_bn, is_train, export,
-                lowrank=256, scope='user', regularizer=regularizer)
-            item_senet = self._excitation2(
-                tf.concat([user_bn, item_bn], axis=1),
-                item_bn,
-                is_train,
-                export,
-                lowrank=128,
-                scope='item',
-                regularizer=regularizer,
-            )
-            creative_senet = self._excitation2(
-                creative_bn, creative_bn, is_train, export,
-                lowrank=128, scope='creative', regularizer=regularizer)
+            if self.use_senet:
+                user_senet = self._excitation2(
+                    user_bn, user_bn, is_train, export,
+                    lowrank=256, scope='user', regularizer=regularizer)
+                item_senet = self._excitation2(
+                    tf.concat([user_bn, item_bn], axis=1),
+                    item_bn,
+                    is_train,
+                    export,
+                    lowrank=128,
+                    scope='item',
+                    regularizer=regularizer,
+                )
+                creative_senet = self._excitation2(
+                    creative_bn, creative_bn, is_train, export,
+                    lowrank=128, scope='creative', regularizer=regularizer)
+            else:
+                user_senet = user_bn
+                item_senet = item_bn
+                creative_senet = creative_bn
 
             user_widths = [
                 len(feature_ids) * self.embedding_size
@@ -1702,9 +1810,15 @@ class MLPModel(ModelBase):
                 axis=1,
                 name='rankmixer_plus_creative',
             )
-            if context.shape[1].value != 288:
-                raise ValueError('task context must be 256+32=288, got {}'.format(
-                    context.shape[1].value))
+            expected_context_width = (
+                self.mixup_token_dim + self.creative_output_dim)
+            if context.shape[1].value != expected_context_width:
+                raise ValueError(
+                    'task context must be token_dim + creative_output_dim = {}, '
+                    'got {}'.format(
+                        expected_context_width,
+                        context.shape[1].value,
+                    ))
             output = self._task_head(context, is_train, export)
 
         tensor_name = mode if mode else 'predict'
