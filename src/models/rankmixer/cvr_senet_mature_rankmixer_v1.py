@@ -164,6 +164,7 @@ _CREATIVE_IDS = _ids("""
 class MLPModel(ModelBase):
     """Configurable Base-three-bucket, pure mature RankMixer model."""
 
+    _COMPAT_BUILD = 'mature_rankmixer_v1_tf_only_20260901'
     _EXPECTED_FIELD_COUNTS = (385, 835, 14)
     _GROUP_VERSION = 'pure_mature_rankmixer_base_3bucket_d256_v1'
     _GROUP_CHECKSUMS = {
@@ -311,6 +312,15 @@ class MLPModel(ModelBase):
         self._validate_feature_contract()
         self.rm_parameter_breakdown = self._calculate_dense_trainable_params()
 
+        self.runtime_build_id = _kwargs.get(
+            'runtime_build_id', self._COMPAT_BUILD)
+        if self.runtime_build_id != self._COMPAT_BUILD:
+            logging.warning(
+                'args/source build ID mismatch: args=%s, source=%s',
+                self.runtime_build_id,
+                self._COMPAT_BUILD,
+            )
+
         logging.info(
             'Pure mature RankMixer: fields=%s, T=%d, D=%d, '
             'L=%d, M=%d, creative=%d, head=%s, dense_params=%d',
@@ -322,6 +332,15 @@ class MLPModel(ModelBase):
             self.creative_output_dim,
             self.cvr_layers,
             self.rm_parameter_breakdown['total'],
+        )
+        logging.info(
+            'Mature RankMixer compatibility build: source=%s, args=%s, '
+            'module=%s, file=%s, BN=ModelBase.batch_norm_layer_v2, '
+            'phalanx/cayman=disabled',
+            self._COMPAT_BUILD,
+            self.runtime_build_id,
+            __name__,
+            os.path.basename(__file__),
         )
 
         if _kwargs.get('log_gflags', True) and self.random_feature is None:
@@ -683,16 +702,41 @@ class MLPModel(ModelBase):
         self.global_step = tf.train.get_or_create_global_step()
         self.global_step_op = tf.assign_add(self.global_step, 1)
         for graph_mode in ('train', 'test'):
-            logging.info('********** %s **********', graph_mode)
-            data_paths = test_paths if graph_mode == 'test' else input_paths
-            self.build_dataset_op(data_paths, mode=graph_mode, flood_mode=mode)
-            self.build_pred_results_op(mode=graph_mode, flood_mode=mode)
-            self.build_auc_copc_op(mode=graph_mode)
-            if graph_mode == 'train':
-                self.build_loss_op(mode=graph_mode)
-                self.build_summary(mode=graph_mode)
-                self.build_optimizer_op()
-        self._build_export(config=config)
+            logging.info(
+                '********** %s (build=%s) **********',
+                graph_mode,
+                self._COMPAT_BUILD,
+            )
+            try:
+                data_paths = test_paths if graph_mode == 'test' else input_paths
+                self.build_dataset_op(
+                    data_paths, mode=graph_mode, flood_mode=mode)
+                logging.info('%s dataset graph ready', graph_mode)
+                self.build_pred_results_op(mode=graph_mode, flood_mode=mode)
+                logging.info('%s prediction graph ready', graph_mode)
+                self.build_auc_copc_op(mode=graph_mode)
+                logging.info('%s metric graph ready', graph_mode)
+                if graph_mode == 'train':
+                    self.build_loss_op(mode=graph_mode)
+                    self.build_summary(mode=graph_mode)
+                    self.build_optimizer_op()
+                    logging.info('train loss/optimizer graph ready')
+            except Exception:
+                logging.exception(
+                    'Mature RankMixer %s graph build failed (build=%s)',
+                    graph_mode,
+                    self._COMPAT_BUILD,
+                )
+                raise
+        try:
+            self._build_export(config=config)
+            logging.info('export graph ready (build=%s)', self._COMPAT_BUILD)
+        except Exception:
+            logging.exception(
+                'Mature RankMixer export graph build failed (build=%s)',
+                self._COMPAT_BUILD,
+            )
+            raise
         self.run_metadata = tf.RunMetadata()
         self.run_options = tf.RunOptions(
             trace_level=tf.RunOptions.FULL_TRACE,

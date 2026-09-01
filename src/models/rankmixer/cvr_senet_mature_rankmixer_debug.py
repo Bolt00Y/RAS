@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Pure mature RankMixer for Base three-bucket single-head fst_CVR.
+"""Server-debug build of the pure mature RankMixer single-head fst_CVR model.
 
-The default configuration is the production-callable D=384, L=3 design:
+The default configuration is the production-callable D=256 design:
 
 * Base-only sparse inputs: common_user(385), item(835), creative(14), E=17.
 * Mature low-rank excitation2 SENet: user=256, item=128, creative=128.
-* 31 local tokens + 1 user/item global token, T=32, D=384.
-* Three mature mix_up + per-token SwiGLU blocks, expansion=3.5 (M=1344).
-* Mean pooling plus a proportionally scaled creative bypass of 48 dimensions.
+* 31 local tokens + 1 user/item global token, T=32, D=256.
+* Three mature mix_up + per-token SwiGLU blocks, expansion=3.5 (M=896).
+* Mean pooling plus a proportionally scaled creative bypass of 32 dimensions.
 * Mature compact task tower [256, 128] with the established Flood/Riemann BN.
 * One fst_cvr sigmoid/BCE only.
 
 There is deliberately no sequence/gattr/dense-feature path, DIN, replay
 correction, DCN-M/cross/shortcut, or auxiliary task head in this module.
 
-The implementation targets the repository's existing Python 3 / TensorFlow 1.x
-/ Flood runtime.  Common infrastructure (feature columns, Flood lookup/data,
-metrics and optimizers) is imported from the project; all architecture-specific
-RankMixer code lives in this file.
+The RankMixer graph is kept aligned with ``cvr_senet_mature_rankmixer_v1``.
+The constructor, Flood dataset lifecycle, optimizer, train/test/export methods
+and warm-up hook follow the already deployed ``cvr_bn_rankmixer_v1`` through
+``cvr_bn_rankmixer_v10`` style.  The file is standalone inside ``models`` and
+has no dependency on the legacy reference directory.
 """
 
 import hashlib
@@ -36,6 +37,7 @@ from flood.python.ops import parsing_ops
 from flood.python.ops.auc import flood_auc
 from flood.python.training.optimizer import FloodOptimizer
 from flood.python.utils import lookup_utils
+from framework.hooks.new_branch_warmup_hook import Senet2NewWarmupHook
 from utils import learning_rate as learning_rate_utils
 from utils.accumulated_metrics import *
 from utils.file_utils import mkdir_hdfs, upload_hdfs
@@ -162,11 +164,11 @@ _CREATIVE_IDS = _ids("""
 
 
 class MLPModel(ModelBase):
-    """Configurable Base-three-bucket, pure mature RankMixer model."""
+    """Frozen D256/L3 mature RankMixer on the proven Base/Flood shell."""
 
-    _COMPAT_BUILD = 'mature_rankmixer_v2_tf_only_20260901'
     _EXPECTED_FIELD_COUNTS = (385, 835, 14)
-    _GROUP_VERSION = 'pure_mature_rankmixer_base_3bucket_d384_l3_v2'
+    _EXPECTED_DENSE_TRAINABLE_PARAMS = 109976671
+    _GROUP_VERSION = 'pure_mature_rankmixer_base_3bucket_d256_v1'
     _GROUP_CHECKSUMS = {
         'user_v1': 'bf6fed778c4286bd139cc89038be3cda1d1ff5160bbb87074c4f7eeb9773ae82',
         'user_v2': '3740fe428c796e2841d16abe9e66b5be6ff9b51feae37a97f03fd02504054636',
@@ -199,14 +201,37 @@ class MLPModel(ModelBase):
         self.eval_batch_size = int(_kwargs.get('eval_batch_size', 2048))
         self.l2_deep = float(_kwargs.get('l2_deep', 0.000001))
         self.grad_clip_value = float(_kwargs.get('grad_clip_value', 15))
+        self.dropout = _kwargs.get('dropout', None)
         self.max_partitions = _kwargs.get('max_partitions', None)
+        self.act_type = _kwargs.get('act_type', 'relu')
+        self.init_type = _kwargs.get('init_type', 'xavier')
         self.embedding_size = int(_kwargs.get('embedding_size', 17))
+        self.pretrain_embedding_size = int(
+            _kwargs.get('pretrain_embedding_size', 64))
         self.log_nn_vars = _kwargs.get('log_nn_vars', False)
 
+        # TF/distributed config: keep the attribute contract used by v1-v10.
         self.tf_config = _kwargs.get('tf_config', None)
         self.worker_id = self.tf_config['task']['index'] if self.tf_config else 0
         self.is_chief = self.worker_id == 0
         self.task_index = self.worker_id
+
+        # Warm-up attributes are consumed by the common runner/ModelBase even
+        # though the frozen debug configuration uses dense cold start.
+        self.enable_dense_warmup = _kwargs.get('enable_dense_warmup', False)
+        self.enable_mlt_warmup = _kwargs.get('enable_mlt_warmup', False)
+        self.hooks = _kwargs.get('hooks', [])
+        self.skip_tensors = _kwargs.get('skip_tensors', '')
+        self.warm_up_tensors = _kwargs.get('warm_up_tensors', '')
+        self.warmup_type = _kwargs.get('warmup_type', 'default')
+        self.warm_mlp_layer = _kwargs.get('warm_mlp_layer', [])
+        self.use_mlp_gate = _kwargs.get('use_mlp_gate', False)
+        self.old_epoch_ckpt_import_dir = _kwargs.get(
+            'old_epoch_ckpt_import_dir', None)
+        self.ckpt_import_dir1 = _kwargs.get('ckpt_import_dir1', None)
+        self.ckpt_import_dir2 = _kwargs.get('ckpt_import_dir2', None)
+        self.warm_up_tensors1 = _kwargs.get('warm_up_tensors1', '')
+        self.dense_tuning = _kwargs.get('dense_tuning', False)
 
         self.model_dir = _kwargs.get('model_dir', None)
         self.predict_path = _kwargs.get('predict_path', None)
@@ -214,6 +239,7 @@ class MLPModel(ModelBase):
         self.upload_log = _kwargs.get('upload_log', False)
         self.save_predict_result = _kwargs.get('save_predict_result', False)
         self.ps_stage = _kwargs.get('ps_stage', 'update')
+        self.update_model_dir = _kwargs.get('update_model_dir', None)
 
         # Only use the Base/Flood BN path already exercised by rankmixer v1-v10.
         # Keep accepting the legacy flag without letting a stale args file pull
@@ -229,6 +255,7 @@ class MLPModel(ModelBase):
         self.embed_renorm_decay = float(_kwargs.get('embed_renorm_decay', 0.99))
         self.use_senet = _kwargs.get('use_senet', True)
         self.use_senet_bn = _kwargs.get('use_senet_bn', True)
+        self.senet_hidden_size = int(_kwargs.get('senet_hidden_size', 128))
         self.senet_act_type = _kwargs.get('senet_act_type', 'sigmoid')
         self.mlp_act_type = _kwargs.get('mlp_act_type', 'gelu_2')
         self.clip_val = float(_kwargs.get('clip_val', 50))
@@ -242,14 +269,14 @@ class MLPModel(ModelBase):
              'decay_steps': 40000, 'min_rate': 0.5},
         )
 
-        # Configurable architecture.  Defaults reproduce the v2 D384/L3 run.
+        # Configurable architecture.  Defaults reproduce the v1 D256/L3 run.
         self.mixup_token_num = int(_kwargs.get('mixup_token_num', 32))
-        self.mixup_token_dim = int(_kwargs.get('mixup_token_dim', 384))
+        self.mixup_token_dim = int(_kwargs.get('mixup_token_dim', 256))
         self.mlp_mixer_layers = int(_kwargs.get('mlp_mixer_layers', 3))
         self.mixer_expand_ratio = float(_kwargs.get('mixer_expand_ratio', 3.5))
         self.mixer_hidden_dim = int(self.mixup_token_dim * self.mixer_expand_ratio)
         self.global_token_hidden_dim = int(_kwargs.get('global_token_hidden_dim', 512))
-        self.creative_output_dim = int(_kwargs.get('creative_output_dim', 48))
+        self.creative_output_dim = int(_kwargs.get('creative_output_dim', 32))
         self.creative_hidden_dim = int(_kwargs.get('creative_hidden_dim', 256))
         self.cvr_layers = [int(value) for value in _kwargs.get('cvr_layers', [256, 128])]
         self.cvr_label_name = _kwargs.get('cvr_label_name', 'fst_cvr_label')
@@ -274,6 +301,14 @@ class MLPModel(ModelBase):
             feature_config=self.fea_conf_obj_old,
             default_embedding_size=self.embedding_size,
         )
+        self.default_sequence_len = int(
+            _kwargs.get('default_sequence_len', 100))
+
+        # Dense optimizer attributes kept by all successful RankMixer versions.
+        self.dense_scale = _kwargs.get('dense_scale', 0.01)
+        self.dense_global_norm = _kwargs.get('dense_global_norm', True)
+        self.dense_clip_threshold = _kwargs.get(
+            'dense_clip_threshold', [-2000000.0, 2000000.0])
 
         # Data path remains the Base path; no replay-specific correction exists.
         self.epochs = _kwargs.get('epochs', None)
@@ -288,9 +323,15 @@ class MLPModel(ModelBase):
         self.drop_last_files = int(_kwargs.get('drop_last_files', 2))
         self.slow_worker_timeout = int(_kwargs.get('slow_worker_timeout', 3600000))
         self.slow_worker_num_limit = int(_kwargs.get('slow_worker_num_limit', 0))
+        self.train_stage_param = _kwargs.get(
+            'train_stage_param', 'replay##dist2')
         self.sampler_label_name = _kwargs.get('sampler_label_name', '')
         self.sampler_positive_rate = float(_kwargs.get('sampler_positive_rate', 1.0))
         self.sampler_negative_rate = float(_kwargs.get('sampler_negative_rate', 1.0))
+        self.enable_neg_sampler = _kwargs.get('enable_neg_sampler', True)
+        self.filter_pass_values = _kwargs.get('filter_pass_values', '')
+        self.filter_label_names = _kwargs.get('filter_label_names', '')
+        self.filter_drop_values = _kwargs.get('filter_drop_values', '')
         self.filter_pass_empty = _kwargs.get('filter_pass_empty', True)
 
         self.strict_test_date = _kwargs.get('strict_test_date', False)
@@ -304,21 +345,22 @@ class MLPModel(ModelBase):
         self.num_ps = len(self.tf_config['cluster']['ps']) if self.tf_config else 1
         self.num_worker = len(self.tf_config['cluster']['worker']) if self.tf_config else 1
         self.fq_table_config = _kwargs.get('fq_table_config', 'shrink_only_config')
+        self.seq_add_dim = _kwargs.get('seq_add_dim', 0)
         self.dir2_all_tensor = _kwargs.get('dir2_all_tensor', 'None')
         self.second_epoch_ckpt_import_dir = _kwargs.get('second_epoch_ckpt_import_dir', '')
-        self.enable_dense_warmup = _kwargs.get('enable_dense_warmup', False)
+        self.ffn_version = _kwargs.get('ffn_version', 'v1')
+        self.scale_type = _kwargs.get('scale_type', 0)
 
         self._validate_architecture_args(_kwargs)
         self._validate_feature_contract()
         self.rm_parameter_breakdown = self._calculate_dense_trainable_params()
-
-        self.runtime_build_id = _kwargs.get(
-            'runtime_build_id', self._COMPAT_BUILD)
-        if self.runtime_build_id != self._COMPAT_BUILD:
-            logging.warning(
-                'args/source build ID mismatch: args=%s, source=%s',
-                self.runtime_build_id,
-                self._COMPAT_BUILD,
+        if self.rm_parameter_breakdown['total'] != \
+                self._EXPECTED_DENSE_TRAINABLE_PARAMS:
+            raise ValueError(
+                'dense parameter ledger mismatch: actual={}, expected={}'.format(
+                    self.rm_parameter_breakdown['total'],
+                    self._EXPECTED_DENSE_TRAINABLE_PARAMS,
+                )
             )
 
         logging.info(
@@ -333,15 +375,6 @@ class MLPModel(ModelBase):
             self.cvr_layers,
             self.rm_parameter_breakdown['total'],
         )
-        logging.info(
-            'Mature RankMixer compatibility build: source=%s, args=%s, '
-            'module=%s, file=%s, BN=ModelBase.batch_norm_layer_v2, '
-            'phalanx/cayman=disabled',
-            self._COMPAT_BUILD,
-            self.runtime_build_id,
-            __name__,
-            os.path.basename(__file__),
-        )
 
         if _kwargs.get('log_gflags', True) and self.random_feature is None:
             self.list_all_member()
@@ -349,35 +382,40 @@ class MLPModel(ModelBase):
         super().__init__()
 
     def _validate_architecture_args(self, kwargs):
-        positive_dimensions = {
-            'embedding_size': self.embedding_size,
-            'mixup_token_num': self.mixup_token_num,
-            'mixup_token_dim': self.mixup_token_dim,
-            'mlp_mixer_layers': self.mlp_mixer_layers,
-            'mixer_hidden_dim': self.mixer_hidden_dim,
-            'global_token_hidden_dim': self.global_token_hidden_dim,
-            'creative_output_dim': self.creative_output_dim,
-            'creative_hidden_dim': self.creative_hidden_dim,
+        # v1-v10 freeze their architecture at construction time.  Do the same
+        # here so a stale args file cannot silently create a different graph.
+        required = {
+            'embedding_size': (self.embedding_size, 17),
+            'senet_hidden_size': (self.senet_hidden_size, 128),
+            'mixup_token_num': (self.mixup_token_num, 32),
+            'mixup_token_dim': (self.mixup_token_dim, 256),
+            'mlp_mixer_layers': (self.mlp_mixer_layers, 3),
+            'mixer_hidden_dim': (self.mixer_hidden_dim, 896),
+            'global_token_hidden_dim': (self.global_token_hidden_dim, 512),
+            'creative_output_dim': (self.creative_output_dim, 32),
+            'creative_hidden_dim': (self.creative_hidden_dim, 256),
         }
-        invalid_dimensions = {
-            name: value for name, value in positive_dimensions.items()
-            if value <= 0
-        }
-        if invalid_dimensions:
-            raise ValueError('dimensions/layers must be positive: {}'.format(
-                invalid_dimensions))
-        if self.mixer_expand_ratio <= 0:
-            raise ValueError('mixer_expand_ratio must be positive, got {}'.format(
+        for name, (actual, expected) in required.items():
+            if actual != expected:
+                raise ValueError('{} must be {}, got {}'.format(
+                    name, expected, actual))
+        if abs(self.mixer_expand_ratio - 3.5) > 1e-12:
+            raise ValueError('mixer_expand_ratio must be 3.5, got {}'.format(
                 self.mixer_expand_ratio))
-        invalid_head_layers = [value for value in self.cvr_layers if value <= 0]
-        if invalid_head_layers:
-            raise ValueError('cvr_layers must contain positive widths, got {}'.format(
-                self.cvr_layers))
+        if self.cvr_layers != [256, 128]:
+            raise ValueError('cvr_layers must be [256, 128]')
         if self.mixup_token_dim % self.mixup_token_num != 0:
+            raise ValueError('mixup_token_dim must be divisible by mixup_token_num')
+        if not self.use_senet or not self.use_senet_bn or not self.batch_norm:
             raise ValueError(
-                'mixup_token_dim ({}) must be divisible by mixup_token_num ({}) '
-                'for mix_up reshape'.format(
-                    self.mixup_token_dim, self.mixup_token_num))
+                'use_senet/use_senet_bn/batch_norm must all be true')
+        if self.senet_act_type != 'sigmoid' or self.mlp_act_type != 'gelu_2':
+            raise ValueError(
+                "senet_act_type='sigmoid' and mlp_act_type='gelu_2' are required")
+        if self.enable_dense_warmup:
+            raise ValueError('the debug model requires dense cold start')
+        if self.use_mlp_gate:
+            raise ValueError('the debug model requires use_mlp_gate=false')
 
         forbidden_flags = (
             'enable_rpy_neg_sampler', 'enable_last_cvr', 'enable_wide_cvr',
@@ -386,10 +424,11 @@ class MLPModel(ModelBase):
         )
         enabled = [name for name in forbidden_flags if bool(kwargs.get(name, False))]
         if enabled:
-            logging.warning(
-                'single-head RankMixer ignores unsupported extra paths: %s',
-                enabled,
-            )
+            raise ValueError('unsupported extra paths enabled: {}'.format(enabled))
+        if self.sampler_label_name or self.sampler_positive_rate != 1.0 \
+                or self.sampler_negative_rate != 1.0:
+            raise ValueError(
+                're-sampling is forbidden; use Base samples unchanged')
 
     def _validate_feature_contract(self):
         unsupported = {
@@ -416,24 +455,14 @@ class MLPModel(ModelBase):
         self.feature_field_counts = tuple(
             len(expected_sets[name]) for name in ('common', 'item', 'creative'))
         if self.feature_field_counts != self._EXPECTED_FIELD_COUNTS:
-            logging.warning(
-                'feature counts differ from the v2 baseline: baseline=%s, actual=%s',
-                self._EXPECTED_FIELD_COUNTS,
-                self.feature_field_counts,
-            )
+            raise ValueError('Base field counts must be {}, got {}'.format(
+                self._EXPECTED_FIELD_COUNTS, self.feature_field_counts))
         for bucket_name in ('common', 'item', 'creative'):
-            missing_from_config = group_sets[bucket_name] - expected_sets[bucket_name]
-            if missing_from_config:
-                raise ValueError(
-                    '{} routing references fields missing from feature config: {}'.format(
-                        bucket_name, sorted(missing_from_config)))
-            unused_config_fields = expected_sets[bucket_name] - group_sets[bucket_name]
-            if unused_config_fields:
-                logging.warning(
-                    '%s feature config contains %d fields not routed into tokens',
-                    bucket_name,
-                    len(unused_config_fields),
-                )
+            if expected_sets[bucket_name] != group_sets[bucket_name]:
+                missing = expected_sets[bucket_name] - group_sets[bucket_name]
+                unknown = group_sets[bucket_name] - expected_sets[bucket_name]
+                raise ValueError('{} routing mismatch: missing={}, unknown={}'.format(
+                    bucket_name, sorted(missing), sorted(unknown)))
 
         ordered_groups = list(self._USER_GROUPS) + list(self._ITEM_GROUPS)
         all_ids = []
@@ -442,42 +471,25 @@ class MLPModel(ModelBase):
                 raise ValueError('{} contains duplicate IDs'.format(group_name))
             checksum = hashlib.sha256('\n'.join(feature_ids).encode('utf-8')).hexdigest()
             if checksum != self._GROUP_CHECKSUMS[group_name]:
-                logging.warning(
-                    '%s routing differs from the v2 baseline checksum: %s',
-                    group_name,
-                    checksum,
-                )
+                raise ValueError('{} checksum mismatch: {}'.format(
+                    group_name, checksum))
             all_ids.extend(feature_ids)
         creative_checksum = hashlib.sha256('\n'.join(_CREATIVE_IDS).encode('utf-8')).hexdigest()
         if creative_checksum != self._GROUP_CHECKSUMS['creative']:
-            logging.warning(
-                'creative routing differs from the v2 baseline checksum: %s',
-                creative_checksum,
-            )
+            raise ValueError('creative checksum mismatch: {}'.format(
+                creative_checksum))
         all_ids.extend(_CREATIVE_IDS)
-        if len(all_ids) != len(set(all_ids)):
-            raise ValueError('feature routing contains IDs assigned more than once')
-        baseline_total = sum(self._EXPECTED_FIELD_COUNTS)
-        if len(all_ids) != baseline_total:
-            logging.warning(
-                'routed field count differs from the v2 baseline: baseline=%d, actual=%d',
-                baseline_total,
-                len(all_ids),
-            )
+        if len(all_ids) != 1234 or len(set(all_ids)) != 1234:
+            raise ValueError('internal routing must cover 1234 unique fields')
         all_checksum = hashlib.sha256('\n'.join(all_ids).encode('utf-8')).hexdigest()
         if all_checksum != self._ALL_GROUPS_CHECKSUM:
-            logging.warning(
-                'complete routing differs from the v2 baseline checksum: %s',
-                all_checksum,
-            )
+            raise ValueError('complete routing checksum mismatch: {}'.format(
+                all_checksum))
 
         local_tokens = sum(token_count for _, _, token_count in ordered_groups)
         self.local_token_num = local_tokens
-        if local_tokens + 1 != self.mixup_token_num:
-            raise ValueError(
-                'configured token groups produce {} local + 1 global tokens, but '
-                'mixup_token_num={}; change the group token allocation together '
-                'with mixup_token_num'.format(local_tokens, self.mixup_token_num))
+        if local_tokens != 31 or local_tokens + 1 != self.mixup_token_num:
+            raise ValueError('token allocation must be 31 local + 1 global')
 
     def _calculate_dense_trainable_params(self):
         user_width = sum(
@@ -566,18 +578,12 @@ class MLPModel(ModelBase):
             scope=dense_scope,
         )
         actual_total = 0
-        has_unknown_shape = False
         log_manifest = not getattr(self, '_rm_logged_dense_manifest', False)
         for variable in dense_variables:
             shape = variable.shape.as_list()
             if any(dimension is None for dimension in shape):
-                has_unknown_shape = True
-                logging.warning(
-                    'skip dense parameter audit for unknown variable shape: %s %s',
-                    variable.op.name,
-                    shape,
-                )
-                continue
+                raise ValueError('unknown dense variable shape: {} {}'.format(
+                    variable.op.name, shape))
             variable_total = 1
             for dimension in shape:
                 variable_total *= dimension
@@ -585,22 +591,10 @@ class MLPModel(ModelBase):
             if log_manifest:
                 logging.info('RankMixer dense variable: %s shape=%s params=%d',
                              variable.op.name, shape, variable_total)
-        estimated_total = self.rm_parameter_breakdown['total']
-        if has_unknown_shape:
-            logging.warning(
-                'dense parameter audit is partial: known_params=%d, formula_estimate=%d',
-                actual_total,
-                estimated_total,
-            )
-        elif actual_total != estimated_total:
-            logging.warning(
-                'graph dense params=%d, formula estimate=%d; continuing because '
-                'the architecture is configurable',
-                actual_total,
-                estimated_total,
-            )
-        else:
-            logging.info('graph dense params verified: %d', actual_total)
+        if actual_total != self._EXPECTED_DENSE_TRAINABLE_PARAMS:
+            raise ValueError('graph dense params={}, expected={}'.format(
+                actual_total, self._EXPECTED_DENSE_TRAINABLE_PARAMS))
+        logging.info('graph dense params verified: %d', actual_total)
         self._rm_logged_dense_manifest = True
         return actual_total
 
@@ -613,164 +607,156 @@ class MLPModel(ModelBase):
     @classmethod
     def get_features_conf(cls, **kwargs):
         features_conf = {}
-        feature_version = kwargs.get(
-            'feature_version', 'data.cvr.cvr_fea_v10_base_cold')
-        module = locate(feature_version)
-        if module is None:
-            raise ValueError('invalid feature_version: {}'.format(feature_version))
-        fea_conf_obj = module.FeatureConfig()
-        embedding_size = int(kwargs.get('embedding_size', 17))
 
-        for key, value_map in fea_conf_obj.feature_details.items():
-            if bool(int(value_map.get('model_ignore', 0))):
-                logging.info('feature %s will not save', key)
+        feature_version = kwargs.get('feature_version', None)
+        module = locate(feature_version)
+        fea_conf_obj = module.FeatureConfig()
+
+        embedding_size = kwargs.get('embedding_size', 17)
+
+        for key, v_map in fea_conf_obj.feature_details.items():
+            if bool(int(v_map.get("model_ignore", 0))):
+                logging.info(f"fea key {key} will not save")
                 continue
-            if value_map.get('fea_class', 'common') in ('dense', 'label', 'extra'):
-                logging.info('skip feature %s', key)
+            if v_map.get("fea_class", "common") in ["dense", "label", "extra"]:
+                logging.info(f"skip fea key {key}")
                 continue
             conf = {
-                'embedding_size': int(value_map.get('embedding_size', embedding_size)),
-                'pooling_type': value_map.get('pooling_type', 'SUM_POOLING'),
-                'feature_parameter_args': {
-                    'accessor': {
-                        'stats_param': {
-                            'constant_feature': bool(int(
-                                value_map.get('constant_feature', 0)))
+                "embedding_size": int(v_map.get("embedding_size", embedding_size)),
+                "pooling_type": v_map.get("pooling_type", "SUM_POOLING"),
+                "feature_parameter_args": {
+                    "accessor": {
+                        "stats_param": {
+                            "constant_feature": bool(int(v_map.get("constant_feature", 0)))
                         }
                     }
-                },
+                }
             }
-            stats_param = conf['feature_parameter_args']['accessor']['stats_param']
-            if 'delete_threshold' in value_map:
-                stats_param['delete_threshold'] = value_map['delete_threshold']
-            if 'create_nonclk_prob' in value_map:
-                stats_param['create_nonclk_prob'] = value_map['create_nonclk_prob']
-            if 'create_click_prob' in value_map:
-                # Keep the established repository behavior for checkpoint config.
-                stats_param['create_nonclk_prob'] = value_map['create_click_prob']
+            stats_param = conf["feature_parameter_args"]["accessor"]["stats_param"]
+
+            if "delete_threshold" in v_map:
+                delete_threshold = v_map["delete_threshold"]
+                stats_param["delete_threshold"] = delete_threshold
+                logging.info(f"Feature '{key}': delete_threshold set to {delete_threshold}.")
+
+            if "create_nonclk_prob" in v_map:
+                create_nonclk_prob = v_map["create_nonclk_prob"]
+                stats_param["create_nonclk_prob"] = create_nonclk_prob
+                logging.info(f"Feature '{key}': create_nonclk_prob set to {create_nonclk_prob}.")
+
+            if "create_click_prob" in v_map:
+                create_click_prob = v_map["create_click_prob"]
+                stats_param["create_nonclk_prob"] = create_click_prob
+                logging.info(f"Feature '{key}': create_click_prob set to {create_click_prob}.")
+
             features_conf[key] = conf
-        logging.info('features_conf size=%d', len(features_conf))
+        logging.info(f"features_conf is {features_conf}, features_conf size is {len(features_conf)}")
         return features_conf
 
     @classmethod
     def get_share_embedding_conf(cls, **kwargs):
-        feature_version = kwargs.get(
-            'feature_version', 'data.cvr.cvr_fea_v10_base_cold')
-        module = locate(feature_version)
-        if module is None:
-            raise ValueError('invalid feature_version: {}'.format(feature_version))
-        return module.FeatureConfig().features_share_map
+        feature_version = kwargs.get('feature_version', None)
+        if feature_version:
+            module = locate(feature_version)
+            fea_conf_obj = module.FeatureConfig()
+            return fea_conf_obj.features_share_map
+        else:
+            return {}
 
     def get_dataset(self, data_paths, mode, use_dynamic_file=True, take_batch_num=0):
-        parquet_columns = self.features.parquet_reader_columns
-        features_spec = tf.feature_column.make_parse_example_spec(parquet_columns)
-        visible_features = self.fea_conf_obj.visible_fea_map.keys()
+        """获取数据集"""
+        parquet_cols = self.features.parquet_reader_columns
+        features_spec = tf.feature_column.make_parse_example_spec(parquet_cols)
+        size_limits_map = self.fea_conf_obj.feature_size_limit_map
+        feature_name_map = self.fea_conf_obj.features_multi_map
+        visible_feature_lst = self.fea_conf_obj.visible_fea_map.keys()
+
         return {
             'dataset': flood_data_util.get_parquet_data(
                 features=features_spec,
                 data_paths=data_paths,
-                batch_size=self.batch_size if mode == 'train' else self.eval_batch_size,
-                size_limits_map=self.fea_conf_obj.feature_size_limit_map,
-                feature_name_map=self.fea_conf_obj.features_multi_map,
-                sparse_features_to_tensor=list(visible_features),
+                batch_size=self.batch_size if mode == "train" else self.eval_batch_size,
+                size_limits_map=size_limits_map,
+                feature_name_map=feature_name_map,
+                sparse_features_to_tensor=list(visible_feature_lst),
                 sampler_label_name=self.sampler_label_name,
                 sampler_positive_rate=self.sampler_positive_rate,
                 sampler_negative_rate=self.sampler_negative_rate,
                 filter_pass_empty=self.filter_pass_empty,
-                shuffle=(mode == 'train'),
-                use_dynamic_files=use_dynamic_file if mode != 'predict' else False,
-                take_batch_num=0 if mode == 'train' else take_batch_num,
-                random_feature='' if mode == 'train' else self.random_feature,
+                shuffle=True if mode == "train" else False,
+                use_dynamic_files=use_dynamic_file if mode != "predict" else False,
+                take_batch_num=0 if mode == "train" else take_batch_num,
+                random_feature="" if mode == "train" else self.random_feature,
                 join_key_name='pk',
                 epochs=1,
                 prefetch_num=self.prefetch_num,
                 sampler_stat=self.sampler_stat,
                 drop_last_files=self.drop_last_files if mode == 'train' else 0,
                 async_pull=self.async_pull,
-                max_prefetched_pull=self.max_prefetched_pull,
-                drop_remainder=(mode == 'train'),
-                interleave=self.test_interleave if mode in ('test', 'predict') else self.interleave,
+                max_prefetched_pull=-1,
+                drop_remainder=True if mode == 'train' else False,
+                interleave=self.test_interleave if mode in ["test", "predict"] else self.interleave,
                 slow_worker_timeout=self.slow_worker_timeout,
                 slow_worker_num_limit=self.slow_worker_num_limit,
                 range_size_limit=100 * 1024 * 1024,
-                hole_size_limit=10 * 1024 * 1024,
+                hole_size_limit=10 * 1024 * 1024
             )
         }
 
-    def build(self, input_paths, test_paths, mode='train', config=None,
-              use_dynamic=True, **kwargs):
+    def build(self, input_paths, test_paths, mode='train', config=None, use_dynamic=True, **kwargs):
+        """构建完整的模型计算图"""
         self.global_step = tf.train.get_or_create_global_step()
         self.global_step_op = tf.assign_add(self.global_step, 1)
-        for graph_mode in ('train', 'test'):
-            logging.info(
-                '********** %s (build=%s) **********',
-                graph_mode,
-                self._COMPAT_BUILD,
-            )
-            try:
-                data_paths = test_paths if graph_mode == 'test' else input_paths
-                self.build_dataset_op(
-                    data_paths, mode=graph_mode, flood_mode=mode)
-                logging.info('%s dataset graph ready', graph_mode)
-                self.build_pred_results_op(mode=graph_mode, flood_mode=mode)
-                logging.info('%s prediction graph ready', graph_mode)
-                self.build_auc_copc_op(mode=graph_mode)
-                logging.info('%s metric graph ready', graph_mode)
-                if graph_mode == 'train':
-                    self.build_loss_op(mode=graph_mode)
-                    self.build_summary(mode=graph_mode)
-                    self.build_optimizer_op()
-                    logging.info('train loss/optimizer graph ready')
-            except Exception:
-                logging.exception(
-                    'Mature RankMixer %s graph build failed (build=%s)',
-                    graph_mode,
-                    self._COMPAT_BUILD,
-                )
-                raise
-        try:
-            self._build_export(config=config)
-            logging.info('export graph ready (build=%s)', self._COMPAT_BUILD)
-        except Exception:
-            logging.exception(
-                'Mature RankMixer export graph build failed (build=%s)',
-                self._COMPAT_BUILD,
-            )
-            raise
+        for tmp_mode in ['train', 'test']:
+            logging.info(f"{'*' * 10} {tmp_mode} {'*' * 10}")
+            data_paths = test_paths if tmp_mode == 'test' else input_paths
+            self.build_dataset_op(data_paths, mode=tmp_mode, flood_mode=mode)
+            self.build_pred_results_op(mode=tmp_mode, flood_mode=mode)
+            self.build_auc_copc_op(mode=tmp_mode)
+            if tmp_mode == 'train':
+                self.build_loss_op(mode=tmp_mode)
+                self.build_summary(mode=tmp_mode)
+                self.build_optimizer_op()
+        self._build_export(config=config)
         self.run_metadata = tf.RunMetadata()
-        self.run_options = tf.RunOptions(
-            trace_level=tf.RunOptions.FULL_TRACE,
-            timeout_in_ms=self.timeout,
-        )
+        self.run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE, timeout_in_ms=self.timeout)
         self.timeout_options = tf.RunOptions(timeout_in_ms=self.timeout)
 
         if self.log_nn_vars:
-            for variable in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
-                logging.info('global variable: %s', variable)
+            global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+            logging.info('global_vars:')
+            for var in global_vars:
+                logging.info('{}'.format(var))
 
     def build_dataset_op(self, data_paths, mode, flood_mode):
         if mode == 'train':
             use_dynamic_files = (flood_mode == 'train')
         else:
             use_dynamic_files = self.strict_test_date and self.order_by_date
-        logging.info('flood_mode=%s, graph_mode=%s, use_dynamic_files=%s',
-                     flood_mode, mode, use_dynamic_files)
+
+        logging.info(
+            f"flood_mode is {flood_mode}, {mode}_paths: {data_paths[:2]}, use_dynamic_files is {use_dynamic_files}")
+
         dataset_op = self.get_dataset(
             data_paths,
-            mode,
+            flood_mode,
             use_dynamic_file=use_dynamic_files,
-            take_batch_num=self.test_batch_num if mode == 'test' else 0,
+            take_batch_num=self.test_batch_num if mode == 'test' else 0
         )
+
         dataset = dataset_op['dataset'].map(self.parse_examples, num_parallel_calls=None)
         dataset = dataset.prefetch(1)
         iterator = dataset.make_initializable_iterator()
-        self['{}_iterator'.format(mode)] = iterator
-        self['{}_init_op'.format(mode)] = iterator.initializer
-        result = iterator.get_next()
-        for key, value in result.items():
-            self['{}_{}'.format(mode, key)] = value
+
+        self[f'{mode}_iterator'] = iterator
+        self[f'{mode}_init_op'] = iterator.initializer
+
+        res = self[f'{mode}_iterator'].get_next()
+        for key, value in res.items():
+            self[f'{mode}_{key}'] = value
 
     def parse_examples(self, *example_batch):
+        """解析输入数据批次，只保留 fst 主任务 label"""
         columns = self.features.parquet_reader_columns
         features = parsing_ops.parse_parquet(
             example_batch,
@@ -779,89 +765,80 @@ class MLPModel(ModelBase):
             unique=False,
             share_embedding_conf=self.fea_conf_obj.features_share_map,
             global_hash=False,
-            psv2=True,
+            psv2=True
         )
-        features['sampleid'] = flood.generate_sample_id(
-            search_ids=features['search_id'].values,
-            example_ids=features['example_ids'].values,
-        )
-        labels = tf.cast(features.pop(self.cvr_label_name), tf.float32)
-        sample_id = tf.cast(features.pop('sampleid'), tf.float32)
-        search_id = features['search_id'].values
-        example_id = features['example_ids'].values
+        features["sampleid"] = flood.generate_sample_id(
+            search_ids=features["search_id"].values,
+            example_ids=features["example_ids"].values)
+        label_cvr_first = tf.cast(features.pop(self.cvr_label_name), tf.float32)
+        sampleid = tf.cast(features.pop('sampleid'), tf.float32)
+        search_id = features["search_id"].values
+        example_id = features["example_ids"].values
+
         return {
             'features': features,
-            'labels': labels,
-            'sampleid': sample_id,
+            'labels': label_cvr_first,
+            'sampleid': sampleid,
             'search_id': search_id,
-            'example_id': example_id,
+            'example_id': example_id
         }
 
     def build_pred_results_op(self, mode, flood_mode=None):
-        function_mode = mode if mode == 'test' else flood_mode
-        results = self.model_fn(
-            self['{}_features'.format(mode)],
-            self['{}_labels'.format(mode)],
-            mode=function_mode,
-        )
+        fn_mode = mode if mode == 'test' else flood_mode
+        results = self.model_fn(self[f'{mode}_features'], self[f'{mode}_labels'], mode=fn_mode)
+
         for key, value in results.items():
-            self['{}_{}'.format(mode, key)] = value
+            self[f'{mode}_{key}'] = value
 
     def build_loss_op(self, mode):
-        labels = tf.reshape(self['{}_labels'.format(mode)], shape=[-1])
-        predictions = tf.reshape(self['{}_pred'.format(mode)], shape=[-1])
-        self.loss = tf.reduce_mean(tf.losses.log_loss(
-            predictions=predictions,
-            labels=labels,
-        ))
+        """只保留 fst 主任务损失"""
+        labels = tf.reshape(self[f'{mode}_labels'], shape=[-1])
+        pred = tf.reshape(self[f'{mode}_pred'], shape=[-1])
+        self.loss = tf.reduce_mean(tf.losses.log_loss(predictions=pred, labels=labels))
         self.loss_first = self.loss
         self.labels_pos_cvr_count = tf.reduce_sum(labels)
 
     def build_auc_copc_op(self, mode):
-        labels = self['{}_labels'.format(mode)]
-        predictions = self['{}_pred'.format(mode)]
-        self['{}_auc'.format(mode)] = flood_auc(
-            labels,
-            predictions,
-            name='auc/cvr',
-            num_thresholds=2000,
-        )
-        self['{}_copc'.format(mode)] = (
-            tf.reduce_sum(predictions) / (tf.reduce_sum(labels) + 1e-8)
-        )
-        self['{}_auc_values'.format(mode)] = tf.get_collection(
-            tf.GraphKeys.METRIC_VARIABLES,
-            scope='auc',
-        )
-        self['{}_reset_auc_op'.format(mode)] = tf.variables_initializer(
-            var_list=self['{}_auc_values'.format(mode)])
-        self['{}_pred_mean'.format(mode)] = tf.reduce_mean(predictions)
+        """只保留 cvr 主指标"""
+        self[f'{mode}_auc'] = flood_auc(self[f'{mode}_labels'], self[f'{mode}_pred'], name='auc/cvr',
+                                        num_thresholds=2000)
+        self[f'{mode}_copc'] = tf.reduce_sum(self[f'{mode}_pred']) / (tf.reduce_sum(self[f'{mode}_labels']) + 1e-8)
+        self[f'{mode}_auc_values'] = tf.get_collection(tf.GraphKeys.METRIC_VARIABLES, scope='auc')
+        self[f'{mode}_reset_auc_op'] = tf.variables_initializer(var_list=self[f'{mode}_auc_values'])
+        self[f'{mode}_pred_mean'] = tf.reduce_mean(self[f'{mode}_pred'])
 
     def build_summary(self, mode):
-        summaries = [
-            tf.summary.scalar('{}/loss'.format(mode), self.loss),
-            tf.summary.scalar('{}/auc'.format(mode), self['{}_auc'.format(mode)]),
-            tf.summary.scalar('{}/copc'.format(mode), self['{}_copc'.format(mode)]),
-        ]
-        self.eval_summary = tf.summary.merge(summaries, name='eval_summary')
+        auc_summary = tf.summary.scalar(f'{mode}/auc', self[f'{mode}_auc'])
+        loss_summary = tf.summary.scalar(f'{mode}/loss', self.loss)
+        copc_summary = tf.summary.scalar(f'{mode}/copc', self[f'{mode}_copc'])
+        self.eval_summary = tf.summary.merge(
+            [
+                loss_summary,
+                auc_summary,
+                copc_summary,
+            ],
+            name='eval_summary',
+        )
 
     def build_optimizer_op(self):
-        if 'circle_restart' in self.decay:
+        """构建优化器操作，包括梯度计算和应用"""
+        if "circle_restart" in self.decay:
             self.learning_rate = tf.train.cosine_decay_restarts(
                 learning_rate=self.learning_rate,
                 global_step=tf.train.get_global_step(),
                 first_decay_steps=800000,
                 t_mul=2.0,
                 m_mul=1.0,
-                alpha=0.000005,
+                alpha=0.000005
             )
-        elif 'exp' in self.decay:
+        elif "exp" in self.decay:
             self.learning_rate = tf.train.exponential_decay(
                 learning_rate=self.learning_rate,
                 global_step=tf.train.get_global_step(),
                 decay_steps=500000,
                 decay_rate=0.98,
                 staircase=False,
+                name=None
             )
         else:
             self._build_lr_schedule()
@@ -869,80 +846,56 @@ class MLPModel(ModelBase):
         optimizer = self.get_optimizer(self.optimizer, self.learning_rate)
         self.optimizer = FloodOptimizer(optimizer)
         grads_and_vars = self.optimizer.compute_gradients(self.loss)
-        for gradient, variable in grads_and_vars:
-            logging.info('[gradient] %s %s', gradient, variable)
-            if gradient is not None:
-                tf.summary.histogram(
-                    'train/{}/gradients'.format(variable.op.name),
-                    gradient,
-                )
-        self.train_op = [self.optimizer.apply_gradients(
-            grads_and_vars,
-            global_step=tf.train.get_global_step(),
-        )]
+        for (grad, var) in grads_and_vars:
+            logging.info(f'[normal gradiant] {grad} {var}')
+            if grad is not None:
+                tf.summary.histogram('train/' + var.op.name + '/gradients', grad)
+        self.train_op = [self.optimizer.apply_gradients(grads_and_vars, global_step=tf.train.get_global_step())]
 
     def _build_lr_schedule(self):
-        self.learning_rate = self._schedule_lr(
-            self.learning_rate,
-            self.schedule_config,
-        )
+        learning_rate = self.learning_rate
+        learning_rate = self._schedule_lr(learning_rate, self.schedule_config)
+        self.learning_rate = learning_rate
 
-    def _schedule_lr(self, learning_rate, schedule_config):
-        learning_rate = tf.convert_to_tensor(learning_rate)
+    def _schedule_lr(self, lr, schedule_config: dict):
+        lr = tf.convert_to_tensor(lr)
         if 'type' in schedule_config:
-            logging.info('use learning-rate schedule: %s', schedule_config)
+            logging.info('use lr decay schedule')
             learning_rate_utils.get_or_create_milestone_step_reset_op()
-            learning_rate = learning_rate_utils.learning_rate_schedule(
-                learning_rate,
-                schedule_config['type'],
-                **schedule_config
-            )
-        return learning_rate
+            schedule_type = schedule_config['type']
+            lr = learning_rate_utils.learning_rate_schedule(
+                lr,
+                schedule_type,
+                **schedule_config)
+        return lr
 
     def get_optimizer(self, optimizer='Adagrad', learning_rate=0.001):
         optimizer = optimizer.strip()
-        logging.info('use optimizer: %s', optimizer)
+        logging.info('use optimitzer: ' + optimizer)
         if optimizer == 'Adam':
-            return tf.train.AdamOptimizer(
-                learning_rate=learning_rate,
-                beta1=0.9,
-                beta2=0.999,
-                epsilon=1e-8,
-            )
-        if optimizer == 'flood_adam':
+            return tf.train.AdamOptimizer(learning_rate=learning_rate, beta1=0.9, beta2=0.999, epsilon=1e-8)
+        elif optimizer == "flood_adam":
             from flood.python.training.adam_optimizer import AdamOptimizer as FloodAdamOptimizer
-            return FloodAdamOptimizer(
-                learning_rate=learning_rate,
-                beta1=0.9,
-                beta2=0.999,
-                epsilon=1e-8,
-            )
-        if optimizer == 'Adagrad':
-            return tf.train.AdagradOptimizer(
-                learning_rate=learning_rate,
-                initial_accumulator_value=1e-8,
-            )
-        if optimizer == 'Momentum':
-            return tf.train.MomentumOptimizer(
-                learning_rate=learning_rate,
-                momentum=0.95,
-            )
-        if optimizer == 'ftrl':
+            optimizer = FloodAdamOptimizer(learning_rate=learning_rate, beta1=0.9, beta2=0.999,
+                                           epsilon=1e-8)
+            return optimizer
+        elif optimizer == 'Adagrad':
+            return tf.train.AdagradOptimizer(learning_rate=learning_rate, initial_accumulator_value=1e-8)
+        elif optimizer == 'Momentum':
+            return tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.95)
+        elif optimizer == 'ftrl':
             return tf.train.FtrlOptimizer(learning_rate)
-        if optimizer == 'lazyAdam':
-            return tf.contrib.opt.LazyAdamOptimizer(
-                learning_rate=learning_rate,
-                beta1=0.9,
-                beta2=0.999,
-                epsilon=1e-8,
-            )
-        if optimizer == 'SGD':
+        elif optimizer == 'lazyAdam':
+            return tf.contrib.opt.LazyAdamOptimizer(learning_rate=learning_rate, beta1=0.9, beta2=0.999, epsilon=1e-8)
+        elif optimizer == 'SGD':
             return tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
-        raise ValueError('unsupported optimizer: {}'.format(optimizer))
+        logging.info('cannot find optimizer: ' + optimizer)
+        return self.optimizer
 
     def train(self, session, worker_id=0, **kwargs):
+        """执行训练步骤"""
         self.train_count += 1
-        fetches = {
+        fetch = {
             'train_op': self.train_op,
             'loss': self.loss,
             'labels_pos_cvr_count': self.labels_pos_cvr_count,
@@ -952,199 +905,209 @@ class MLPModel(ModelBase):
             'copc': self['train_copc'],
             'learning_rate': self.learning_rate,
         }
-        result = session.run(fetches, options=self.timeout_options)
+
+        res = session.run(fetch, options=self.timeout_options)
+
         if self.train_count % kwargs.get('train_log_step', 10) == 0:
-            logging.info('---------------- train [%d] ----------------', self.train_count)
+            logging.info(f"----------------- train [{self.train_count}] ------------------------")
             logging.info(
-                'gstep=%s loss=%.6f auc=%.6f copc=%.6f pred_mean=%.6f '
-                'positive=%s lr=%s',
-                result['global_step'],
-                result['loss'],
-                result['auc'],
-                result['copc'],
-                result['pred_mean'],
-                result['labels_pos_cvr_count'],
-                result['learning_rate'],
+                f"lstep: {self.train_count}, "
+                f"gstep: {res['global_step']}, "
+                f"loss: {res['loss']:.6f}, "
+                f"auc: {res['auc']:.6f}, "
+                f"copc: {res['copc']:.6f}, "
+                f"pred_mean: {res['pred_mean']:.6f},"
+                f"labels_pos_cvr_count: {res['labels_pos_cvr_count']},"
+                f"learning_rate:  {res['learning_rate']},"
             )
+            logging.info("-------------------------------------------------------------")
+
         if self.task_index == 0 and self.train_reset_interval > 0 \
-                and self.train_count * self.num_worker \
-                > self.train_reset_interval * self.train_reset_count:
+                and self.train_count * self.num_worker > self.train_reset_interval * self.train_reset_count:
             self.train_reset_count += 1
-            logging.info('reset train AUC')
+            logging.info(" >>>> reset auc <<<< ")
             session.run([self['train_reset_auc_op']])
-        return {
-            'global_step': result['global_step'],
-            'train_reset_count': self.train_reset_count,
-        }
+        return {'global_step': res['global_step'], 'train_reset_count': self.train_reset_count}
 
     def test(self, session, worker_id=0, prefix='test', **kwargs):
         self.train_init(session)
-        log_format = '%(asctime)-15s [%(levelname)s] [%(filename)s:%(lineno)s] %(message)s'
+        FORMAT = '%(asctime)-15s [%(levelname)s] [%(filename)s:%(lineno)s] %(message)s'
         file_handler = FileHandler('flood_worker_0.log')
-        file_handler.setFormatter(Formatter(log_format))
-        getLogger(name='search_jarvis_logging').addHandler(file_handler)
+        file_handler.setFormatter(Formatter(FORMAT))
 
-        test_count = 0
+        logger = getLogger(name='search_jarvis_logging')
+        logger.addHandler(file_handler)
+
+        test_cnt = 0
         session.run([self['test_init_op']])
+
         auc_accum = RocAucAccum(num_thresholds=2000)
         pr_auc_accum = PrAucAccum(num_thresholds=2000)
         copc_accum = COPCAccum()
         bucket_error = BucketErrorAccum(1000)
-        sample_count_accum = SampleCntAccum()
-        fetches = {
+        sample_cnt_accum = SampleCntAccum()
+
+        fetchs = {
             'sampleid': self['test_sampleid'],
-            'search_id': self['test_search_id'],
-            'example_id': self['test_example_id'],
+            'test_search_id': self['test_search_id'],
+            'test_example_id': self['test_example_id'],
             'labels': self['test_labels'],
             'pred': self['test_pred'],
             'auc': self['test_auc'],
             'copc': self['test_copc'],
         }
 
-        local_path = None
-        hdfs_path = None
         if self.save_predict_result:
             local_path = 'predictions-{}.txt'.format(worker_id)
-            hdfs_dir = os.path.join(
-                self.predict_path if self.predict_path else self.model_dir,
-                prefix,
-            )
+            if self.predict_path:
+                hdfs_dir = os.path.join(self.predict_path, prefix)
+            else:
+                hdfs_dir = os.path.join(self.model_dir, prefix)
             hdfs_path = os.path.join(hdfs_dir, local_path)
+            logging.info("predict res local path: %s", local_path)
+            logging.info("predict res hdfs path: %s", hdfs_path)
             if worker_id == 0:
                 mkdir_hdfs(hdfs_dir)
-            with tf.gfile.Open(local_path, 'w') as output_file:
-                output_file.write('')
+            cnt = 0
+            with tf.gfile.Open(local_path, 'w') as f:
+                f.write('')
 
         while True:
             try:
-                result = session.run(fetches, options=self.timeout_options)
+                res = session.run(fetchs, options=self.timeout_options)
+
                 if self.save_predict_result:
-                    with tf.gfile.Open(local_path, 'a') as output_file:
-                        for search_id, example_id, label, prediction in zip(
-                                result['search_id'], result['example_id'],
-                                result['labels'], result['pred']):
-                            line = '\t'.join([
-                                search_id.decode(),
-                                example_id.decode(),
-                                str(label[0]),
-                                str(prediction),
-                            ]) + '\n'
-                            output_file.write(line)
+                    with tf.gfile.Open(local_path, 'a') as f:
+                        for search_id, example_id, label_cvr, pred in zip(res['test_search_id'],
+                                                                          res['test_example_id'], res['labels'],
+                                                                          res['pred']):
+                            line = '\t'.join(
+                                [search_id.decode(), example_id.decode(), str(label_cvr[0]), str(pred)]) + '\n'
+                            f.write(line)
+                            cnt += 1
 
-                labels = result['labels']
-                predictions = result['pred']
-                test_count += 1
-                auc_accum.update(labels, predictions)
-                pr_auc_accum.update(labels, predictions)
-                copc_accum.update(labels, predictions)
-                bucket_error.update(labels, predictions)
-                sample_count_accum.update(labels, predictions)
+                label_cvr, pred = res['labels'], res['pred']
+                test_cnt += 1
 
-                if 0 < self.test_batch_num < test_count:
-                    logging.info('finish test at test_batch_num=%d', self.test_batch_num)
+                auc_accum.update(label_cvr, pred)
+                pr_auc_accum.update(label_cvr, pred)
+                copc_accum.update(label_cvr, pred)
+                bucket_error.update(label_cvr, pred)
+                sample_cnt_accum.update(label_cvr, pred)
+
+                if 0 < self.test_batch_num < test_cnt:
+                    logging.info(f"finish test by test_batch_num={self.test_batch_num}")
                     break
-                if test_count % kwargs.get('test_log_step', 10) == 0:
-                    logging.info('test_count=%d auc=%.6f copc=%.6f',
-                                 test_count, result['auc'], result['copc'])
-            except tf.errors.OutOfRangeError as error:
-                logging.info('all test data consumed: %s', str(error))
+
+                if test_cnt % kwargs.get('test_log_step', 10) == 0:
+                    logging.info("----------------- test_cnt [%s] ------------------------" % test_cnt)
+                    logging.info(f"CVR AUC: {res['auc']:.6f}  CVR COPC: {res['copc']:.6f}")
+
+            except tf.errors.OutOfRangeError as e:
+                logging.info(f'all data set used. {e.message}')
                 break
-            except tf.errors.DeadlineExceededError as error:
-                logging.error('test step timed out: %s', str(error))
+            except tf.errors.DeadlineExceededError as e:
+                logging.error('===========test step timed out========== %s' % e.message)
                 break
-            except tf.errors.InvalidArgumentError as error:
-                logging.warning('skip invalid test data: %s', str(error))
+            except tf.errors.InvalidArgumentError as e:
+                logging.warning('data error: %s' % e.message)
                 continue
-            except (tf.errors.PermissionDeniedError,
-                    tf.errors.FailedPreconditionError,
-                    RuntimeError) as error:
-                logging.error('test aborted: %s', str(error))
+            except tf.errors.PermissionDeniedError as e:
+                logging.error("PermissionDeniedError: %s" % str(e))
+                break
+            except tf.errors.FailedPreconditionError as e:
+                logging.error("FailedPreconditionError: %s" % str(e))
+                break
+            except RuntimeError as e:
+                logging.warning("runtime error:%s" % str(e))
                 break
 
-        accumulated_metrics = {
-            'cvr-tower': {
-                'roc_auc': auc_accum.dump(),
-                'copc': copc_accum.dump(),
-                'pr_auc': pr_auc_accum.dump(),
-                'bucket_error': bucket_error.dump(),
-                'sample_cnt': sample_count_accum.dump(),
-            }
-        }
-        result = {
-            'accum_metrics': accumulated_metrics,
-            'title': 'lamb-feature-{}'.format(self.random_feature)
-            if self.random_feature else 'base',
-        }
+        accum_metrics = {'cvr-tower': {
+            'roc_auc': auc_accum.dump(),
+            'copc': copc_accum.dump(),
+            'pr_auc': pr_auc_accum.dump(),
+            'bucket_error': bucket_error.dump(),
+            'sample_cnt': sample_cnt_accum.dump(),
+        }}
+
+        res = {'accum_metrics': accum_metrics,
+               'title': f'lamb-feature-{self.random_feature}' if self.random_feature else 'base'}
+
         if self.save_predict_result:
             upload_hdfs(local_path, hdfs_path, True)
-            if self.upload_log and worker_id == 0:
-                upload_hdfs(
-                    'flood_worker_0.log',
-                    os.path.join(hdfs_dir, 'flood_worker_0.log'),
-                    True,
-                )
-        return result
+            logging.info("upload predict result into hdfs: %s", hdfs_path)
+
+        if self.upload_log and self.save_predict_result and worker_id == 0:
+            logging.info("set worker0 log file")
+            log_hdfs_path = os.path.join(hdfs_dir, "flood_worker_0.log")
+            upload_hdfs("flood_worker_0.log", log_hdfs_path, True)
+            logging.info("worker0 log upload done")
+
+        return res
 
     def predict(self, session, worker_id=0, **kwargs):
-        prefix = 'predict-{}'.format(self.random_feature) \
-            if self.random_feature else 'predict'
-        result = self.test(session, worker_id, prefix=prefix, **kwargs)
+        prefix = 'predict'
         if self.random_feature:
-            result['merge_from_all_workers'] = not self.parallel_feature_analysis
-        return result
+            prefix = 'predict-%s' % self.random_feature
+
+        ret = self.test(session, worker_id, prefix=prefix, **kwargs)
+
+        if self.random_feature:
+            logging.info("Run all predict data for Random Feature: %s" % self.random_feature)
+        else:
+            logging.info("Run all predict data.")
+
+        if self.random_feature:
+            if self.parallel_feature_analysis:
+                ret.update({'merge_from_all_workers': False})
+            else:
+                ret.update({'merge_from_all_workers': True})
+
+        return ret
 
     def _build_export(self, config=None):
-        serialized_example = tf.placeholder(
-            dtype=tf.string,
-            shape=[None],
-            name='example',
-        )
-        features = tf.parse_example(
-            serialized_example,
-            tf.feature_column.make_parse_example_spec(self.features.export_columns),
-        )
+        serialized_tf_example = tf.placeholder(dtype=tf.string, shape=[None], name='example')
+        features = tf.parse_example(serialized_tf_example,
+                                    tf.feature_column.make_parse_example_spec(self.features.export_columns))
+
         fake_labels = tf.constant(value=[[1]], shape=[1, 1], dtype=tf.float32)
-        prediction_result = self.model_fn(
-            features,
-            fake_labels,
-            mode='export',
-            export=True,
-        )
+        pred_result = self.model_fn(features, fake_labels, mode="export", export=True)
+
         self.export_spec = {
-            'input': {'example': serialized_example},
-            'output': {'cvr': prediction_result['pred']},
+            'input': {'example': serialized_tf_example},
+            'output': {'cvr': pred_result['pred']}
         }
 
     def export(self):
         return self.export_spec
 
     def train_init(self, session):
-        logging.info('reinitialize train dataset')
+        logging.info("reinitialize train_init_op.")
         session.run(self['train_init_op'])
         if self.is_chief:
             session.run(learning_rate_utils.get_or_create_milestone_step_reset_op())
             logging.info(
-                'milestone step: %s',
+                "milestone step: %s",
                 session.run(learning_rate_utils.get_or_create_milestone_step()),
             )
 
     def evaluate(self, session, **kwargs):
         self.eval_count += 1
+        fetches = {
+            'summary': self['eval_summary'],
+            'global_step': self.global_step,
+        }
+        result = None
         try:
-            result = session.run(
-                {
-                    'summary': self['eval_summary'],
-                    'global_step': self.global_step,
-                },
-                options=tf.RunOptions(timeout_in_ms=400000),
-            )
+            timeout = 400000
+            result = session.run(fetches, options=tf.RunOptions(timeout_in_ms=timeout))
         except tf.errors.DeadlineExceededError:
-            logging.error('evaluation timed out')
-            return None
+            logging.error('Error: evaluation timed out')
+            return
         except tf.errors.OutOfRangeError:
-            logging.info('evaluation data exhausted; reinitialize train data')
+            logging.info("Run out of evaluation data, reinitialize")
             self.train_init(session)
-            return None
+
         result['summary'] = tf.Summary()
         return result
 
@@ -1152,19 +1115,13 @@ class MLPModel(ModelBase):
         logging.info('-' * 30)
         logging.info('model args:')
         for name, value in vars(self).items():
-            logging.info('%s=%s', name, value)
+            logging.info('%s=%s' % (name, value))
         logging.info('-' * 30)
 
     def get_hooks(self):
         hooks = []
-        if not self.enable_dense_warmup:
-            return hooks
-
-        task_config = self.tf_config.get('task', {}) if self.tf_config else {}
-        is_master = task_config.get('type') == 'master'
-        is_worker_zero = task_config.get('index', 0) == 0
-        if is_master or is_worker_zero:
-            from framework.hooks.new_branch_warmup_hook import Senet2NewWarmupHook
+        if self.enable_dense_warmup and (
+                self.tf_config['task']['type'] == "master" or self.tf_config['task']['index'] == 0):
             hooks.append(Senet2NewWarmupHook(self.model_dir, model=self))
         return hooks
 
