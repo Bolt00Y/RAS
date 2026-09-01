@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """FST-runtime build of the pure mature RankMixer single-head fst_CVR model.
 
-The default configuration is the production-callable D=256 design:
+The default configuration is the frozen D=256 design:
 
 * Base-only sparse inputs: common_user(385), item(835), creative(14), E=17.
 * Mature low-rank excitation2 SENet: user=256, item=128, creative=128.
@@ -246,7 +246,7 @@ class MLPModel(ModelBase):
         self.task_index = self.worker_id
 
         # Warm-up attributes are consumed by the common runner/ModelBase even
-        # though the frozen debug configuration uses dense cold start.
+        # though the frozen FST-v1 configuration uses dense cold start.
         self.enable_dense_warmup = _kwargs.get('enable_dense_warmup', False)
         self.enable_mlt_warmup = _kwargs.get('enable_mlt_warmup', False)
         self.hooks = _kwargs.get('hooks', [])
