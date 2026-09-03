@@ -1,0 +1,40 @@
+flowchart TD
+    IN["三桶 Embedding + 各自 Input BN<br/>C: 6545；I: 14195；A: 238"]:::keep
+    SE["字段级 SENet，隐藏维度 128<br/>C 条件为 C；I 条件为 C+I<br/>A 条件为 C+I+A"]:::keep
+    LOCAL["Local：10C + 20I + 1A 分组<br/>逐组独立 FC → GELU2 → 逐 Token 切片<br/>31 个 512 维 Token"]:::keep
+    LN["Local RMSNorm<br/>逐 Token gamma: 31 × 512"]:::keep
+    GLOBAL["Global：SENet 后 C+I+A 拼接<br/>20978 → 512 → 512<br/>第一层 GELU2，第二层 Linear"]:::keep
+    GN["Global RMSNorm<br/>gamma: 512"]:::keep
+    CORE["31 Local + 1 Global → B × 32 × 512<br/>2 个 RankMixer Block；H=T=32，M=704<br/>Mix/Revert + 两套 RMSNorm/pSwiGLU<br/>块内残差 + 原始输入 X 的长残差"]:::keep
+    FINAL["Final RMSNorm<br/>逐 Token gamma: 32 × 512"]:::keep
+    GT["【基线①】Final Global<br/>取索引 31，输出 512 维"]:::change
+    LT["Final Local<br/>取索引 0–30，形状 B × 31 × 512"]:::change
+    Q["【基线②】Global → Query<br/>512 → 128"]:::change
+    K["【基线②】Local → Key<br/>共享 512 → 128 投影"]:::change
+    POOL["【基线②】条件 Pool<br/>Softmax 仅覆盖 31 个 Local<br/>按权重汇总原始 Local 值，输出 512 维"]:::change
+    FLAT["【基线③】门控压缩 Flatten<br/>31 × 512 = 15872 → 512<br/>GELU2 → RMSNorm → sigmoid(a) 门控"]:::change
+    CAT["三路拼接：Global + Pool + Flatten<br/>512 + 512 + 512 = 1536"]:::change
+    HEAD["任务塔：1536 → 2048 → 2048 → 256 → 1<br/>隐藏层 Dense → BN → GELU2"]:::keep
+    OUT["Logit 裁剪到 -50～50 → Sigmoid<br/>以 fst_cvr_label 计算平均 BCE"]:::output
+
+    IN --> SE
+    SE --> LOCAL --> LN
+    SE --> GLOBAL --> GN
+    LN --> CORE
+    GN --> CORE
+    CORE --> FINAL
+    FINAL --> GT
+    FINAL --> LT
+    GT --> Q --> POOL
+    LT --> K --> POOL
+    LT -->|"Value 直接使用 Local"| POOL
+    LT --> FLAT
+    GT --> CAT
+    POOL --> CAT
+    FLAT --> CAT
+    CAT --> HEAD --> OUT
+
+    classDef keep fill:#EAF2FF,stroke:#587DAD,color:#173455;
+    classDef change fill:#FFF0D9,stroke:#CC8428,color:#633900,stroke-width:2px;
+    classDef optimize fill:#F0E9FB,stroke:#8C63B6,color:#4B2E70,stroke-width:2px;
+    classDef output fill:#E5F4EE,stroke:#468D75,color:#174D3C;

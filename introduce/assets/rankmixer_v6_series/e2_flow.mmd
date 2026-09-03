@@ -1,0 +1,24 @@
+flowchart TD
+    IN["三桶 Embedding + 各自 Input BN<br/>C: 6545；I: 14195；A: 238"]:::keep
+    SE["字段级 SENet，隐藏维度 128<br/>C 条件为 C；I 条件为 C+I<br/>A 条件为 C+I+A"]:::keep
+    LOCAL["Local：10C + 20I + 1A 分组<br/>逐组独立 FC → GELU2 → 逐 Token 切片<br/>31 个 512 维 Token"]:::keep
+    LN["Local RMSNorm<br/>逐 Token gamma: 31 × 512"]:::keep
+    GLOBAL["Global：SENet 后 C+I+A 拼接<br/>20978 → 512 → 512<br/>第一层 GELU2，第二层 Linear"]:::keep
+    GN["Global RMSNorm<br/>gamma: 512"]:::keep
+    CORE["31 Local + 1 Global → B × 32 × 512<br/>2 个 RankMixer Block；H=T=32，M=704<br/>Mix/Revert + 两套 RMSNorm/pSwiGLU<br/>块内残差 + 原始输入 X 的长残差"]:::keep
+    FINAL["Final RMSNorm<br/>逐 Token gamma: 32 × 512"]:::keep
+    FLAT["【改动①】PureFlat 替换三路读出<br/>全部 32 个 Token，包含 Global<br/>B × 32 × 512 → B × 16384"]:::change
+    HEAD["【改动②】首层输入 1536 → 16384<br/>任务塔：16384 → 2048 → 2048 → 256 → 1<br/>隐藏层 Dense → BN → GELU2 保留"]:::change
+    OUT["Logit 裁剪到 -50～50 → Sigmoid<br/>以 fst_cvr_label 计算平均 BCE"]:::output
+
+    IN --> SE
+    SE --> LOCAL --> LN
+    SE --> GLOBAL --> GN
+    LN --> CORE
+    GN --> CORE
+    CORE --> FINAL --> FLAT --> HEAD --> OUT
+
+    classDef keep fill:#EAF2FF,stroke:#587DAD,color:#173455;
+    classDef change fill:#FFF0D9,stroke:#CC8428,color:#633900,stroke-width:2px;
+    classDef optimize fill:#F0E9FB,stroke:#8C63B6,color:#4B2E70,stroke-width:2px;
+    classDef output fill:#E5F4EE,stroke:#468D75,color:#174D3C;

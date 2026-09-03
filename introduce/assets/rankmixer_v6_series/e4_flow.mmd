@@ -1,0 +1,34 @@
+flowchart TD
+    IN["三桶 Embedding + 各自 Input BN<br/>C: 6545；I: 14195；A: 238"]:::keep
+    CI["common/item 字段级 SENet 保留<br/>C 条件为 C；I 条件为 C+I"]:::keep
+    A["【改动②】creative-only SENet<br/>条件 C+I+A → 仅 A<br/>14 → 128 → 14 的字段门控"]:::change
+    GI["【改动③】直接取 BN 后、SENet 前的 C+I<br/>输入 20978 → 20740，不含 creative"]:::change
+    LOCAL["【改动①】分组 10C/20I/1A → 10C/21I/0A<br/>逐组独立 FC → GELU2 → Unpack<br/>输入分组改变，输出仍为 31 × 256"]:::change
+    LN["Local RMSNorm 保留<br/>逐 Token gamma: 31 × 256"]:::keep
+    GLOBAL["【改动③】Global MLP 输入随动<br/>20740 → 256 → 256<br/>第一层 GELU2，第二层 Linear"]:::change
+    GN["Global RMSNorm 保留<br/>gamma: 256"]:::keep
+    CORE["保留 Small 的两个 RankMixer Block<br/>31 Local + 1 Global → B × 32 × 256<br/>RMSNorm；H=T=32，M=704<br/>Mix/Revert、两套 pSwiGLU 与残差保留"]:::keep
+    FINAL["【改动④】Final RMSNorm → LayerNorm<br/>共享 gamma/beta: 各 256；epsilon=1e-8"]:::change
+    POOL["【改动⑤】PureFlat → 32-Token Mean Pool<br/>包含 Global，每个 Token 权重为 1/32<br/>输出 256 维主干表示"]:::change
+    CREATIVE["【改动②】新增 creative 旁路：238 → 256 → 32<br/>每层 Dense → BN → 参数化 Swish<br/>逐通道 beta 可训练，初始 1.702"]:::change
+    CAT["【改动⑤】主干与旁路直接拼接<br/>256 + 32 = 288<br/>拼接前无额外分支 Norm 或门控"]:::change
+    HEAD["【改动⑥】缩小任务塔：288 → 256 → 128 → 1<br/>替换 8192 → 2048 → 2048 → 256 → 1<br/>隐藏层仍为 Dense → BN → GELU2"]:::change
+    OUT["Logit 裁剪到 -50～50 → Sigmoid<br/>以 fst_cvr_label 计算平均 BCE"]:::output
+
+    IN --> CI
+    IN --> GI
+    IN --> A
+    CI --> LOCAL --> LN
+    GI --> GLOBAL --> GN
+    LN --> CORE
+    GN --> CORE
+    CORE --> FINAL --> POOL
+    A --> CREATIVE
+    POOL --> CAT
+    CREATIVE --> CAT
+    CAT --> HEAD --> OUT
+
+    classDef keep fill:#EAF2FF,stroke:#587DAD,color:#173455;
+    classDef change fill:#FFF0D9,stroke:#CC8428,color:#633900,stroke-width:2px;
+    classDef optimize fill:#F0E9FB,stroke:#8C63B6,color:#4B2E70,stroke-width:2px;
+    classDef output fill:#E5F4EE,stroke:#468D75,color:#174D3C;

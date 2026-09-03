@@ -1,0 +1,24 @@
+flowchart TD
+    IN["三桶 Embedding + 各自 Input BN<br/>C: 6545；I: 14195；A: 238"]:::keep
+    SE["字段级 SENet，隐藏维度 128<br/>C 条件为 C；I 条件为 C+I<br/>A 条件为 C+I+A，内部 BN 保留"]:::keep
+    LOCAL["Local：10C + 20I + 1A 分组<br/>逐组独立 FC → GELU2 → 逐 Token 切片<br/>31 个 512 维 Token"]:::keep
+    LN["【改动①②】Local RMSNorm → LayerNorm<br/>gamma: 31 × 512 → 共享 gamma/beta: 各 512"]:::change
+    GLOBAL["Global：SENet 后 C+I+A 拼接<br/>20978 → 512 → 512<br/>第一层 GELU2，第二层 Linear"]:::keep
+    GN["【改动①②】Global RMSNorm → LayerNorm<br/>gamma: 512 → gamma/beta: 各 512"]:::change
+    CORE["【改动①②】仅替换 4 处 Block PreNorm<br/>31 Local + 1 Global → B × 32 × 512<br/>2 个 Block；RMSNorm → 共享 gamma/beta 的 LN<br/>Mix/Revert、pSwiGLU、残差与 M=704 保留"]:::change
+    FINAL["【改动①②】Final RMSNorm → LayerNorm<br/>gamma: 32 × 512 → 共享 gamma/beta: 各 512"]:::change
+    FLAT["PureFlat 保留，包含 Global<br/>B × 32 × 512 → B × 16384"]:::keep
+    HEAD["任务塔保留：16384 → 2048 → 2048 → 256 → 1<br/>隐藏层仍为 Dense → BN → GELU2"]:::keep
+    OUT["Logit 裁剪到 -50～50 → Sigmoid<br/>以 fst_cvr_label 计算平均 BCE"]:::output
+
+    IN --> SE
+    SE --> LOCAL --> LN
+    SE --> GLOBAL --> GN
+    LN --> CORE
+    GN --> CORE
+    CORE --> FINAL --> FLAT --> HEAD --> OUT
+
+    classDef keep fill:#EAF2FF,stroke:#587DAD,color:#173455;
+    classDef change fill:#FFF0D9,stroke:#CC8428,color:#633900,stroke-width:2px;
+    classDef optimize fill:#F0E9FB,stroke:#8C63B6,color:#4B2E70,stroke-width:2px;
+    classDef output fill:#E5F4EE,stroke:#468D75,color:#174D3C;
