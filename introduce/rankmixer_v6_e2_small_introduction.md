@@ -1,5 +1,9 @@
 # RankMixer v6-E2-Small：256 维与严格等价的 Token 构造优化
 
+三层版本见 [RankMixer v6-E2-Small-3](rankmixer_v6_e2_small_3_introduction.md)：
+以本版本为基线，仅将 RankMixer Block 数从 2 改为 3，保留 Final RMSNorm、PureFlat
+和 `[2048,2048,256]` 任务头。
+
 本版本对应 `src/models/rankmixer/cvr_bn_rankmixer_v6_e2_small.py`，启动参数为
 `bash/set-rankmixer-v6-e2-small-args.txt`。原版 v6-E2 的代码和参数文件保持原样。
 
