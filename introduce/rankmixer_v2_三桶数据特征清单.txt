@@ -9,7 +9,7 @@ RankMixer v2 运行时三桶数据特征清单
    cvr_fea_v10_base_cold.py 完整继承这三桶，同时清空 dense / sequence / gattr / din。
 4. 模型使用方式：src/models/rankmixer/cvr_bn_rankmixer_v2.py 按 common_fea_map / item_fea_map /
    creative_fea_map 将 lookup 得到的字段 embedding 分入 common / item / creative 三桶。
-5. 字段语义来源：docs/数据特征清单/USER_COM.txt，按特征 ID 精确匹配。
+5. 字段语义来源：docs/features/USER_COM.txt，按特征 ID 精确匹配。
 
 【范围与校验结果】
 - common：385 个字段

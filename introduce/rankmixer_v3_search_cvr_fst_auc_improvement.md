@@ -3,7 +3,7 @@
 > 目标模型：[cvr_bn_rankmixer_v3.py](../src/models/rankmixer/cvr_bn_rankmixer_v3.py)  
 > v3 实际启动脚本：[set-rankmixer-v3.txt](../bash/set-rankmixer-v3.txt)  
 > 当前特征配置：[cvr_fea_v10_base_cold.py](../src/data/cvr/cvr_fea_v10_base_cold.py)  
-> 三桶特征清单：[rankmixer_v2_三桶数据特征清单.txt](../docs/数据特征清单/rankmixer_v2_三桶数据特征清单.txt)  
+> 三桶特征清单：[rankmixer_v2_三桶数据特征清单.txt](../docs/features/rankmixer_v2_三桶数据特征清单.txt)  
 > 对比模型：[recommend_cvr.py](../src/models/reference/recommend_cvr.py) 与 [mlp_mixer_swiglu_fuse.py](../src/models/reference/mlp_mixer_swiglu_fuse.py)  
 > 相关基础说明：[Semantic RankMixer v3 方案简介](rankmixer_v3_introduction.md) 与 [Reference CVR 完整拆解](reference_cvr_algorithm_detailed_introduction.md)
 

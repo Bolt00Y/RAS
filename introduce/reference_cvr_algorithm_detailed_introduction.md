@@ -4,7 +4,7 @@
 >
 > - [`recommend_cvr.py`](../src/models/reference/recommend_cvr.py)
 > - [`mlp_mixer_swiglu_fuse.py`](../src/models/reference/mlp_mixer_swiglu_fuse.py)
-> - [`USER_COM.txt`](../docs/数据特征清单/USER_COM.txt)
+> - [`USER_COM.txt`](../docs/features/USER_COM.txt)
 >
 > 分析日期：2026-08-17
 >

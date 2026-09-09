@@ -25,7 +25,7 @@
 
 本总结使用以下本地证据：
 
-- 训练协议和 AUC 记录：[`docs/background.md`](../docs/background.md)
+- 训练协议和 AUC 记录：[`docs/overview/background.md`](../docs/overview/background.md)
 - Base 实现：[`cvr_bn_senet_dcnm_fst.py`](../src/models/seq_model/cvr_bn_senet_dcnm_fst.py)
 - RankMixer v1–v10 实现：[`src/models/rankmixer`](../src/models/rankmixer)
 - 各版本服务器参数：[`bash`](../bash)

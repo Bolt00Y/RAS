@@ -6,8 +6,8 @@
 - v3：[cvr_bn_rankmixer_v3.py](../src/models/rankmixer/cvr_bn_rankmixer_v3.py)
 - v3 完整启动脚本：[set-rankmixer-v3.txt](../bash/set-rankmixer-v3.txt)
 - v3 参数提取脚本：[set-rankmixer-v3-args.txt](../bash/set-rankmixer-v3-args.txt)
-- 三桶字段与语义清单：[rankmixer_v2_三桶数据特征清单.txt](../docs/数据特征清单/rankmixer_v2_三桶数据特征清单.txt)
-- 字段语义来源：[USER_COM.txt](../docs/数据特征清单/USER_COM.txt)
+- 三桶字段与语义清单：[rankmixer_v2_三桶数据特征清单.txt](../docs/features/rankmixer_v2_三桶数据特征清单.txt)
+- 字段语义来源：[USER_COM.txt](../docs/features/USER_COM.txt)
 
 当前运行配置使用 `data.cvr.cvr_fea_v10_base_cold`，输入为：
 

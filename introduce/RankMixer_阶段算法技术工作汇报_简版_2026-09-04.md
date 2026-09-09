@@ -2,7 +2,7 @@
 
 > 汇报日期：2026-09-04<br>
 > 任务：电商搜索排序首次转化率（fst_CVR）预估<br>
-> 数据来源：[RankMixer-汇总.xlsx](/Users/goku/Documents/Codex/RSA_code_0816/docs/RankMixer-汇总.xlsx)；背景来源：[background.md](/Users/goku/Documents/Codex/RSA_code_0816/docs/background.md)<br>
+> 数据来源：[RankMixer-汇总.xlsx](../docs/experiments/RankMixer-汇总.xlsx)；背景来源：[background.md](../docs/overview/background.md)<br>
 > 详细版本：[RankMixer 阶段算法技术工作汇报](/Users/goku/Documents/Codex/RSA_code_0816/introduce/RankMixer_阶段算法技术工作汇报_2026-09-03.md)
 
 ## 1. 工作目标与阶段结论
@@ -37,7 +37,7 @@ $$
 x_t=\phi\!\left(\operatorname{Concat}_{j\in G_t}E_jW_t+b_t\right).
 $$
 
-基础 Mixing 与 Per-token FFN 来自 [RankMixer](https://arxiv.org/abs/2507.15551)；Mixing/Reverting、Per-token SwiGLU 和 RMSNorm 主要参考 [TokenMixer-Large](/Users/goku/Documents/Codex/RSA_code_0816/docs/tokenmixer/TokenMixer-Large.pdf)。其他机制分别参考 [SENet](https://arxiv.org/abs/1709.01507)、[DCN](https://arxiv.org/abs/1708.05123)、[SwiGLU](https://arxiv.org/abs/2002.05202)、[RMSNorm](https://arxiv.org/abs/1910.07467) 和 [LayerNorm](https://arxiv.org/abs/1607.06450)。业务语义分组、Query–Item Cross、PureFlat 和 creative 旁路来自本阶段的代码诊断、离线实验与公司结构经验。
+基础 Mixing 与 Per-token FFN 来自 [RankMixer](https://arxiv.org/abs/2507.15551)；Mixing/Reverting、Per-token SwiGLU 和 RMSNorm 主要参考 [TokenMixer-Large](../docs/papers/TokenMixer-Large/TokenMixer-Large.pdf)。其他机制分别参考 [SENet](https://arxiv.org/abs/1709.01507)、[DCN](https://arxiv.org/abs/1708.05123)、[SwiGLU](https://arxiv.org/abs/2002.05202)、[RMSNorm](https://arxiv.org/abs/1910.07467) 和 [LayerNorm](https://arxiv.org/abs/1607.06450)。业务语义分组、Query–Item Cross、PureFlat 和 creative 旁路来自本阶段的代码诊断、离线实验与公司结构经验。
 
 ## 3. 整体迭代路线
 

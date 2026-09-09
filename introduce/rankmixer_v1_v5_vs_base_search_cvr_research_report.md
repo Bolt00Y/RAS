@@ -2,7 +2,7 @@
 
 > 报告日期：2026-08-19  
 > 研究对象：`fst_CVR` 搜索精排模型  
-> 结论依据：当前仓库源码、启动参数及 `docs/background.md` 中记录的离线结果
+> 结论依据：当前仓库源码、启动参数及 `docs/overview/background.md` 中记录的离线结果
 
 ## 0. 执行摘要
 
@@ -35,12 +35,12 @@
 
 | 类型 | 文件 | 用途 |
 |---|---|---|
-| 实验记录 | [`docs/background.md`](../docs/background.md) | 训练/测试日期协议与 AUC 结果 |
+| 实验记录 | [`docs/overview/background.md`](../docs/overview/background.md) | 训练/测试日期协议与 AUC 结果 |
 | Base 实现 | [`cvr_bn_senet_dcnm_fst.py`](../src/models/seq_model/cvr_bn_senet_dcnm_fst.py) | SENet、DCN-M、MLP 和损失实现 |
 | RankMixer 实现 | [`cvr_bn_rankmixer_v1.py`](../src/models/rankmixer/cvr_bn_rankmixer_v1.py) 至 [`cvr_bn_rankmixer_v5.py`](../src/models/rankmixer/cvr_bn_rankmixer_v5.py) | 各版本前向结构和训练生命周期 |
 | 启动参数 | [`bash`](../bash) 下的 `set-rankmixer-v*-args.txt` | 实际启用开关、维度、优化器及冷/热启动配置 |
 | 复杂度核算 | [`model_parameters_flops_analysis.md`](model_parameters_flops_analysis.md) | Base、v1、v2、v3 的静态参数/FLOPs 复核 |
-| 特征说明 | [`rankmixer_v2_三桶数据特征清单.txt`](../docs/数据特征清单/rankmixer_v2_三桶数据特征清单.txt) | 字段规模和业务语义 |
+| 特征说明 | [`rankmixer_v2_三桶数据特征清单.txt`](../docs/features/rankmixer_v2_三桶数据特征清单.txt) | 字段规模和业务语义 |
 
 ### 1.2 三类陈述严格分离
 

@@ -3,7 +3,7 @@
 > 整理日期：2026-09-05；依据最新 AUC 汇总、已确认口径与当前源码重新编排<br>
 > 任务：电商搜索排序首次转化率（fst_CVR）预估<br>
 > 核心工作：cvr_bn_rankmixer_v1～v10 迭代、v6 系列消融，以及公司线上结构的小模型适配与 mature 系列实验<br>
-> 数值依据：[RankMixer-汇总.xlsx](/Users/goku/Documents/Codex/RSA_code_0816/docs/RankMixer-汇总.xlsx)，Sheet1；实验背景：[background.md](/Users/goku/Documents/Codex/RSA_code_0816/docs/background.md)。
+> 数值依据：[RankMixer-汇总.xlsx](../docs/experiments/RankMixer-汇总.xlsx)，Sheet1；实验背景：[background.md](../docs/overview/background.md)。
 
 ## 阅读导引
 
@@ -189,8 +189,8 @@ RMSNorm 不减去均值，但仍对整体范数做归一化，因此不能把它
 
 | 公式或模块 | 思路来源 | 本阶段的使用边界 |
 |---|---|---|
-| 无参数 Mixing 与 Per-token FFN | [RankMixer 论文](https://arxiv.org/html/2507.15551v1#S3)；[仓库内论文](/Users/goku/Documents/Codex/RSA_code_0816/docs/rankmixer/RankMixer.pdf) | v1 建立基础主干；三桶 token 化、宽度、层数和任务头是本项目配置 |
-| Mixing/Reverting 与双空间 FFN | [TokenMixer-Large 论文](/Users/goku/Documents/Codex/RSA_code_0816/docs/tokenmixer/TokenMixer-Large.pdf) | v5 起借鉴重排后更新、逆变换和残差组织；本项目没有把论文中的其他训练目标或效果当作自身结果 |
+| 无参数 Mixing 与 Per-token FFN | [RankMixer 论文](https://arxiv.org/html/2507.15551v1#S3)；[仓库内论文](../docs/papers/RankMixer/RankMixer.pdf) | v1 建立基础主干；三桶 token 化、宽度、层数和任务头是本项目配置 |
+| Mixing/Reverting 与双空间 FFN | [TokenMixer-Large 论文](../docs/papers/TokenMixer-Large/TokenMixer-Large.pdf) | v5 起借鉴重排后更新、逆变换和残差组织；本项目没有把论文中的其他训练目标或效果当作自身结果 |
 | SENet | [Squeeze-and-Excitation Networks](https://arxiv.org/abs/1709.01507) | 借鉴“压缩统计后学习门控”的思想；字段级、条件式三桶门控和 mature 的维度级门控由现有业务代码定义 |
 | SwiGLU | [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202) | 借鉴双投影逐元素门控；Per-token 独立参数、$M=704/896/1344$ 和残差位置由各版本代码决定 |
 | RMSNorm 与 LayerNorm | [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467)；[Layer Normalization](https://arxiv.org/abs/1607.06450) | 归一化公式来自论文；按 token 独立还是沿最后一维共享，以当前源码中的参数形状为准 |
@@ -1700,7 +1700,7 @@ $$
 
 汇总表还记录了 `unimixer_v1`，因此本报告保留这条独立探索。它的出发点是：RankMixer 的交互重排固定不变，是否可以通过可学习的分块混合矩阵，自适应选择不同特征子空间之间的信息流。
 
-**思路来源。**可学习的块间/块内混合与 Sinkhorn 归一化参考仓库中的 [UniMixer 论文](/Users/goku/Documents/Codex/RSA_code_0816/docs/UniMixer/UniMixer.pdf)；当前 `UniMixer-Lite` 的低秩参数化、有限迭代和完整任务结构以本项目代码为准。
+**思路来源。**可学习的块间/块内混合与 Sinkhorn 归一化参考仓库中的 [UniMixer 论文](../docs/papers/UniMixer/UniMixer.pdf)；当前 `UniMixer-Lite` 的低秩参数化、有限迭代和完整任务结构以本项目代码为准。
 
 对应源码：[cvr_bn_unimixer_v1.py](/Users/goku/Documents/Codex/RSA_code_0816/src/models/rankmixer/cvr_bn_unimixer_v1.py:518)。
 
@@ -2019,7 +2019,7 @@ $$
 
 | 事项 | 核对结果 | 本报告处理 |
 | --- | --- | --- |
-| 数据来源 | `docs/background.md` 记录任务背景；`docs/RankMixer-汇总.xlsx` 汇总各版本的最新离线 AUC | 前者用于解释业务与技术背景，后者作为结果数值的主来源 |
+| 数据来源 | `docs/overview/background.md` 记录任务背景；`docs/experiments/RankMixer-汇总.xlsx` 汇总各版本的最新离线 AUC | 前者用于解释业务与技术背景，后者作为结果数值的主来源 |
 | BN v1 的第三个测试日 | Excel G28=0.864362；background.md 写为 0.864326 | 使用 Excel，四日相对 Base 均值更新为 −千2.666 |
 | 8 月 Base 的第五个测试日 | Excel B8/B52=0.869504；background.md 写为 0.869604 | 使用 Excel 的 0.869504 |
 | v10 与 E3 | v10 尚未运行；最新 Excel 只有 E3 的结果列 | 0.866386 仅归属于 E3，v10 保持“无实测结果” |

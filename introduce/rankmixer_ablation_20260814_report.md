@@ -32,7 +32,7 @@ E3：v6 语义均衡分组，D=512
 
 ### 2.1 历史证据只适合排序优先级，不能替代本轮结果
 
-[`background.md`](../docs/background.md) 记录的 `2026-08-15 → 2026-08-16` Dense 冷启动结果为：
+[`background.md`](../docs/overview/background.md) 记录的 `2026-08-15 → 2026-08-16` Dense 冷启动结果为：
 
 | 模型 | AUC | 相对 Base |
 |---|---:|---:|
@@ -124,7 +124,7 @@ E4 仅作为条件实验保留，不预先实现或排队。只有同时满足�
 hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint
 ```
 
-这是根据 [`background.md`](../docs/background.md) 中“Dense 冷启动、Sparse 共用热启动”的规则做的保守选择，不代表该路径一定是 `2026-08-14` 队列当前批准的 sparse 基线。提交前只需确认一次：若应换路径，必须四个任务一起换，不能单独修改某一组。
+这是根据 [`background.md`](../docs/overview/background.md) 中“Dense 冷启动、Sparse 共用热启动”的规则做的保守选择，不代表该路径一定是 `2026-08-14` 队列当前批准的 sparse 基线。提交前只需确认一次：若应换路径，必须四个任务一起换，不能单独修改某一组。
 
 ## 6. 可直接排队的配置
 

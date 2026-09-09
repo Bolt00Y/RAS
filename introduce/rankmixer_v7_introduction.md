@@ -5,7 +5,7 @@
 - 模型：[`cvr_bn_rankmixer_v7.py`](../src/models/rankmixer/cvr_bn_rankmixer_v7.py)
 - 参数：[`set-rankmixer-v7-args.txt`](../bash/set-rankmixer-v7-args.txt)
 - 基线版本：[`cvr_bn_rankmixer_v3.py`](../src/models/rankmixer/cvr_bn_rankmixer_v3.py)
-- 统一实验协议：[`background.md`](../docs/background.md)
+- 统一实验协议：[`background.md`](../docs/overview/background.md)
 
 ## 1. 实验目标与边界
 

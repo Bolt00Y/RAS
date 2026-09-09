@@ -31,8 +31,8 @@ RankMixer v9-Small 是面向电商搜索首次转化率 `fst_CVR` 预估的单�
 - 模型：[`cvr_bn_rankmixer_v9.py`](../src/models/rankmixer/cvr_bn_rankmixer_v9.py)
 - 训练参数：[`set-rankmixer-v9-args.txt`](../bash/set-rankmixer-v9-args.txt)
 - 静态测试：[`test_rankmixer_v9_static.py`](../src/models/rankmixer/tests/test_rankmixer_v9_static.py)
-- 完整设计：[`rankmixer_v9_small_design.md`](../docs/rankmixer_v9_small_design.md)
-- 统一实验背景：[`background.md`](../docs/background.md)
+- 完整设计：[`rankmixer_v9_small_design.md`](../docs/design/rankmixer_v9_small_design.md)
+- 统一实验背景：[`background.md`](../docs/overview/background.md)
 
 ## 2. 设计依据与目标
 
@@ -368,7 +368,7 @@ FP32 Dense 参数本体约为 `0.798 GB`，不包含训练时的梯度、优化�
 | Logit 结构 | 单路径 | 单路径 | 单路径 | **单路径** |
 | Dense 参数 | 90.342M | 348.432M | 192.243M | **199.446M** |
 
-旧版 v9 Base-Anchored Residual 方案曾冻结 RankMixer 输入并用受限 delta 修正 Base logit。当前实现已经完全移除该结构；历史设计仅保留在 [`rankmixer_v9_base_anchored_residual_design.md`](../docs/rankmixer_v9_base_anchored_residual_design.md) 中。
+旧版 v9 Base-Anchored Residual 方案曾冻结 RankMixer 输入并用受限 delta 修正 Base logit。当前实现已经完全移除该结构；历史设计仅保留在 [`rankmixer_v9_base_anchored_residual_design.md`](../docs/archive/rankmixer_v9_base_anchored_residual_design.md) 中。
 
 ## 13. 训练 args 与冷启动协议
 
