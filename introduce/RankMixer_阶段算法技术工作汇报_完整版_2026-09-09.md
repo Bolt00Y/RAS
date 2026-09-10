@@ -26,7 +26,8 @@
 ### 1.2 版本演进路线
 
 ```mermaid
-flowchart TB
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph START["任务起点与统一对照"]
         OLD["原有模型<br/>cvr_fst_last_norpy"]
         BASE["Base：任务适配与对照构建<br/>BN + 分层 SENet + DCNM"]
@@ -147,7 +148,8 @@ flowchart TB
 **算法流程图：Base：整理任务与输入，保留原有交叉塔**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_senet["继承：字段级分层 SENet"]
         N_stats["逐字段取17维均值<br/>得到 c / i / a 统计"]
         N_gates["分层 SENet 门控<br/>c；[c,i]；[c,i,a]<br/>隐层128，2×Sigmoid"]
@@ -275,7 +277,8 @@ v5 起采用的 Mixing–FFN–Reverting–FFN 思路对应 [TokenMixer-Large �
 **算法流程图：Block 对比：原始 RankMixer、TML 图 1 与本项目**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_r_["原始 RankMixer：1 个 FFN 阶段"]
         N_r_x["输入 X"]
         N_r_p["固定 Mixing：P(X)"]
@@ -356,7 +359,8 @@ flowchart TD
 **算法流程图：BN v1：从直接切分到基础 Mixer**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_block["RankMixer Block × 2；每层1套FFN"]
         N_bin["当前 Block 输入 x"]
         N_mix["固定 Mixing<br/>reshape→transpose"]
@@ -466,7 +470,8 @@ v2 的目标是把基础实现中的几个明显问题一起修正，让后续�
 **算法流程图：v2：完整字段、输入门控与桶间交叉**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_block["Post-Norm Block × 2；每层1套FFN"]
         N_bin["当前 Block 输入 x"]
         N_mix["固定 Mixing"]
@@ -563,7 +568,8 @@ $$
 **算法流程图：模块对比：删除额外Pre-LN，并缩小FFN**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_before["修改前：BN v1"]
         N_v1mix["v1 固定 Mixing"]
         N_v1ln1["x + Mixing(x)<br/>LN₁ → s"]
@@ -609,7 +615,7 @@ flowchart TD
     class N_note note;
 ```
 
-左右两路是同一Block的替代实现，不是串行连接。v1有三次LN，v2删除紧接Mixing后LN的额外FFN前LN，保留两次Add&LN；同时FFN中间宽度3072→1536。T=16，D=768，各自堆叠L=2；两路每个Block都只有一套PFFN，批量矩阵乘不改变Token参数独立性。
+图中两条分支分别表示 v1 与 v2 的 Block 实现，彼此不串接。v1有三次LN，v2删除紧接Mixing后LN的额外FFN前LN，保留两次Add&LN；同时FFN中间宽度3072→1536。T=16，D=768，各自堆叠L=2；两路每个Block都只有一套PFFN，批量矩阵乘不改变Token参数独立性。
 
 ### 2.4 v3：按业务语义组织 Token
 
@@ -618,7 +624,8 @@ flowchart TD
 **算法流程图：v3：固定语义组，保持其余主干与读出**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_block["Post-Norm Block × 2；每层1套FFN"]
         N_bin["当前 Block 输入 x"]
         N_mix["固定 Mixing"]
@@ -726,7 +733,8 @@ $$
 **算法流程图：模块对比：完整字段分组走向固定语义分组**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_before["v2：完整字段，但按顺序分组"]
         N_order2["v2：保留桶内字段顺序"]
         N_slice2["顺序均衡切分<br/>common/item/creative<br/>5 / 10 / 1组"]
@@ -767,7 +775,7 @@ flowchart TD
     class N_note note;
 ```
 
-两路并排展示可替换的Token构造，不相互串接。v2按桶内返回顺序把完整字段均衡切成5/10/1组；v3按字段ID映射和业务语义清单确定成员与顺序。已有1234字段均保留，每字段17维，T=16/D=768/L=2及后续主干读出不变；变化不是增加特征或共享投影。
+图中分别展示 v2 与 v3 的 Token 构造，两条分支互为对照。v2按桶内返回顺序把完整字段均衡切成5/10/1组；v3按字段ID映射和业务语义清单确定成员与顺序。已有1234字段均保留，每字段17维，T=16/D=768/L=2及后续主干读出不变；变化不是增加特征或共享投影。
 
 ### 2.5 v4：增加 Query–Item 定向交互
 
@@ -776,7 +784,8 @@ v3 有了固定语义 Token 后，我可以精确定位 Query 与商品信息，
 **算法流程图：v4：从 Mixer 前的语义 Token 构建 Q–I 交叉**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_block["保留：Post-Norm Block × 2"]
         N_bin["当前 Block 输入 x"]
         N_mix["固定 Mixing"]
@@ -884,7 +893,8 @@ v4 的结果让我把问题重新放回整个信息路径上：仅给个别语�
 **算法流程图：v5：31+1 Token、双空间交互与三路读出**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_tokenize["输入组织：31 Local + 1 Global"]
         N_groups["冻结哈希均衡分组<br/>common/item/creative<br/>10 / 20 / 1组"]
         N_local["同宽组独立批量投影<br/>GELU + per-token RMS<br/>31 × 1024"]
@@ -1032,7 +1042,8 @@ v5 扩充了信息路径，但仍留下两个具体问题。一是哈希均衡�
 **算法流程图：v6：语义均衡与D512保留双空间交互**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_tokenize["输入组织：31 Local + 1 Global"]
         N_groups["固定语义均衡分组<br/>common/item/creative<br/>10 / 20 / 1组"]
         N_local["同宽组独立批量投影<br/>GELU + per-token RMS<br/>31 × 512"]
@@ -1150,7 +1161,8 @@ v3 已经加入固定语义分组、Token 交互和三桶交叉，但这些表�
 **算法流程图：v7：保持 v3 主干，替换深任务头**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段 Embedding<br/>385 / 835 / 14 × 17"]
     N_bn["分桶 BN<br/>字段级分层 SENet"]
     N_groups["固定语义分组<br/>5 common / 10 item / 1 creative"]
@@ -1237,7 +1249,8 @@ v6 是先把每组字段投影成 512 维 Token，再进行跨 Token 交互。�
 **算法流程图：v8：Cross Local 与 Raw Global 两条入口**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段 Embedding<br/>共 1234 × 17"]
     N_raw["分桶 BN + 分层 SENet<br/>Raw：20978 维"]
     N_dcn["新增两层 Masked DCN<br/>rank 500 / mask 隐层 250"]
@@ -1331,7 +1344,8 @@ v8 的 Local 路径只看到 Cross 表示，原始视图主要由 Global 保留�
 **算法流程图：v9：双视图 Local 与 DCNM 直连路径**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段 Embedding<br/>共 1234 × 17"]
     N_raw["分桶 BN + 分层 SENet<br/>Raw：20978 维"]
     N_dcn["Base 同型两层 DCNM<br/>rank 500，无 Mask"]
@@ -1426,7 +1440,8 @@ $$
 **算法流程图：前置交叉细节：v8 Masked DCN 与 v9 DCNM**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_v8["v8：Masked Low-Rank DCN 单层"]
         N_v8rank["线性低秩投影<br/>20978 → 500"]
         N_v8maskhidden["Mask 隐层 + ReLU<br/>20978 → 250"]
@@ -1487,7 +1502,8 @@ flowchart TD
 **算法流程图：v10：PureFlat 与 LayerNorm 的联合替换**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段 Embedding<br/>共 1234 × 17"]
     N_raw["分桶 BN + 分层 SENet<br/>20978 维"]
     N_groups["10 / 20 / 1 语义组<br/>31 个 Local 入口"]
@@ -1572,7 +1588,8 @@ RankMixer 的固定重排没有可训练参数，提供的是预先确定的信�
 **算法流程图：UniMixer v1：可学习混合与双流主干**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段 Embedding<br/>共 1234 × 17"]
     N_bn["分桶 BN<br/>字段级分层 SENet"]
     N_groups["固定语义分组<br/>10 common / 21 item<br/>1 creative，共 32 组"]
@@ -1663,7 +1680,8 @@ $$
 **算法流程图：UniMixer 内部：可学习混合和双流状态更新**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_mixing["UniMixing-Lite：块内 → 块间"]
         N_reshape["坐标重组<br/>16384 维 → 512 × 32"]
         N_params["块间 U Vᵀ：rank 128<br/>块内：8 个基矩阵加权"]
@@ -1733,7 +1751,8 @@ v6 用 Global、条件池化和压缩 Flatten 三路读出，原本希望兼顾�
 **算法流程图：E2：完整读出进入任务头**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段输入<br/>1234字段 × 17维"]
     N_bn["分桶 BN<br/>总宽度 20978"]
     N_senet["字段级分层 SENet<br/>三桶继续共同入主干"]
@@ -1839,7 +1858,8 @@ v10 同时使用了 PureFlat 和 LayerNorm，无法只凭结构看出两个改�
 **算法流程图：E3：替换归一化实现**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段输入<br/>1234字段 × 17维"]
     N_bn["分桶 BN<br/>总宽度 20978"]
     N_senet["字段级分层 SENet<br/>三桶继续共同入主干"]
@@ -1936,7 +1956,8 @@ $$
 **算法流程图：归一化对比：统计与共享方式**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_rms_branch["保留原值均值，仅做 RMS 缩放"]
         N_rms_stat["RMS 路径<br/>计算 mean(x²)"]
         N_rms_den["分母<br/>√(mean(x²) + ε_R)"]
@@ -1992,7 +2013,8 @@ E2 的正向结果伴随着接近两亿 Dense 参数，接下来的问题是：�
 **算法流程图：Small：缩窄 Token 表示**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段输入<br/>1234字段 × 17维"]
     N_bn["分桶 BN<br/>总宽度 20978"]
     N_senet["字段级分层 SENet<br/>三桶继续共同入主干"]
@@ -2097,7 +2119,8 @@ $$
 **算法流程图：E4：creative 旁路与轻量末端**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_main["common/item 主干"]
         N_ci_senet["common/item 字段 SENet<br/>common 依赖自身<br/>item 依赖 common+item"]
         N_groups["主干固定语义组<br/>10 common + 21 item<br/>无 creative Local"]
@@ -2216,7 +2239,8 @@ E2 说明完整读出有价值，Small 又说明宽度有压缩空间；我还�
 **算法流程图：Small-1：集中压缩末端**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段输入<br/>1234字段 × 17维"]
     N_bn["分桶 BN<br/>总宽度 20978"]
     N_senet["字段级分层 SENet<br/>三桶继续共同入主干"]
@@ -2302,7 +2326,8 @@ $$
 **算法流程图：末端对比：PureFlat 与 MeanPool**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_flat_branch["Small / Small-3 的完整末端"]
         N_rms["Small：最终 RMSNorm<br/>γ：[32,256]"]
         N_flat["PureFlat 全量展平<br/>[B,8192]"]
@@ -2353,7 +2378,8 @@ Small-1 的回退还留下一个可能：均值与小任务头对上游表示的
 **算法流程图：Small-2：在轻量末端下增深**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段输入<br/>1234字段 × 17维"]
     N_bn["分桶 BN<br/>总宽度 20978"]
     N_senet["字段级分层 SENet<br/>三桶继续共同入主干"]
@@ -2452,7 +2478,8 @@ Small-3 回到**原始 Small 分支**，保留 RMSNorm、PureFlat 和 `[2048,204
 **算法流程图：Small-3：完整读出分支增深**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     N_input["三桶字段输入<br/>1234字段 × 17维"]
     N_bn["分桶 BN<br/>总宽度 20978"]
     N_senet["字段级分层 SENet<br/>三桶继续共同入主干"]
@@ -2529,7 +2556,8 @@ Small-3 沿用 Base 的字段级分层 SENet。每个字段的 17 维 Embedding 
 Local Token 按固定字段 ID 分成 `10 common + 20 item + 1 creative` 共 31 组。common 每组 38 或 39 个字段，item 每组 41 或 42 个字段，creative 的 14 个字段单独成组；同宽组通过批量矩阵乘投影，但各 Token 参数独立。另一个 Global Token 由三桶 SENet 后的全部 20,978 维表示经过 `20,978→256→256` 生成。
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     A["common 385 / item 835 / creative 14<br/>每字段 17 维"] --> B["分桶 BN + Base 字段级分层 SENet"]
     B --> C["31 个固定语义组<br/>10 common + 20 item + 1 creative"]
     C --> D["独立投影 + RMSNorm<br/>31 × 256"]
@@ -2557,7 +2585,8 @@ $$
 **算法流程图：双 FFN Block：两种布局下更新**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_mixed_ffn["第一套 Per-token SwiGLU：重排空间"]
         N_norm_m["RMSNorm_m<br/>每个混合 Token 独立 γ"]
         N_up_m["Up 投影<br/>256 → 704"]
@@ -2720,7 +2749,8 @@ Small-3 的 COPC 在五日内为 0.981053～1.017099，既出现低估，也出�
 **算法流程图：mature_v1：公司成熟方案适配参考**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_local_path["Local：SENet后表示"]
         N_groups["common三粗组→3+3+4<br/>item四粗组→5+5+5+6<br/>共31个Local Token"]
         N_local["粗组共同读取组内字段<br/>Dense→GELU→BN<br/>reshape为31 × 256"]
@@ -2823,7 +2853,8 @@ mature_v1 当前配置为：T=32、D=256、L=3、M=896；Local使用SENet后comm
 **算法流程图：mature_v2：公司成熟方案适配参考**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_local_path["Local：SENet后表示"]
         N_groups["common三粗组→3+3+4<br/>item四粗组→5+5+5+6<br/>共31个Local Token"]
         N_local["粗组共同读取组内字段<br/>Dense→GELU→BN<br/>reshape为31 × 384"]
@@ -2908,7 +2939,8 @@ flowchart TD
 **算法流程图：mature_v3：公司成熟方案适配参考**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_local_path["Local：SENet后表示"]
         N_groups["common三粗组→3+3+4<br/>item四粗组→5+5+5+6<br/>共31个Local Token"]
         N_local["粗组共同读取组内字段<br/>Dense→GELU→BN<br/>reshape为31 × 384"]
@@ -2992,7 +3024,8 @@ flowchart TD
 **算法流程图：mature_v4：公司成熟方案适配参考**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_local_path["Local：SENet后表示"]
         N_groups["common三粗组→3+3+4<br/>item四粗组→5+5+5+6<br/>共31个Local Token"]
         N_local["粗组共同读取组内字段<br/>Dense→GELU→BN<br/>reshape为31 × 384"]
@@ -3078,7 +3111,8 @@ flowchart TD
 **算法流程图：mature_v5：公司成熟方案适配参考**
 
 ```mermaid
-flowchart TD
+%%{init: {"look": "classic", "flowchart": {"nodeSpacing": 18, "rankSpacing": 18, "padding": 6, "wrappingWidth": 100}}}%%
+flowchart LR
     subgraph SG_local_path["Local：SENet后表示"]
         N_map["先按旧顺序完成BN/SENet<br/>再恢复字段ID→Tensor<br/>覆盖/重复/桶归属校验"]
         N_groups["冻结细粒度语义组<br/>common10 + item21<br/>一组只生成一个Token"]
