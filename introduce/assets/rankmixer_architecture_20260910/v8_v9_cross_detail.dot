@@ -1,0 +1,57 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"x0" [label="初始输入 x₀\nBN/SENet 后：20978 维",width="3.342",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"xl" [label="当前层输入 x_l\n20978 维",width="2.247",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"v8rank" [label="线性低秩投影\n20978 → 500",width="2.117",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v8maskhidden" [label="Mask 隐层 + ReLU\n20978 → 250",width="2.657",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"v8mask" [label="线性 Mask 输出\n250 → 500\n偏置 1，小幅随机权重",width="2.957",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"v8multiply" [label="逐元素相乘\nrank ⊙ mask：500 维",width="3.197",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"v8restore" [label="线性升维\n500 → 20978",width="2.117",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v8cross" [label="与初始 x₀ 逐元素相乘\n得到交叉更新",width="3.102",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v8add" [label="加回当前层 x_l\n20978 维残差",width="2.247",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v8out" [label="LayerNorm\nv8 当前层输出 x_l₊₁",width="3.182",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"v9rank" [label="线性低秩投影\n20978 → 500",width="2.117",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v9restore" [label="线性升维\n500 → 20978",width="2.117",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v9cross" [label="与初始 x₀ 逐元素相乘\n得到交叉更新",width="3.102",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v9add" [label="加回当前层 x_l\n20978 维残差",width="2.247",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v9out" [label="LayerNorm\nv9 当前层输出 x_l₊₁",width="3.182",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="Mask 未经过 Sigmoid\n可放大、抑制或改变符号",width="3.167",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_v8" { label="v8：Masked Low-Rank DCN 单层"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"v8rank";
+"v8maskhidden";
+"v8mask";
+"v8multiply";
+"v8restore";
+"v8cross";
+"v8add";
+"v8out";
+}
+subgraph "cluster_v9" { label="v9：Base 同型 DCNM 单层"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"v9rank";
+"v9restore";
+"v9cross";
+"v9add";
+"v9out";
+}
+"xl" -> "v8rank";
+"xl" -> "v8maskhidden";
+"v8maskhidden" -> "v8mask";
+"v8rank" -> "v8multiply";
+"v8mask" -> "v8multiply";
+"v8multiply" -> "v8restore";
+"v8restore" -> "v8cross";
+"x0" -> "v8cross";
+"v8cross" -> "v8add";
+"xl" -> "v8add" [label="当前层残差"];
+"v8add" -> "v8out";
+"xl" -> "v9rank";
+"v9rank" -> "v9restore";
+"v9restore" -> "v9cross";
+"x0" -> "v9cross";
+"v9cross" -> "v9add";
+"xl" -> "v9add" [label="当前层残差"];
+"v9add" -> "v9out";
+"note" -> "v8mask" [style="dashed",color="#9ba8b5"];
+}

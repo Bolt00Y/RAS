@@ -1,0 +1,52 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶 Embedding\n385 / 835 / 14 ×17",width="3.027",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"bn" [label="分桶 BN",width="1.800",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"senet" [label="字段级分层 SENet\n隐层128，字段gate",width="2.682",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"group" [label="固定语义字段集合\ncommon/item/creative\n5 / 10 / 1组",width="3.317",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"proj" [label="每组独立 Linear + GELU\nT=16，D=768",width="3.447",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"bin" [label="当前 Block 输入 x",width="2.722",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"mix" [label="固定 Mixing",width="1.932",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"ln1" [label="x + Mixing(x)\nLayerNorm 得到 s",width="2.657",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"ffn" [label="批量独立 PFFN\n768→1536→768\nGELU",width="2.367",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"ln2" [label="s + PFFN(s)\nLayerNorm",width="2.012",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"pool" [label="样本相关门控池化\nSoftmax → 加权求和\n输出768维",width="2.972",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"means" [label="Mixer前按桶取均值\nc / i / a，各768维",width="2.907",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"cross" [label="拼接 c,i,a 与两两乘积\n4608→768 + LN\n可学习标量门控",width="3.182",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"fusion" [label="Pool + 桶间交叉\n融合 LayerNorm",width="2.432",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"head" [label="线性 768→1\n截断 + Sigmoid",width="2.367",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"out" [label="首次转化概率",width="1.917",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"map" [label="字段ID → Tensor映射\n覆盖/重复/桶归属校验",width="3.117",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+subgraph "cluster_block" { label="Post-Norm Block × 2；每层1套FFN"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"bin";
+"mix";
+"ln1";
+"ffn";
+"ln2";
+}
+subgraph "cluster_crossbranch" { label="保留完整语义的前置旁路"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"means";
+"cross";
+}
+"input" -> "bn";
+"bn" -> "senet";
+"senet" -> "map";
+"group" -> "proj";
+"proj" -> "bin";
+"bin" -> "mix";
+"mix" -> "ln1";
+"bin" -> "ln1" [label="残差"];
+"ln1" -> "ffn";
+"ffn" -> "ln2";
+"ln1" -> "ln2" [label="残差 s"];
+"ln2" -> "pool" [label="堆叠2层后"];
+"proj" -> "means" [label="前置Token旁路"];
+"means" -> "cross";
+"pool" -> "fusion";
+"cross" -> "fusion";
+"fusion" -> "head";
+"head" -> "out";
+"map" -> "group";
+}

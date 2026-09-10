@@ -1,0 +1,43 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶SENet后字段\n每字段完整17维",width="2.392",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"order2" [label="v2：保留桶内字段顺序",width="2.957",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"slice2" [label="顺序均衡切分\ncommon/item/creative\n5 / 10 / 1组",width="3.317",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"proj2" [label="每组独立 Linear + GELU\n17×组字段数 →768",width="3.447",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"tokens2" [label="v2：16 × 768 Token",width="2.987",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"map3" [label="v3：字段ID → Tensor\n建立显式映射",width="3.157",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"check3" [label="校验字段全覆盖\n检查重复及桶归属",width="2.417",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"list3" [label="固定业务语义清单\n用户/Query/会话\n商品/相关性/统计…",width="2.707",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"gather3" [label="按清单取成员及顺序\ncommon/item/creative\n5 / 10 / 1组",width="3.317",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"proj3" [label="每组独立 Linear + GELU\n17×组字段数 →768",width="3.447",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"tokens3" [label="v3：16 × 768 Token",width="2.987",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="仅重排组成员\n投影参数总量不变\n后续两层主干/读出保留",width="3.062",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_before" { label="v2：完整字段，但按顺序分组"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"order2";
+"slice2";
+"proj2";
+"tokens2";
+}
+subgraph "cluster_after" { label="v3：固定业务语义分组"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"map3";
+"check3";
+"list3";
+"gather3";
+"proj3";
+"tokens3";
+}
+"input" -> "order2";
+"order2" -> "slice2";
+"slice2" -> "proj2";
+"proj2" -> "tokens2";
+"input" -> "map3";
+"map3" -> "check3";
+"check3" -> "gather3";
+"list3" -> "gather3" [label="字段ID清单"];
+"gather3" -> "proj3";
+"proj3" -> "tokens3";
+"tokens2" -> "note" [style="dashed",color="#9ba8b5"];
+"tokens3" -> "note" [style="dashed",color="#9ba8b5"];
+}

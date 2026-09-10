@@ -1,0 +1,37 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶字段输入\n1234字段 × 17维",width="2.472",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"bn" [label="分桶 BN\n总宽度 20978",width="2.037",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"senet" [label="字段级分层 SENet\n三桶继续共同入主干",width="2.667",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"groups" [label="固定语义分组\n10 common / 20 item\n1 creative",width="3.172",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"local" [label="Local：Linear + GELU\n31 × 256\nRMSNorm",width="3.277",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"global" [label="三桶 SENet 后全量输入\n20978 → 256 → 256\nRMSNorm\n首层GELU，次层线性",width="3.182",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"concat" [label="31 Local + 1 Global\n32 × 256",width="3.172",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"block1" [label="Block 1：双 SwiGLU\nD=256，M=704\nPreNorm：RMSNorm",width="2.947",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"block2" [label="Block 2：双 SwiGLU\nD=256，M=704\nPreNorm：RMSNorm",width="2.947",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"block3" [label="新增 Block 3\n独立双 SwiGLU\nD=256，M=704",width="2.182",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"norm" [label="最终 LayerNorm\n共享 γ / β：[256]",width="2.972",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"readout" [label="沿 Token 轴 MeanPool\n32 × 256 → 256",width="3.237",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"head" [label="小任务头\n256 → 256 → 128\nDense + BN + GELU",width="2.882",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"logit" [label="线性层 → 1维\nLogit 裁剪 [-50,50]",width="3.092",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"output" [label="Sigmoid\nfst_CVR 预估",width="2.077",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"delta" [label="直接来源：Small-1\n仅 L：2 → 3\n保留轻量末端",width="2.682",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+"input" -> "bn";
+"bn" -> "senet";
+"senet" -> "groups";
+"groups" -> "local";
+"senet" -> "global" [label="三桶 SENet 后"];
+"local" -> "concat";
+"global" -> "concat";
+"concat" -> "block1";
+"block1" -> "block2";
+"block2" -> "block3";
+"block3" -> "norm";
+"norm" -> "readout";
+"readout" -> "head";
+"head" -> "logit";
+"logit" -> "output";
+"delta" -> "block3" [label="唯一结构改动",style="dashed",color="#9ba8b5"];
+}

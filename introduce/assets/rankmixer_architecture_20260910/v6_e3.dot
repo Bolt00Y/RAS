@@ -1,0 +1,35 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶字段输入\n1234字段 × 17维",width="2.472",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"bn" [label="分桶 BN\n总宽度 20978",width="2.037",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"senet" [label="字段级分层 SENet\n三桶继续共同入主干",width="2.667",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"groups" [label="固定语义分组\n10 common / 20 item\n1 creative",width="3.172",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"local" [label="Local：Linear + GELU\n31 × 512\nLayerNorm",width="3.277",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"global" [label="三桶 SENet 后全量输入\n20978 → 512 → 512\nLayerNorm\n首层GELU，次层线性",width="3.182",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"concat" [label="31 Local + 1 Global\n32 × 512",width="3.172",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"block1" [label="Block 1：双 SwiGLU\nD=512，M=704\nPreNorm：LN",width="2.947",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"block2" [label="Block 2：双 SwiGLU\nD=512，M=704\nPreNorm：LN",width="2.947",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"norm" [label="最终 LayerNorm\n共享 γ / β：[512]",width="2.972",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"readout" [label="PureFlat 全量展平\n32 × 512 → 16384",width="2.842",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"head" [label="完整任务头\n16384 → 2048 → 2048\n→ 256；BN + GELU",width="3.382",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"logit" [label="线性层 → 1维\nLogit 裁剪 [-50,50]",width="3.092",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"output" [label="Sigmoid\nfst_CVR 预估",width="2.077",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"delta" [label="三维RMS：γ为[T,D]\nLN：共享γ/β为[D]\n并改变中心化与ε",width="2.827",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+"input" -> "bn";
+"bn" -> "senet";
+"senet" -> "groups";
+"groups" -> "local";
+"senet" -> "global" [label="三桶 SENet 后"];
+"local" -> "concat";
+"global" -> "concat";
+"concat" -> "block1";
+"block1" -> "block2";
+"block2" -> "norm";
+"norm" -> "readout";
+"readout" -> "head";
+"head" -> "logit";
+"logit" -> "output";
+"delta" -> "norm" [label="实现差异",style="dashed",color="#9ba8b5"];
+}

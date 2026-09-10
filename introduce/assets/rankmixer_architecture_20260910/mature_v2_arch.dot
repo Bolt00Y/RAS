@@ -1,0 +1,65 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶稀疏字段 ×17维\ncommon385 / item835\ncreative14",width="3.172",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"bn" [label="三桶分别输入 BN",width="2.352",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"senet" [label="维度级低秩 SENet\ncommon秩256；item秩128\nitem gate读取[c,i]",width="3.487",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"groups" [label="common三粗组→3+3+4\nitem四粗组→5+5+5+6\n共31个Local Token",width="3.012",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"local" [label="粗组共同读取组内字段\nDense→GELU→BN\nreshape为31 × 384",width="2.917",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"global" [label="BN后、SENet前 c+i\nLN→20740→512→384\nGELU / Linear / LN",width="3.052",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"tokens" [label="31 Local + 1 Global\nT=32，D=384\nL=3",width="3.172",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"mix" [label="mix_up：Z=P(X)\n固定张量重排",width="2.407",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"preln" [label="对 mixed token 做 LN\nQ=LN(Z)",width="3.237",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"gate" [label="Gate独立上投影\n384→1344，SiLU",width="2.512",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"value" [label="Value独立上投影\n384→1344",width="2.392",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"hidden" [label="Gate × Value\nhidden RMSNorm\n中间维 M=1344",width="2.447",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"down" [label="Per-token Down\n1344→384\noutput RMSNorm",width="2.447",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"add" [label="加回 mix_up 后的 Z\nX下一层 = Z + O",width="2.867",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"final" [label="Final LayerNorm\n32个Token均值池化\n384维",width="2.682",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"creative_senet" [label="creative 自身SENet\n238维→秩128→238维\n维度级 Sigmoid gate",width="3.052",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"creative" [label="creative独立旁路\n238→256→48\n每层BN + 可训练Swish",width="3.117",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"join" [label="主干与creative拼接\n384 + 48 = 432维",width="2.827",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"head" [label="MLP 256→128→1\nBN + 激活 / 线性输出",width="3.077",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"out" [label="截断 + Sigmoid\n首次转化概率",width="2.367",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+subgraph "cluster_local_path" { label="Local：SENet后表示"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"groups";
+"local";
+}
+subgraph "cluster_mature_block" { label="成熟 Block × 3；单套 pSwiGLU"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"mix";
+"preln";
+"gate";
+"value";
+"hidden";
+"down";
+"add";
+}
+subgraph "cluster_creative_path" { label="独立creative支路：末端融合"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"creative_senet";
+"creative";
+}
+"input" -> "bn";
+"bn" -> "senet" [label="common/item"];
+"senet" -> "groups";
+"groups" -> "local";
+"bn" -> "global" [label="common/item原BN表示"];
+"local" -> "tokens";
+"global" -> "tokens";
+"tokens" -> "mix";
+"mix" -> "preln";
+"preln" -> "gate";
+"preln" -> "value";
+"gate" -> "hidden";
+"value" -> "hidden";
+"hidden" -> "down";
+"down" -> "add";
+"mix" -> "add" [label="mixed-space残差 Z"];
+"add" -> "final" [label="堆叠3层后"];
+"bn" -> "creative_senet" [label="creative"];
+"creative_senet" -> "creative";
+"final" -> "join";
+"creative" -> "join";
+"join" -> "head";
+"head" -> "out";
+}

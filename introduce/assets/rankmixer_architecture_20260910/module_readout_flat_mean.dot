@@ -1,0 +1,45 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="主干最终 Token：Z\n[B,32,256]",width="2.682",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"rms" [label="Small：最终 RMSNorm\nγ：[32,256]",width="3.052",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"flat" [label="PureFlat 全量展平\n[B,8192]",width="2.722",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"large1" [label="大头首层：8192→2048\nDense + BN + GELU",width="3.077",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"large2" [label="后续：2048→2048→256\nDense + BN + GELU",width="3.262",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"logit_flat" [label="线性输出：256→1\nLogit 裁剪",width="2.497",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"output_flat" [label="Sigmoid\nSmall 分支预估",width="2.287",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"ln" [label="Small-1：共享 LayerNorm\nγ / β：[256]",width="3.632",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"mean" [label="Token 轴等权 MeanPool\n[B,256]",width="3.342",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"smallhead" [label="小头：256→256→128\nDense + BN + GELU",width="2.972",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"logit_mean" [label="线性输出：128→1\nLogit 裁剪",width="2.497",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"output_mean" [label="Sigmoid\nSmall-1 分支预估",width="2.577",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="同时改变 Norm、读出\n与任务头容量/实现\n不是等参数池化对照",width="2.892",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_flat_branch" { label="Small / Small-3 的完整末端"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"rms";
+"flat";
+"large1";
+"large2";
+"logit_flat";
+"output_flat";
+}
+subgraph "cluster_mean_branch" { label="Small-1 / Small-2 的轻量末端"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"ln";
+"mean";
+"smallhead";
+"logit_mean";
+"output_mean";
+}
+"input" -> "rms";
+"rms" -> "flat";
+"flat" -> "large1";
+"large1" -> "large2";
+"large2" -> "logit_flat";
+"logit_flat" -> "output_flat";
+"input" -> "ln";
+"ln" -> "mean";
+"mean" -> "smallhead";
+"smallhead" -> "logit_mean";
+"logit_mean" -> "output_mean";
+"note" -> "smallhead" [label="组合替换",style="dashed",color="#9ba8b5"];
+}

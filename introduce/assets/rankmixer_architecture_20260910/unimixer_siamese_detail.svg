@@ -1,0 +1,305 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1332" height="1681" viewBox="0 0 1332 1681" role="img" aria-label="UniMixer 内部：可学习混合和双流状态更新"><rect width="100%" height="100%" fill="#ffffff"/><g font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif"><text x="30" y="35" font-size="24" font-weight="600" fill="#173650">UniMixer 内部：可学习混合和双流状态更新</text><text x="30" y="67" font-size="16" fill="#526477">对照：UniMixer v1 实际代码</text><rect x="30" y="91" width="15" height="15" rx="3" fill="#fff0d4" stroke="#ca8425"/><text x="53" y="104" font-size="14" fill="#526477">本版改动 / 本图重点</text><rect x="230" y="91" width="15" height="15" rx="3" fill="#edf4fc" stroke="#7290b1"/><text x="253" y="104" font-size="14" fill="#526477">沿用模块</text><text x="405" y="104" font-size="14" fill="#526477">实线：数据流　虚线：说明或对照</text></g><g transform="translate(24 139)">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(12.96 1487.24)">
+<title>G</title>
+<g id="clust1" class="cluster">
+<title>cluster_mixing</title>
+<path fill="none" stroke="#c5d1de" d="M299.97,-720.24C299.97,-720.24 757.97,-720.24 757.97,-720.24 763.97,-720.24 769.97,-726.24 769.97,-732.24 769.97,-732.24 769.97,-1283.44 769.97,-1283.44 769.97,-1289.44 763.97,-1295.44 757.97,-1295.44 757.97,-1295.44 299.97,-1295.44 299.97,-1295.44 293.97,-1295.44 287.97,-1289.44 287.97,-1283.44 287.97,-1283.44 287.97,-732.24 287.97,-732.24 287.97,-726.24 293.97,-720.24 299.97,-720.24"/>
+<text xml:space="preserve" text-anchor="middle" x="528.97" y="-1275.24" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#425b75">UniMixing&#45;Lite：块内 → 块间</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_states</title>
+<path fill="none" stroke="#c5d1de" d="M532.97,-122.12C532.97,-122.12 1000.97,-122.12 1000.97,-122.12 1006.97,-122.12 1012.97,-128.12 1012.97,-134.12 1012.97,-134.12 1012.97,-434.08 1012.97,-434.08 1012.97,-440.08 1006.97,-446.08 1000.97,-446.08 1000.97,-446.08 532.97,-446.08 532.97,-446.08 526.97,-446.08 520.97,-440.08 520.97,-434.08 520.97,-434.08 520.97,-134.12 520.97,-134.12 520.97,-128.12 526.97,-122.12 532.97,-122.12"/>
+<text xml:space="preserve" text-anchor="middle" x="766.97" y="-425.88" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#425b75">同一个 f_l 更新两条状态流</text>
+</g>
+<!-- x -->
+<g id="node1" class="node">
+<title>x</title>
+<path fill="#e9f5ef" stroke="#6a9e84" stroke-width="1.1" d="M763.77,-1381.36C763.77,-1381.36 658.17,-1381.36 658.17,-1381.36 652.17,-1381.36 646.17,-1375.36 646.17,-1369.36 646.17,-1369.36 646.17,-1331.44 646.17,-1331.44 646.17,-1325.44 652.17,-1319.44 658.17,-1319.44 658.17,-1319.44 763.77,-1319.44 763.77,-1319.44 769.77,-1319.44 775.77,-1325.44 775.77,-1331.44 775.77,-1331.44 775.77,-1369.36 775.77,-1369.36 775.77,-1375.36 769.77,-1381.36 763.77,-1381.36"/>
+<text xml:space="preserve" text-anchor="middle" x="710.97" y="-1355.8" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#174b34">当前 x_l</text>
+<text xml:space="preserve" text-anchor="middle" x="710.97" y="-1334.2" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#174b34">32 × 512</text>
+</g>
+<!-- u -->
+<g id="node4" class="node">
+<title>u</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M259.94,-1249.84C259.94,-1249.84 12,-1249.84 12,-1249.84 6,-1249.84 0,-1243.84 0,-1237.84 0,-1237.84 0,-1199.92 0,-1199.92 0,-1193.92 6,-1187.92 12,-1187.92 12,-1187.92 259.94,-1187.92 259.94,-1187.92 265.94,-1187.92 271.94,-1193.92 271.94,-1199.92 271.94,-1199.92 271.94,-1237.84 271.94,-1237.84 271.94,-1243.84 265.94,-1249.84 259.94,-1249.84"/>
+<text xml:space="preserve" text-anchor="middle" x="135.97" y="-1224.28" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">相加：u = x_l + RMS(y_l)</text>
+<text xml:space="preserve" text-anchor="middle" x="135.97" y="-1202.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">32 × 512</text>
+</g>
+<!-- x&#45;&gt;u -->
+<g id="edge3" class="edge">
+<title>x&#45;&gt;u</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M645.63,-1339.26C589.64,-1330.57 517.97,-1319.44 517.97,-1319.44 517.97,-1319.44 281.97,-1295.44 281.97,-1295.44 281.97,-1295.44 241.15,-1274.31 202.67,-1254.4"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="203.93,-1252.09 196.06,-1250.98 201.51,-1256.76 203.93,-1252.09"/>
+</g>
+<!-- xadd -->
+<g id="node14" class="node">
+<title>xadd</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M708.96,-389.68C708.96,-389.68 554.98,-389.68 554.98,-389.68 548.98,-389.68 542.98,-383.68 542.98,-377.68 542.98,-377.68 542.98,-361.36 542.98,-361.36 542.98,-355.36 548.98,-349.36 554.98,-349.36 554.98,-349.36 708.96,-349.36 708.96,-349.36 714.96,-349.36 720.96,-355.36 720.96,-361.36 720.96,-361.36 720.96,-377.68 720.96,-377.68 720.96,-383.68 714.96,-389.68 708.96,-389.68"/>
+<text xml:space="preserve" text-anchor="middle" x="631.97" y="-364.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">相加：x_l + f_l</text>
+</g>
+<!-- x&#45;&gt;xadd -->
+<g id="edge16" class="edge">
+<title>x&#45;&gt;xadd</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M747.65,-1318.95C762.39,-1306.71 775.97,-1295.44 775.97,-1295.44 775.97,-1295.44 809.97,-1219.88 809.97,-1219.88 809.97,-1219.88 809.97,-1219.88 809.97,-510.84 809.97,-510.84 765.97,-470.08 765.97,-470.08 765.97,-470.08 732.97,-446.08 732.97,-446.08 732.97,-446.08 694.9,-417.6 665.5,-395.6"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="667.22,-393.61 659.64,-391.22 664.07,-397.81 667.22,-393.61"/>
+<text xml:space="preserve" text-anchor="middle" x="831.28" y="-817.06" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">x 流残差</text>
+</g>
+<!-- y -->
+<g id="node2" class="node">
+<title>y</title>
+<path fill="#e9f5ef" stroke="#6a9e84" stroke-width="1.1" d="M789.77,-1474.28C789.77,-1474.28 684.17,-1474.28 684.17,-1474.28 678.17,-1474.28 672.17,-1468.28 672.17,-1462.28 672.17,-1462.28 672.17,-1424.36 672.17,-1424.36 672.17,-1418.36 678.17,-1412.36 684.17,-1412.36 684.17,-1412.36 789.77,-1412.36 789.77,-1412.36 795.77,-1412.36 801.77,-1418.36 801.77,-1424.36 801.77,-1424.36 801.77,-1462.28 801.77,-1462.28 801.77,-1468.28 795.77,-1474.28 789.77,-1474.28"/>
+<text xml:space="preserve" text-anchor="middle" x="736.97" y="-1448.72" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#174b34">当前 y_l</text>
+<text xml:space="preserve" text-anchor="middle" x="736.97" y="-1427.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#174b34">32 × 512</text>
+</g>
+<!-- ynorm -->
+<g id="node3" class="node">
+<title>ynorm</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M493.62,-1370.56C493.62,-1370.56 362.32,-1370.56 362.32,-1370.56 356.32,-1370.56 350.32,-1364.56 350.32,-1358.56 350.32,-1358.56 350.32,-1342.24 350.32,-1342.24 350.32,-1336.24 356.32,-1330.24 362.32,-1330.24 362.32,-1330.24 493.62,-1330.24 493.62,-1330.24 499.62,-1330.24 505.62,-1336.24 505.62,-1342.24 505.62,-1342.24 505.62,-1358.56 505.62,-1358.56 505.62,-1364.56 499.62,-1370.56 493.62,-1370.56"/>
+<text xml:space="preserve" text-anchor="middle" x="427.97" y="-1345" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">RMSNorm(y_l)</text>
+</g>
+<!-- y&#45;&gt;ynorm -->
+<g id="edge1" class="edge">
+<title>y&#45;&gt;ynorm</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M671.82,-1423.15C622.69,-1408.69 555.2,-1388.84 503.68,-1373.68"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="504.51,-1371.18 496.57,-1371.59 503.03,-1376.22 504.51,-1371.18"/>
+</g>
+<!-- yadd -->
+<g id="node16" class="node">
+<title>yadd</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M984.86,-400.48C984.86,-400.48 757.08,-400.48 757.08,-400.48 751.08,-400.48 745.08,-394.48 745.08,-388.48 745.08,-388.48 745.08,-350.56 745.08,-350.56 745.08,-344.56 751.08,-338.56 757.08,-338.56 757.08,-338.56 984.86,-338.56 984.86,-338.56 990.86,-338.56 996.86,-344.56 996.86,-350.56 996.86,-350.56 996.86,-388.48 996.86,-388.48 996.86,-394.48 990.86,-400.48 984.86,-400.48"/>
+<text xml:space="preserve" text-anchor="middle" x="870.97" y="-374.92" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">相加：y_l + f_l</text>
+<text xml:space="preserve" text-anchor="middle" x="870.97" y="-353.32" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">y_l₊₁ 保留未归一化累积</text>
+</g>
+<!-- y&#45;&gt;yadd -->
+<g id="edge20" class="edge">
+<title>y&#45;&gt;yadd</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M781.59,-1412.04C820.57,-1385.6 870.97,-1351.4 870.97,-1351.4 870.97,-1351.4 870.97,-1351.4 870.97,-510.84 870.97,-510.84 870.97,-451.54 870.97,-410.04"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="873.6,-410.21 870.97,-402.71 868.35,-410.21 873.6,-410.21"/>
+<text xml:space="preserve" text-anchor="middle" x="892.28" y="-870.82" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">y 流累积</text>
+</g>
+<!-- ynorm&#45;&gt;u -->
+<g id="edge2" class="edge">
+<title>ynorm&#45;&gt;u</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M374.85,-1329.77C333.1,-1314.34 281.97,-1295.44 281.97,-1295.44 281.97,-1295.44 241.15,-1274.31 202.67,-1254.4"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="203.93,-1252.09 196.06,-1250.98 201.51,-1256.76 203.93,-1252.09"/>
+</g>
+<!-- reshape -->
+<g id="node5" class="node">
+<title>reshape</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M525.5,-1131.52C525.5,-1131.52 316.44,-1131.52 316.44,-1131.52 310.44,-1131.52 304.44,-1125.52 304.44,-1119.52 304.44,-1119.52 304.44,-1081.6 304.44,-1081.6 304.44,-1075.6 310.44,-1069.6 316.44,-1069.6 316.44,-1069.6 525.5,-1069.6 525.5,-1069.6 531.5,-1069.6 537.5,-1075.6 537.5,-1081.6 537.5,-1081.6 537.5,-1119.52 537.5,-1119.52 537.5,-1125.52 531.5,-1131.52 525.5,-1131.52"/>
+<text xml:space="preserve" text-anchor="middle" x="420.97" y="-1105.96" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">坐标重组</text>
+<text xml:space="preserve" text-anchor="middle" x="420.97" y="-1084.36" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">16384 维 → 512 × 32</text>
+</g>
+<!-- u&#45;&gt;reshape -->
+<g id="edge4" class="edge">
+<title>u&#45;&gt;reshape</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M210.48,-1187.47C249.59,-1171.51 297.62,-1151.9 337.93,-1135.45"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="338.84,-1137.92 344.79,-1132.65 336.86,-1133.06 338.84,-1137.92"/>
+</g>
+<!-- addmix -->
+<g id="node11" class="node">
+<title>addmix</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M578.74,-696.24C578.74,-696.24 435.2,-696.24 435.2,-696.24 429.2,-696.24 423.2,-690.24 423.2,-684.24 423.2,-684.24 423.2,-667.92 423.2,-667.92 423.2,-661.92 429.2,-655.92 435.2,-655.92 435.2,-655.92 578.74,-655.92 578.74,-655.92 584.74,-655.92 590.74,-661.92 590.74,-667.92 590.74,-667.92 590.74,-684.24 590.74,-684.24 590.74,-690.24 584.74,-696.24 578.74,-696.24"/>
+<text xml:space="preserve" text-anchor="middle" x="506.97" y="-670.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">相加：u + M(u)</text>
+</g>
+<!-- u&#45;&gt;addmix -->
+<g id="edge12" class="edge">
+<title>u&#45;&gt;addmix</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M147.94,-1187.62C161.57,-1153.16 181.97,-1101.56 181.97,-1101.56 181.97,-1101.56 181.97,-1101.56 181.97,-766.2 181.97,-766.2 281.97,-720.24 281.97,-720.24 281.97,-720.24 351.91,-706.82 413.81,-694.95"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="414.29,-697.53 421.16,-693.54 413.3,-692.38 414.29,-697.53"/>
+<text xml:space="preserve" text-anchor="middle" x="203.64" y="-924.58" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">混合残差</text>
+</g>
+<!-- intra -->
+<g id="node8" class="node">
+<title>intra</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M597.96,-1013.2C597.96,-1013.2 389.98,-1013.2 389.98,-1013.2 383.98,-1013.2 377.98,-1007.2 377.98,-1001.2 377.98,-1001.2 377.98,-963.28 377.98,-963.28 377.98,-957.28 383.98,-951.28 389.98,-951.28 389.98,-951.28 597.96,-951.28 597.96,-951.28 603.96,-951.28 609.96,-957.28 609.96,-963.28 609.96,-963.28 609.96,-1001.2 609.96,-1001.2 609.96,-1007.2 603.96,-1013.2 597.96,-1013.2"/>
+<text xml:space="preserve" text-anchor="middle" x="493.97" y="-987.64" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">先块内混合</text>
+<text xml:space="preserve" text-anchor="middle" x="493.97" y="-966.04" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">每块使用 32 × 32 矩阵</text>
+</g>
+<!-- reshape&#45;&gt;intra -->
+<g id="edge8" class="edge">
+<title>reshape&#45;&gt;intra</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M439.96,-1069.3C449.26,-1054.49 460.53,-1036.52 470.38,-1020.84"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="472.39,-1022.57 474.15,-1014.82 467.94,-1019.78 472.39,-1022.57"/>
+</g>
+<!-- params -->
+<g id="node6" class="node">
+<title>params</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M741.62,-1249.84C741.62,-1249.84 538.32,-1249.84 538.32,-1249.84 532.32,-1249.84 526.32,-1243.84 526.32,-1237.84 526.32,-1237.84 526.32,-1199.92 526.32,-1199.92 526.32,-1193.92 532.32,-1187.92 538.32,-1187.92 538.32,-1187.92 741.62,-1187.92 741.62,-1187.92 747.62,-1187.92 753.62,-1193.92 753.62,-1199.92 753.62,-1199.92 753.62,-1237.84 753.62,-1237.84 753.62,-1243.84 747.62,-1249.84 741.62,-1249.84"/>
+<text xml:space="preserve" text-anchor="middle" x="639.97" y="-1224.28" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">块间 U Vᵀ：rank 128</text>
+<text xml:space="preserve" text-anchor="middle" x="639.97" y="-1202.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">块内：8 个基矩阵加权</text>
+</g>
+<!-- weights -->
+<g id="node7" class="node">
+<title>weights</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M741.98,-1142.32C741.98,-1142.32 573.96,-1142.32 573.96,-1142.32 567.96,-1142.32 561.96,-1136.32 561.96,-1130.32 561.96,-1130.32 561.96,-1070.8 561.96,-1070.8 561.96,-1064.8 567.96,-1058.8 573.96,-1058.8 573.96,-1058.8 741.98,-1058.8 741.98,-1058.8 747.98,-1058.8 753.98,-1064.8 753.98,-1070.8 753.98,-1070.8 753.98,-1130.32 753.98,-1130.32 753.98,-1136.32 747.98,-1142.32 741.98,-1142.32"/>
+<text xml:space="preserve" text-anchor="middle" x="657.97" y="-1116.76" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">对称化、温度、指数</text>
+<text xml:space="preserve" text-anchor="middle" x="657.97" y="-1095.16" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">10 轮行列归一化</text>
+<text xml:space="preserve" text-anchor="middle" x="657.97" y="-1073.56" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">最终对称化</text>
+</g>
+<!-- params&#45;&gt;weights -->
+<g id="edge5" class="edge">
+<title>params&#45;&gt;weights</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M644.65,-1187.62C646.36,-1176.57 648.35,-1163.76 650.25,-1151.45"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="652.8,-1152.15 651.35,-1144.33 647.61,-1151.34 652.8,-1152.15"/>
+<text xml:space="preserve" text-anchor="middle" x="670.64" y="-1161.22" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">模型参数</text>
+</g>
+<!-- weights&#45;&gt;intra -->
+<g id="edge6" class="edge">
+<title>weights&#45;&gt;intra</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M600.15,-1058.55C581.92,-1045.62 561.93,-1031.44 544.26,-1018.91"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="545.9,-1016.85 538.26,-1014.65 542.86,-1021.13 545.9,-1016.85"/>
+<text xml:space="preserve" text-anchor="middle" x="597.64" y="-1032.1" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">块内矩阵</text>
+</g>
+<!-- inter -->
+<g id="node9" class="node">
+<title>inter</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M603.4,-905.68C603.4,-905.68 410.54,-905.68 410.54,-905.68 404.54,-905.68 398.54,-899.68 398.54,-893.68 398.54,-893.68 398.54,-855.76 398.54,-855.76 398.54,-849.76 404.54,-843.76 410.54,-843.76 410.54,-843.76 603.4,-843.76 603.4,-843.76 609.4,-843.76 615.4,-849.76 615.4,-855.76 615.4,-855.76 615.4,-893.68 615.4,-893.68 615.4,-899.68 609.4,-905.68 603.4,-905.68"/>
+<text xml:space="preserve" text-anchor="middle" x="506.97" y="-880.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">再块间混合</text>
+<text xml:space="preserve" text-anchor="middle" x="506.97" y="-858.52" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">使用 512 × 512 矩阵</text>
+</g>
+<!-- weights&#45;&gt;inter -->
+<g id="edge7" class="edge">
+<title>weights&#45;&gt;inter</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M647.94,-1058.26C637.29,-1014.38 621.97,-951.28 621.97,-951.28 621.97,-951.28 590.62,-930.68 560.65,-910.99"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="562.25,-908.9 554.54,-906.97 559.37,-913.29 562.25,-908.9"/>
+<text xml:space="preserve" text-anchor="middle" x="658.66" y="-978.34" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">块间矩阵</text>
+</g>
+<!-- intra&#45;&gt;inter -->
+<g id="edge9" class="edge">
+<title>intra&#45;&gt;inter</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M497.7,-951C499.08,-939.74 500.68,-926.8 502.15,-914.86"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="504.72,-915.45 503.03,-907.69 499.51,-914.81 504.72,-915.45"/>
+</g>
+<!-- mixed -->
+<g id="node10" class="node">
+<title>mixed</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M582.52,-798.16C582.52,-798.16 431.42,-798.16 431.42,-798.16 425.42,-798.16 419.42,-792.16 419.42,-786.16 419.42,-786.16 419.42,-748.24 419.42,-748.24 419.42,-742.24 425.42,-736.24 431.42,-736.24 431.42,-736.24 582.52,-736.24 582.52,-736.24 588.52,-736.24 594.52,-742.24 594.52,-748.24 594.52,-748.24 594.52,-786.16 594.52,-786.16 594.52,-792.16 588.52,-798.16 582.52,-798.16"/>
+<text xml:space="preserve" text-anchor="middle" x="506.97" y="-772.6" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">恢复 Token 布局</text>
+<text xml:space="preserve" text-anchor="middle" x="506.97" y="-751" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">M(u)：32 × 512</text>
+</g>
+<!-- inter&#45;&gt;mixed -->
+<g id="edge10" class="edge">
+<title>inter&#45;&gt;mixed</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M506.97,-843.48C506.97,-832.22 506.97,-819.28 506.97,-807.34"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="509.6,-807.68 506.97,-800.18 504.35,-807.68 509.6,-807.68"/>
+</g>
+<!-- mixed&#45;&gt;addmix -->
+<g id="edge11" class="edge">
+<title>mixed&#45;&gt;addmix</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M506.97,-736.03C506.97,-726.26 506.97,-715.45 506.97,-705.79"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="509.6,-705.83 506.97,-698.33 504.35,-705.83 509.6,-705.83"/>
+</g>
+<!-- rmsmix -->
+<g id="node12" class="node">
+<title>rmsmix</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M672.72,-624.92C672.72,-624.92 489.22,-624.92 489.22,-624.92 483.22,-624.92 477.22,-618.92 477.22,-612.92 477.22,-612.92 477.22,-596.6 477.22,-596.6 477.22,-590.6 483.22,-584.6 489.22,-584.6 489.22,-584.6 672.72,-584.6 672.72,-584.6 678.72,-584.6 684.72,-590.6 684.72,-596.6 684.72,-596.6 684.72,-612.92 684.72,-612.92 684.72,-618.92 678.72,-624.92 672.72,-624.92"/>
+<text xml:space="preserve" text-anchor="middle" x="580.97" y="-599.36" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">RMSNorm(u + M(u))</text>
+</g>
+<!-- addmix&#45;&gt;rmsmix -->
+<g id="edge13" class="edge">
+<title>addmix&#45;&gt;rmsmix</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M527.98,-655.4C535.94,-647.95 545.12,-639.35 553.58,-631.42"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="555.22,-633.48 558.9,-626.44 551.63,-629.65 555.22,-633.48"/>
+</g>
+<!-- ffn -->
+<g id="node13" class="node">
+<title>ffn</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M741.72,-553.6C741.72,-553.6 522.22,-553.6 522.22,-553.6 516.22,-553.6 510.22,-547.6 510.22,-541.6 510.22,-541.6 510.22,-482.08 510.22,-482.08 510.22,-476.08 516.22,-470.08 522.22,-470.08 522.22,-470.08 741.72,-470.08 741.72,-470.08 747.72,-470.08 753.72,-476.08 753.72,-482.08 753.72,-482.08 753.72,-541.6 753.72,-541.6 753.72,-547.6 747.72,-553.6 741.72,-553.6"/>
+<text xml:space="preserve" text-anchor="middle" x="631.97" y="-528.04" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">单套 Per&#45;token SwiGLU</text>
+<text xml:space="preserve" text-anchor="middle" x="631.97" y="-506.44" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">D512 → M1024 → D512</text>
+<text xml:space="preserve" text-anchor="middle" x="631.97" y="-484.84" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">输出 f_l</text>
+</g>
+<!-- rmsmix&#45;&gt;ffn -->
+<g id="edge14" class="edge">
+<title>rmsmix&#45;&gt;ffn</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M591.79,-584.48C595.56,-577.75 599.98,-569.87 604.49,-561.84"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="606.77,-563.14 608.15,-555.31 602.19,-560.57 606.77,-563.14"/>
+</g>
+<!-- ffn&#45;&gt;xadd -->
+<g id="edge15" class="edge">
+<title>ffn&#45;&gt;xadd</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M631.97,-469.88C631.97,-447.11 631.97,-419.35 631.97,-398.97"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="634.6,-399.13 631.97,-391.63 629.35,-399.13 634.6,-399.13"/>
+</g>
+<!-- ffn&#45;&gt;yadd -->
+<g id="edge19" class="edge">
+<title>ffn&#45;&gt;yadd</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M702.07,-469.69C736.75,-449.32 778.17,-425 811.32,-405.54"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="812.48,-407.9 817.62,-401.84 809.82,-403.38 812.48,-407.9"/>
+</g>
+<!-- xrms -->
+<g id="node15" class="node">
+<title>xrms</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M799.38,-307.56C799.38,-307.56 548.56,-307.56 548.56,-307.56 542.56,-307.56 536.56,-301.56 536.56,-295.56 536.56,-295.56 536.56,-257.64 536.56,-257.64 536.56,-251.64 542.56,-245.64 548.56,-245.64 548.56,-245.64 799.38,-245.64 799.38,-245.64 805.38,-245.64 811.38,-251.64 811.38,-257.64 811.38,-257.64 811.38,-295.56 811.38,-295.56 811.38,-301.56 805.38,-307.56 799.38,-307.56"/>
+<text xml:space="preserve" text-anchor="middle" x="673.97" y="-282" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">RMSNorm</text>
+<text xml:space="preserve" text-anchor="middle" x="673.97" y="-260.4" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">x_l₊₁ = RMS(x_l + f_l)</text>
+</g>
+<!-- xadd&#45;&gt;xrms -->
+<g id="edge17" class="edge">
+<title>xadd&#45;&gt;xrms</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M640.88,-349.24C645.34,-339.59 650.89,-327.56 656.18,-316.12"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="658.46,-317.44 659.22,-309.53 653.7,-315.23 658.46,-317.44"/>
+</g>
+<!-- nextx -->
+<g id="node17" class="node">
+<title>nextx</title>
+<path fill="#244968" stroke="#244968" stroke-width="1.1" d="M898.86,-200.04C898.86,-200.04 761.08,-200.04 761.08,-200.04 755.08,-200.04 749.08,-194.04 749.08,-188.04 749.08,-188.04 749.08,-150.12 749.08,-150.12 749.08,-144.12 755.08,-138.12 761.08,-138.12 761.08,-138.12 898.86,-138.12 898.86,-138.12 904.86,-138.12 910.86,-144.12 910.86,-150.12 910.86,-150.12 910.86,-188.04 910.86,-188.04 910.86,-194.04 904.86,-200.04 898.86,-200.04"/>
+<text xml:space="preserve" text-anchor="middle" x="829.97" y="-174.48" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">下一层 x_l₊₁</text>
+<text xml:space="preserve" text-anchor="middle" x="829.97" y="-152.88" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">32 × 512</text>
+</g>
+<!-- xrms&#45;&gt;nextx -->
+<g id="edge18" class="edge">
+<title>xrms&#45;&gt;nextx</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M718.68,-245.36C737.04,-232.94 758.43,-218.47 777.52,-205.56"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="778.81,-207.86 783.55,-201.48 775.87,-203.51 778.81,-207.86"/>
+</g>
+<!-- nexty -->
+<g id="node18" class="node">
+<title>nexty</title>
+<path fill="#244968" stroke="#244968" stroke-width="1.1" d="M984.86,-307.56C984.86,-307.56 847.08,-307.56 847.08,-307.56 841.08,-307.56 835.08,-301.56 835.08,-295.56 835.08,-295.56 835.08,-257.64 835.08,-257.64 835.08,-251.64 841.08,-245.64 847.08,-245.64 847.08,-245.64 984.86,-245.64 984.86,-245.64 990.86,-245.64 996.86,-251.64 996.86,-257.64 996.86,-257.64 996.86,-295.56 996.86,-295.56 996.86,-301.56 990.86,-307.56 984.86,-307.56"/>
+<text xml:space="preserve" text-anchor="middle" x="915.97" y="-282" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">下一层 y_l₊₁</text>
+<text xml:space="preserve" text-anchor="middle" x="915.97" y="-260.4" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">32 × 512</text>
+</g>
+<!-- yadd&#45;&gt;nexty -->
+<g id="edge21" class="edge">
+<title>yadd&#45;&gt;nexty</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M885.96,-338.24C889.49,-331.11 893.29,-323.42 896.98,-315.98"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="899.15,-317.5 900.13,-309.61 894.45,-315.17 899.15,-317.5"/>
+</g>
+<!-- final -->
+<g id="node20" class="node">
+<title>final</title>
+<path fill="#244968" stroke="#244968" stroke-width="1.1" d="M1114.62,-83.52C1114.62,-83.52 893.32,-83.52 893.32,-83.52 887.32,-83.52 881.32,-77.52 881.32,-71.52 881.32,-71.52 881.32,-12 881.32,-12 881.32,-6 887.32,0 893.32,0 893.32,0 1114.62,0 1114.62,0 1120.62,0 1126.62,-6 1126.62,-12 1126.62,-12 1126.62,-71.52 1126.62,-71.52 1126.62,-77.52 1120.62,-83.52 1114.62,-83.52"/>
+<text xml:space="preserve" text-anchor="middle" x="1003.97" y="-57.96" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">两层后相加</text>
+<text xml:space="preserve" text-anchor="middle" x="1003.97" y="-36.36" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">x₂ + RMS(y₂)</text>
+<text xml:space="preserve" text-anchor="middle" x="1003.97" y="-14.76" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">送入 PureFlat / 任务头</text>
+</g>
+<!-- nextx&#45;&gt;final -->
+<g id="edge22" class="edge">
+<title>nextx&#45;&gt;final</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M872.09,-137.74C892.33,-123.17 917.03,-105.38 939.56,-89.15"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="940.83,-91.47 945.38,-84.96 937.76,-87.21 940.83,-91.47"/>
+<text xml:space="preserve" text-anchor="middle" x="949.28" y="-102.42" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">最后一层后</text>
+</g>
+<!-- finaly -->
+<g id="node19" class="node">
+<title>finaly</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M1246.52,-189.24C1246.52,-189.24 1041.42,-189.24 1041.42,-189.24 1035.42,-189.24 1029.42,-183.24 1029.42,-177.24 1029.42,-177.24 1029.42,-160.92 1029.42,-160.92 1029.42,-154.92 1035.42,-148.92 1041.42,-148.92 1041.42,-148.92 1246.52,-148.92 1246.52,-148.92 1252.52,-148.92 1258.52,-154.92 1258.52,-160.92 1258.52,-160.92 1258.52,-177.24 1258.52,-177.24 1258.52,-183.24 1252.52,-189.24 1246.52,-189.24"/>
+<text xml:space="preserve" text-anchor="middle" x="1143.97" y="-163.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">最后一层后的 RMS(y₂)</text>
+</g>
+<!-- nexty&#45;&gt;finaly -->
+<g id="edge23" class="edge">
+<title>nexty&#45;&gt;finaly</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M981.61,-245.22C1017.15,-228.78 1060.38,-208.77 1093.29,-193.54"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="1094.14,-196.03 1099.85,-190.5 1091.94,-191.27 1094.14,-196.03"/>
+<text xml:space="preserve" text-anchor="middle" x="1070.71" y="-218.94" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">最后一层后</text>
+</g>
+<!-- finaly&#45;&gt;final -->
+<g id="edge24" class="edge">
+<title>finaly&#45;&gt;final</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M1122.1,-148.5C1104.6,-132.83 1079.32,-110.21 1056.64,-89.9"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="1058.64,-88.18 1051.3,-85.13 1055.14,-92.09 1058.64,-88.18"/>
+</g>
+</g>
+</g><text x="30" y="1667" font-family="Heiti SC, Arial, sans-serif" font-size="12" fill="#6d7f90">省略 batch 维；同名操作的不同阶段不代表参数共享。</text></svg>

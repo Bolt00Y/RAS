@@ -1,0 +1,31 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶字段 Embedding\n共 1234 × 17",width="2.867",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"raw" [label="分桶 BN + 分层 SENet\n20978 维",width="3.157",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"groups" [label="10 / 20 / 1 语义组\n31 个 Local 入口",width="2.907",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"local" [label="独立 Linear + GELU + Laye\nrNorm\nLocal：31 × 512",width="3.962",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"global" [label="全量输入→512→512\nGlobal + LayerNorm\n1 × 512",width="3.027",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"concat" [label="Concat Local + Global\n32 × 512",width="3.462",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"blocks" [label="两层双 FFN Block\nD512 / M704\n两处 PreNorm 换 LayerNorm",width="3.922",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"norm" [label="Final LayerNorm\n32 × 512",width="2.592",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"flat" [label="PureFlat\n32 × 512 → 16384",width="2.842",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"head" [label="任务头首层输入扩展\n16384→2048→2048→256",width="3.487",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"output" [label="线性输出 → 裁剪 → Sigmoi\nd\nfst_CVR 概率",width="3.867",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"deleted" [label="删除三路 1536 维读出\nGlobal / Pool / 压缩 Flat",width="3.962",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+"results" [label="0909 表无独立结果\nE3 数值不能重复登记",width="2.852",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+"input" -> "raw";
+"raw" -> "groups";
+"groups" -> "local";
+"raw" -> "global";
+"local" -> "concat";
+"global" -> "concat";
+"concat" -> "blocks";
+"blocks" -> "norm";
+"norm" -> "flat";
+"flat" -> "head";
+"head" -> "output";
+"deleted" -> "flat" [label="读出替换",style="dashed",color="#9ba8b5"];
+"results" -> "output" [label="实验状态",style="dashed",color="#9ba8b5"];
+}

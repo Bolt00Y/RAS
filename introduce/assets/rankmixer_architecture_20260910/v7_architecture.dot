@@ -1,0 +1,33 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶字段 Embedding\n385 / 835 / 14 × 17",width="3.172",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"bn" [label="分桶 BN\n字段级分层 SENet",width="2.537",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"groups" [label="固定语义分组\n5 common / 10 item / 1 cr\neative",width="4.042",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"tokens" [label="独立 Linear + GELU\n输入 Token：16 × 768\n投影后LN关闭",width="3.197",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"mixer" [label="两层 RankMixer Block\n每层 Mixing + 单套 PFFN",width="3.592",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"pool" [label="门控加权池化\n16 × 768 → 768",width="2.552",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"means" [label="输入 Token 按桶平均\nc、i、a 各 768 维",width="2.932",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"crosscat" [label="Concat：c、i、a\nc⊙i、c⊙a、i⊙a\n共 4608 维",width="2.537",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"cross" [label="投影 + LN + 标量门控\n4608 → 768",width="3.077",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"fusion" [label="相加 + LN\n池化与交叉融合：768 维",width="3.247",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"head" [label="替换深任务头\n768→2048→2048→256\n各隐藏层 BN + GELU",width="3.197",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"logit" [label="最终线性层\n256 → 1",width="1.800",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"output" [label="裁剪 logit + Sigmoid\nfst_CVR 概率",width="3.237",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="旧 v3：768 → 1\n没有同日 v3 可比结果",width="2.997",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+"input" -> "bn";
+"bn" -> "groups";
+"groups" -> "tokens";
+"tokens" -> "mixer";
+"mixer" -> "pool";
+"tokens" -> "means" [label="Mixer 前"];
+"means" -> "crosscat";
+"crosscat" -> "cross";
+"pool" -> "fusion";
+"cross" -> "fusion";
+"fusion" -> "head";
+"head" -> "logit";
+"logit" -> "output";
+"note" -> "head" [label="替换位置",style="dashed",color="#9ba8b5"];
+}

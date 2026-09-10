@@ -1,0 +1,48 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶稀疏字段\n385 / 835 / 14",width="2.447",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"select" [label="整理当前任务输入\n数值/序列/gattr移出",width="2.932",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"embed" [label="每字段 Embedding 17维\n共 20,978维",width="3.302",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"bn" [label="分桶 BN",width="1.800",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"stats" [label="逐字段取17维均值\n得到 c / i / a 统计",width="3.012",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"gates" [label="分层 SENet 门控\nc；[c,i]；[c,i,a]\n隐层128，2×Sigmoid",width="2.907",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"scale" [label="字段门控 × Embedding\n同字段17维共享gate",width="3.157",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"concat" [label="三桶拼接 x₀\n20,978维",width="1.957",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"crossin" [label="当前层输入 zℓ\n首层 z₀=x₀",width="2.207",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"low" [label="低秩两次线性投影\n20,978→500→20,978",width="3.092",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"product" [label="与原始 x₀ 逐元素相乘",width="3.102",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"add" [label="加回 zℓ → LayerNorm",width="3.302",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"mlp" [label="MLP 2048→2048→256\n各层 BN + 激活",width="3.092",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"logit" [label="线性投影 → logit\n截断 + Sigmoid",width="2.682",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"out" [label="首次转化概率",width="1.917",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+subgraph "cluster_senet" { label="继承：字段级分层 SENet"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"stats";
+"gates";
+"scale";
+}
+subgraph "cluster_dcnm" { label="继承：DCNM 单元 × 2"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"crossin";
+"low";
+"product";
+"add";
+}
+"input" -> "select";
+"select" -> "embed";
+"embed" -> "bn";
+"bn" -> "stats";
+"stats" -> "gates";
+"gates" -> "scale" [label="字段gate"];
+"bn" -> "scale" [label="字段向量"];
+"scale" -> "concat";
+"concat" -> "crossin";
+"crossin" -> "low";
+"low" -> "product";
+"concat" -> "product" [label="固定 x₀"];
+"product" -> "add";
+"crossin" -> "add" [label="层残差"];
+"add" -> "mlp" [label="两层后"];
+"mlp" -> "logit";
+"logit" -> "out";
+}

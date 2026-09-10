@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="874" height="934" viewBox="0 0 874 934" role="img" aria-label="末端对比：PureFlat 与 MeanPool"><rect width="100%" height="100%" fill="#ffffff"/><g font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif"><text x="30" y="35" font-size="24" font-weight="600" fill="#173650">末端对比：PureFlat 与 MeanPool</text><text x="30" y="67" font-size="16" fill="#526477">对照：Small → Small-1</text><rect x="30" y="91" width="15" height="15" rx="3" fill="#fff0d4" stroke="#ca8425"/><text x="53" y="104" font-size="14" fill="#526477">本版改动 / 本图重点</text><rect x="230" y="91" width="15" height="15" rx="3" fill="#edf4fc" stroke="#7290b1"/><text x="253" y="104" font-size="14" fill="#526477">沿用模块</text><text x="405" y="104" font-size="14" fill="#526477">实线：数据流　虚线：说明或对照</text></g><g transform="translate(24 139)">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(12.96 740.2)">
+<title>G</title>
+<g id="clust1" class="cluster">
+<title>cluster_flat_branch</title>
+<path fill="none" stroke="#c5d1de" d="M20,-8C20,-8 262,-8 262,-8 268,-8 274,-14 274,-20 274,-20 274,-629.32 274,-629.32 274,-635.32 268,-641.32 262,-641.32 262,-641.32 20,-641.32 20,-641.32 14,-641.32 8,-635.32 8,-629.32 8,-629.32 8,-20 8,-20 8,-14 14,-8 20,-8"/>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-621.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#425b75">Small / Small&#45;3 的完整末端</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_mean_branch</title>
+<path fill="none" stroke="#c5d1de" d="M294,-109.92C294,-109.92 564,-109.92 564,-109.92 570,-109.92 576,-115.92 576,-121.92 576,-121.92 576,-629.32 576,-629.32 576,-635.32 570,-641.32 564,-641.32 564,-641.32 294,-641.32 294,-641.32 288,-641.32 282,-635.32 282,-629.32 282,-629.32 282,-121.92 282,-121.92 282,-115.92 288,-109.92 294,-109.92"/>
+<text xml:space="preserve" text-anchor="middle" x="429" y="-621.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#425b75">Small&#45;1 / Small&#45;2 的轻量末端</text>
+</g>
+<!-- input -->
+<g id="node1" class="node">
+<title>input</title>
+<path fill="#e9f5ef" stroke="#6a9e84" stroke-width="1.1" d="M371.55,-727.24C371.55,-727.24 202.45,-727.24 202.45,-727.24 196.45,-727.24 190.45,-721.24 190.45,-715.24 190.45,-715.24 190.45,-677.32 190.45,-677.32 190.45,-671.32 196.45,-665.32 202.45,-665.32 202.45,-665.32 371.55,-665.32 371.55,-665.32 377.55,-665.32 383.55,-671.32 383.55,-677.32 383.55,-677.32 383.55,-715.24 383.55,-715.24 383.55,-721.24 377.55,-727.24 371.55,-727.24"/>
+<text xml:space="preserve" text-anchor="middle" x="287" y="-701.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#174b34">主干最终 Token：Z</text>
+<text xml:space="preserve" text-anchor="middle" x="287" y="-680.08" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#174b34">[B,32,256]</text>
+</g>
+<!-- rms -->
+<g id="node2" class="node">
+<title>rms</title>
+<path fill="#edf4fc" stroke="#7290b1" stroke-width="1.1" d="M244.87,-595.72C244.87,-595.72 49.13,-595.72 49.13,-595.72 43.13,-595.72 37.13,-589.72 37.13,-583.72 37.13,-583.72 37.13,-545.8 37.13,-545.8 37.13,-539.8 43.13,-533.8 49.13,-533.8 49.13,-533.8 244.87,-533.8 244.87,-533.8 250.87,-533.8 256.87,-539.8 256.87,-545.8 256.87,-545.8 256.87,-583.72 256.87,-583.72 256.87,-589.72 250.87,-595.72 244.87,-595.72"/>
+<text xml:space="preserve" text-anchor="middle" x="147" y="-570.16" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">Small：最终 RMSNorm</text>
+<text xml:space="preserve" text-anchor="middle" x="147" y="-548.56" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">γ：[32,256]</text>
+</g>
+<!-- input&#45;&gt;rms -->
+<g id="edge1" class="edge">
+<title>input&#45;&gt;rms</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M254.18,-664.91C233.9,-646.16 207.77,-621.98 186.38,-602.19"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="188.18,-600.28 180.9,-597.12 184.62,-604.14 188.18,-600.28"/>
+</g>
+<!-- ln -->
+<g id="node8" class="node">
+<title>ln</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M547.75,-595.72C547.75,-595.72 310.25,-595.72 310.25,-595.72 304.25,-595.72 298.25,-589.72 298.25,-583.72 298.25,-583.72 298.25,-545.8 298.25,-545.8 298.25,-539.8 304.25,-533.8 310.25,-533.8 310.25,-533.8 547.75,-533.8 547.75,-533.8 553.75,-533.8 559.75,-539.8 559.75,-545.8 559.75,-545.8 559.75,-583.72 559.75,-583.72 559.75,-589.72 553.75,-595.72 547.75,-595.72"/>
+<text xml:space="preserve" text-anchor="middle" x="429" y="-570.16" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">Small&#45;1：共享 LayerNorm</text>
+<text xml:space="preserve" text-anchor="middle" x="429" y="-548.56" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">γ / β：[256]</text>
+</g>
+<!-- input&#45;&gt;ln -->
+<g id="edge7" class="edge">
+<title>input&#45;&gt;ln</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M320.29,-664.91C340.95,-646.08 367.59,-621.77 389.34,-601.94"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="390.86,-604.1 394.63,-597.11 387.32,-600.22 390.86,-604.1"/>
+</g>
+<!-- flat -->
+<g id="node3" class="node">
+<title>flat</title>
+<path fill="#edf4fc" stroke="#7290b1" stroke-width="1.1" d="M229.99,-492C229.99,-492 58.01,-492 58.01,-492 52.01,-492 46.01,-486 46.01,-480 46.01,-480 46.01,-442.08 46.01,-442.08 46.01,-436.08 52.01,-430.08 58.01,-430.08 58.01,-430.08 229.99,-430.08 229.99,-430.08 235.99,-430.08 241.99,-436.08 241.99,-442.08 241.99,-442.08 241.99,-480 241.99,-480 241.99,-486 235.99,-492 229.99,-492"/>
+<text xml:space="preserve" text-anchor="middle" x="144" y="-466.44" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">PureFlat 全量展平</text>
+<text xml:space="preserve" text-anchor="middle" x="144" y="-444.84" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">[B,8192]</text>
+</g>
+<!-- rms&#45;&gt;flat -->
+<g id="edge2" class="edge">
+<title>rms&#45;&gt;flat</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M146.11,-533.52C145.81,-523.46 145.48,-512.11 145.16,-501.47"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="147.79,-501.5 144.95,-494.08 142.54,-501.66 147.79,-501.5"/>
+</g>
+<!-- large1 -->
+<g id="node4" class="node">
+<title>large1</title>
+<path fill="#edf4fc" stroke="#7290b1" stroke-width="1.1" d="M240.77,-373.68C240.77,-373.68 43.23,-373.68 43.23,-373.68 37.23,-373.68 31.23,-367.68 31.23,-361.68 31.23,-361.68 31.23,-323.76 31.23,-323.76 31.23,-317.76 37.23,-311.76 43.23,-311.76 43.23,-311.76 240.77,-311.76 240.77,-311.76 246.77,-311.76 252.77,-317.76 252.77,-323.76 252.77,-323.76 252.77,-361.68 252.77,-361.68 252.77,-367.68 246.77,-373.68 240.77,-373.68"/>
+<text xml:space="preserve" text-anchor="middle" x="142" y="-348.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">大头首层：8192→2048</text>
+<text xml:space="preserve" text-anchor="middle" x="142" y="-326.52" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">Dense + BN + GELU</text>
+</g>
+<!-- flat&#45;&gt;large1 -->
+<g id="edge3" class="edge">
+<title>flat&#45;&gt;large1</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M143.48,-429.78C143.23,-415.51 142.94,-398.3 142.68,-383.04"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="145.3,-383.02 142.55,-375.57 140.05,-383.11 145.3,-383.02"/>
+</g>
+<!-- large2 -->
+<g id="node5" class="node">
+<title>large2</title>
+<path fill="#edf4fc" stroke="#7290b1" stroke-width="1.1" d="M246.43,-280.76C246.43,-280.76 35.57,-280.76 35.57,-280.76 29.57,-280.76 23.57,-274.76 23.57,-268.76 23.57,-268.76 23.57,-230.84 23.57,-230.84 23.57,-224.84 29.57,-218.84 35.57,-218.84 35.57,-218.84 246.43,-218.84 246.43,-218.84 252.43,-218.84 258.43,-224.84 258.43,-230.84 258.43,-230.84 258.43,-268.76 258.43,-268.76 258.43,-274.76 252.43,-280.76 246.43,-280.76"/>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-255.2" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">后续：2048→2048→256</text>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-233.6" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">Dense + BN + GELU</text>
+</g>
+<!-- large1&#45;&gt;large2 -->
+<g id="edge4" class="edge">
+<title>large1&#45;&gt;large2</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M141.67,-311.44C141.59,-304.62 141.51,-297.27 141.43,-290.13"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="144.06,-290.46 141.35,-282.99 138.81,-290.52 144.06,-290.46"/>
+</g>
+<!-- logit_flat -->
+<g id="node6" class="node">
+<title>logit_flat</title>
+<path fill="#edf4fc" stroke="#7290b1" stroke-width="1.1" d="M218.89,-187.84C218.89,-187.84 63.11,-187.84 63.11,-187.84 57.11,-187.84 51.11,-181.84 51.11,-175.84 51.11,-175.84 51.11,-137.92 51.11,-137.92 51.11,-131.92 57.11,-125.92 63.11,-125.92 63.11,-125.92 218.89,-125.92 218.89,-125.92 224.89,-125.92 230.89,-131.92 230.89,-137.92 230.89,-137.92 230.89,-175.84 230.89,-175.84 230.89,-181.84 224.89,-187.84 218.89,-187.84"/>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-162.28" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">线性输出：256→1</text>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-140.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#183a5e">Logit 裁剪</text>
+</g>
+<!-- large2&#45;&gt;logit_flat -->
+<g id="edge5" class="edge">
+<title>large2&#45;&gt;logit_flat</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M141,-218.52C141,-211.7 141,-204.35 141,-197.21"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="143.63,-197.57 141,-190.07 138.38,-197.57 143.63,-197.57"/>
+</g>
+<!-- output_flat -->
+<g id="node7" class="node">
+<title>output_flat</title>
+<path fill="#244968" stroke="#244968" stroke-width="1.1" d="M211.33,-85.92C211.33,-85.92 70.67,-85.92 70.67,-85.92 64.67,-85.92 58.67,-79.92 58.67,-73.92 58.67,-73.92 58.67,-36 58.67,-36 58.67,-30 64.67,-24 70.67,-24 70.67,-24 211.33,-24 211.33,-24 217.33,-24 223.33,-30 223.33,-36 223.33,-36 223.33,-73.92 223.33,-73.92 223.33,-79.92 217.33,-85.92 211.33,-85.92"/>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-60.36" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">Sigmoid</text>
+<text xml:space="preserve" text-anchor="middle" x="141" y="-38.76" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">Small 分支预估</text>
+</g>
+<!-- logit_flat&#45;&gt;output_flat -->
+<g id="edge6" class="edge">
+<title>logit_flat&#45;&gt;output_flat</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M141,-125.63C141,-116.13 141,-105.5 141,-95.46"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="143.63,-95.69 141,-88.19 138.38,-95.69 143.63,-95.69"/>
+</g>
+<!-- mean -->
+<g id="node9" class="node">
+<title>mean</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M545.31,-492C545.31,-492 328.69,-492 328.69,-492 322.69,-492 316.69,-486 316.69,-480 316.69,-480 316.69,-442.08 316.69,-442.08 316.69,-436.08 322.69,-430.08 328.69,-430.08 328.69,-430.08 545.31,-430.08 545.31,-430.08 551.31,-430.08 557.31,-436.08 557.31,-442.08 557.31,-442.08 557.31,-480 557.31,-480 557.31,-486 551.31,-492 545.31,-492"/>
+<text xml:space="preserve" text-anchor="middle" x="437" y="-466.44" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">Token 轴等权 MeanPool</text>
+<text xml:space="preserve" text-anchor="middle" x="437" y="-444.84" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">[B,256]</text>
+</g>
+<!-- ln&#45;&gt;mean -->
+<g id="edge8" class="edge">
+<title>ln&#45;&gt;mean</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M431.38,-533.52C432.17,-523.46 433.06,-512.11 433.9,-501.47"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="436.51,-501.76 434.48,-494.08 431.28,-501.35 436.51,-501.76"/>
+</g>
+<!-- smallhead -->
+<g id="node10" class="node">
+<title>smallhead</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M543.99,-373.68C543.99,-373.68 354.01,-373.68 354.01,-373.68 348.01,-373.68 342.01,-367.68 342.01,-361.68 342.01,-361.68 342.01,-323.76 342.01,-323.76 342.01,-317.76 348.01,-311.76 354.01,-311.76 354.01,-311.76 543.99,-311.76 543.99,-311.76 549.99,-311.76 555.99,-317.76 555.99,-323.76 555.99,-323.76 555.99,-361.68 555.99,-361.68 555.99,-367.68 549.99,-373.68 543.99,-373.68"/>
+<text xml:space="preserve" text-anchor="middle" x="449" y="-348.12" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">小头：256→256→128</text>
+<text xml:space="preserve" text-anchor="middle" x="449" y="-326.52" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">Dense + BN + GELU</text>
+</g>
+<!-- mean&#45;&gt;smallhead -->
+<g id="edge9" class="edge">
+<title>mean&#45;&gt;smallhead</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M440.12,-429.78C441.61,-415.38 443.4,-397.98 444.99,-382.61"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="447.56,-383.29 445.72,-375.56 442.33,-382.75 447.56,-383.29"/>
+</g>
+<!-- logit_mean -->
+<g id="node11" class="node">
+<title>logit_mean</title>
+<path fill="#fff0d4" stroke="#ca8425" stroke-width="1.1" d="M526.89,-280.76C526.89,-280.76 371.11,-280.76 371.11,-280.76 365.11,-280.76 359.11,-274.76 359.11,-268.76 359.11,-268.76 359.11,-230.84 359.11,-230.84 359.11,-224.84 365.11,-218.84 371.11,-218.84 371.11,-218.84 526.89,-218.84 526.89,-218.84 532.89,-218.84 538.89,-224.84 538.89,-230.84 538.89,-230.84 538.89,-268.76 538.89,-268.76 538.89,-274.76 532.89,-280.76 526.89,-280.76"/>
+<text xml:space="preserve" text-anchor="middle" x="449" y="-255.2" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">线性输出：128→1</text>
+<text xml:space="preserve" text-anchor="middle" x="449" y="-233.6" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#71400d">Logit 裁剪</text>
+</g>
+<!-- smallhead&#45;&gt;logit_mean -->
+<g id="edge10" class="edge">
+<title>smallhead&#45;&gt;logit_mean</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M449,-311.44C449,-304.62 449,-297.27 449,-290.13"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="451.63,-290.49 449,-282.99 446.38,-290.49 451.63,-290.49"/>
+</g>
+<!-- output_mean -->
+<g id="node12" class="node">
+<title>output_mean</title>
+<path fill="#244968" stroke="#244968" stroke-width="1.1" d="M529.77,-187.84C529.77,-187.84 368.23,-187.84 368.23,-187.84 362.23,-187.84 356.23,-181.84 356.23,-175.84 356.23,-175.84 356.23,-137.92 356.23,-137.92 356.23,-131.92 362.23,-125.92 368.23,-125.92 368.23,-125.92 529.77,-125.92 529.77,-125.92 535.77,-125.92 541.77,-131.92 541.77,-137.92 541.77,-137.92 541.77,-175.84 541.77,-175.84 541.77,-181.84 535.77,-187.84 529.77,-187.84"/>
+<text xml:space="preserve" text-anchor="middle" x="449" y="-162.28" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">Sigmoid</text>
+<text xml:space="preserve" text-anchor="middle" x="449" y="-140.68" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#ffffff">Small&#45;1 分支预估</text>
+</g>
+<!-- logit_mean&#45;&gt;output_mean -->
+<g id="edge11" class="edge">
+<title>logit_mean&#45;&gt;output_mean</title>
+<path fill="none" stroke="#607388" stroke-width="1.15" d="M449,-218.52C449,-211.7 449,-204.35 449,-197.21"/>
+<polygon fill="#607388" stroke="#607388" stroke-width="1.15" points="451.63,-197.57 449,-190.07 446.38,-197.57 451.63,-197.57"/>
+</g>
+<!-- note -->
+<g id="node13" class="node">
+<title>note</title>
+<path fill="#f5f6f8" stroke="#a3adb8" stroke-width="1.1" stroke-dasharray="5,2" d="M788.11,-502.8C788.11,-502.8 603.89,-502.8 603.89,-502.8 597.89,-502.8 591.89,-496.8 591.89,-490.8 591.89,-490.8 591.89,-431.28 591.89,-431.28 591.89,-425.28 597.89,-419.28 603.89,-419.28 603.89,-419.28 788.11,-419.28 788.11,-419.28 794.11,-419.28 800.11,-425.28 800.11,-431.28 800.11,-431.28 800.11,-490.8 800.11,-490.8 800.11,-496.8 794.11,-502.8 788.11,-502.8"/>
+<text xml:space="preserve" text-anchor="middle" x="696" y="-477.24" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#435161">同时改变 Norm、读出</text>
+<text xml:space="preserve" text-anchor="middle" x="696" y="-455.64" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#435161">与任务头容量/实现</text>
+<text xml:space="preserve" text-anchor="middle" x="696" y="-434.04" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="18.00" fill="#435161">不是等参数池化对照</text>
+</g>
+<!-- note&#45;&gt;smallhead -->
+<g id="edge12" class="edge">
+<title>note&#45;&gt;smallhead</title>
+<path fill="none" stroke="#9ba8b5" stroke-width="1.15" stroke-dasharray="5,2" d="M608.57,-418.87C580.27,-405.54 549.2,-390.91 522.06,-378.13"/>
+<polygon fill="#9ba8b5" stroke="#9ba8b5" stroke-width="1.15" points="523.25,-375.79 515.35,-374.96 521.01,-380.54 523.25,-375.79"/>
+<text xml:space="preserve" text-anchor="middle" x="594.17" y="-392.58" font-family="Heiti SC, PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="13.00" fill="#3b5065">组合替换</text>
+</g>
+</g>
+</g><text x="30" y="920" font-family="Heiti SC, Arial, sans-serif" font-size="12" fill="#6d7f90">省略 batch 维；同名操作的不同阶段不代表参数共享。</text></svg>

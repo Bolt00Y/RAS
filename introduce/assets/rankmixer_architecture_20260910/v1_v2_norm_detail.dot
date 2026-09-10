@@ -1,0 +1,49 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="当层输入 x\n[batch,16,768]",width="2.447",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"v1mix" [label="v1 固定 Mixing",width="2.367",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v1ln1" [label="x + Mixing(x)\nLN₁ → s",width="2.302",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v1pre" [label="额外 LN₂(s)",width="2.037",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v1ffn" [label="逐Token PFFN\n768→3072→768",width="2.367",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v1post" [label="s + FFN(LN₂(s))\nLN₃",width="2.697",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v1out" [label="v1 Block 输出",width="2.222",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"v2mix" [label="v2 固定 Mixing",width="2.367",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v2ln1" [label="x + Mixing(x)\nLN → s",width="2.302",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v2ffn" [label="批量独立 PFFN\n直接接收 s\n768→1536→768",width="2.367",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"v2post" [label="s + FFN(s)\nLN",width="1.867",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"v2out" [label="v2 Block 输出",width="2.222",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="删去额外FFN前LN\nFFN扩展倍数4→2",width="2.392",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_before" { label="修改前：BN v1"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"v1mix";
+"v1ln1";
+"v1pre";
+"v1ffn";
+"v1post";
+"v1out";
+}
+subgraph "cluster_after" { label="修改后：v2"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"v2mix";
+"v2ln1";
+"v2ffn";
+"v2post";
+"v2out";
+}
+"input" -> "v1mix";
+"v1mix" -> "v1ln1";
+"input" -> "v1ln1" [label="残差"];
+"v1ln1" -> "v1pre";
+"v1pre" -> "v1ffn";
+"v1ffn" -> "v1post";
+"v1ln1" -> "v1post" [label="残差 s"];
+"v1post" -> "v1out";
+"input" -> "v2mix";
+"v2mix" -> "v2ln1";
+"input" -> "v2ln1" [label="残差"];
+"v2ln1" -> "v2ffn";
+"v2ffn" -> "v2post";
+"v2ln1" -> "v2post" [label="残差 s"];
+"v2post" -> "v2out";
+"v2ffn" -> "note" [style="dashed",color="#9ba8b5"];
+}

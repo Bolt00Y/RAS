@@ -1,0 +1,44 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="三桶 Embedding\n385 / 835 / 14 ×17",width="3.027",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"bn" [label="分桶 BN",width="1.800",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"flat" [label="拼接 20,978维",width="2.182",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"split" [label="按坐标切16段\n15×1311 + 1313",width="2.447",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"proj" [label="每段独立 Linear + GELU\nT=16，D=768",width="3.447",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"bin" [label="当前 Block 输入 x",width="2.722",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"mix" [label="固定 Mixing\nreshape→transpose",width="2.987",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln1" [label="x + Mixing(x)\nLayerNorm₁ 得到 s",width="2.907",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln2" [label="FFN 前 LayerNorm₂",width="2.947",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ffn" [label="独立 Per-token FFN\n768→3072→768\nGELU",width="2.947",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln3" [label="s + FFN 输出\nLayerNorm₃",width="2.077",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"pool" [label="16个Token取均值\n768维",width="2.432",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"head" [label="线性 768→1\n截断 + Sigmoid",width="2.367",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"out" [label="首次转化概率",width="1.917",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="每字段17维\n切段未对齐字段边界",width="2.667",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_block" { label="RankMixer Block × 2；每层1套FFN"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"bin";
+"mix";
+"ln1";
+"ln2";
+"ffn";
+"ln3";
+}
+"input" -> "bn";
+"bn" -> "flat";
+"flat" -> "split";
+"split" -> "proj";
+"proj" -> "bin";
+"bin" -> "mix";
+"mix" -> "ln1";
+"bin" -> "ln1" [label="残差"];
+"ln1" -> "ln2";
+"ln2" -> "ffn";
+"ffn" -> "ln3";
+"ln1" -> "ln3" [label="残差 s"];
+"ln3" -> "pool" [label="堆叠2层后"];
+"pool" -> "head";
+"head" -> "out";
+"split" -> "note" [style="dashed",color="#9ba8b5"];
+}

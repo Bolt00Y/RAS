@@ -1,0 +1,56 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="Block 输入 x\n[B,32,256]",width="2.077",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"mix" [label="固定 Mixing：m=P(x)\n[B,32,32,8] 换轴\n恢复为 [B,32,256]",width="3.052",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"norm_m" [label="RMSNorm_m\n每个混合 Token 独立 γ",width="3.327",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"up_m" [label="Up 投影\n256 → 704",width="1.827",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"gate_m" [label="Gate 投影 + SiLU\n256 → 704",width="2.657",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"mul_m" [label="逐元素相乘\nUp ⊙ SiLU(Gate)",width="2.697",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"down_m" [label="Down 投影\n704 → 256\n得到 mixed update",width="2.802",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"add_m" [label="第一次残差\nh = m + mixed update",width="3.317",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"revert" [label="Reverting：r=P⁻¹(h)\n恢复 Token 坐标布局\n不恢复原始数值",width="3.237",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"norm_o" [label="RMSNorm_o\n每个原布局 Token 独立 γ",width="3.577",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"up_o" [label="Up 投影\n256 → 704",width="1.827",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"gate_o" [label="Gate 投影 + SiLU\n256 → 704",width="2.657",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"mul_o" [label="逐元素相乘\nUp ⊙ SiLU(Gate)",width="2.697",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"down_o" [label="Down 投影\n704 → 256\n得到 original update",width="3.237",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"add_out" [label="长残差加回输入 x\ny = x + original update\n此处不加 r",width="3.752",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"output" [label="Block 输出 y\n[B,32,256]",width="2.077",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"weights" [label="每阶段 32 组独立权重\n两阶段之间不共享\n三个 Block 之间不共享",width="3.182",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_mixed_ffn" { label="第一套 Per-token SwiGLU：重排空间"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"norm_m";
+"up_m";
+"gate_m";
+"mul_m";
+"down_m";
+}
+subgraph "cluster_original_ffn" { label="第二套 Per-token SwiGLU：原布局空间"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"norm_o";
+"up_o";
+"gate_o";
+"mul_o";
+"down_o";
+}
+"input" -> "mix";
+"mix" -> "norm_m";
+"norm_m" -> "up_m";
+"norm_m" -> "gate_m";
+"up_m" -> "mul_m";
+"gate_m" -> "mul_m";
+"mul_m" -> "down_m";
+"down_m" -> "add_m" [label="更新"];
+"mix" -> "add_m" [label="+ m"];
+"add_m" -> "revert";
+"revert" -> "norm_o";
+"norm_o" -> "up_o";
+"norm_o" -> "gate_o";
+"up_o" -> "mul_o";
+"gate_o" -> "mul_o";
+"mul_o" -> "down_o";
+"down_o" -> "add_out" [label="更新"];
+"input" -> "add_out" [label="+ x：长残差"];
+"add_out" -> "output";
+"weights" -> "down_o" [label="权重关系",style="dashed",color="#9ba8b5"];
+}

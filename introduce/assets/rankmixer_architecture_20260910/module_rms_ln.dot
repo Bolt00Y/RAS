@@ -1,0 +1,51 @@
+digraph G {
+graph [rankdir=TB,bgcolor="transparent",pad="0.18",nodesep="0.33",ranksep="0.42",splines=polyline,fontname="Arial",fontsize=18,compound=true,newrank=true];
+node [shape=box,style="rounded,filled",fontname="Arial",fontsize=18,margin="0.17,0.13",penwidth=1.1];
+edge [color="#607388",fontcolor="#3b5065",fontname="Arial",fontsize=13,arrowsize=0.75,penwidth=1.15];
+"input" [label="Token 张量 x\n[B,T,D]\n均沿最后一维统计",width="2.417",fillcolor="#e9f5ef",color="#6a9e84",fontcolor="#174b34"];
+"rms_stat" [label="RMS 路径\n计算 mean(x²)",width="2.222",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"rms_den" [label="分母\n√(mean(x²) + ε_R)",width="3.092",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"rms_div" [label="原值除以分母\n不减 Token 均值",width="2.432",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"rms_affine" [label="乘独立 scale\nγ：[T,D]\n无平移 β",width="2.037",fillcolor="#edf4fc",color="#7290b1",fontcolor="#183a5e"];
+"rms_out" [label="RMSNorm 输出\n[B,T,D]",width="2.077",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"ln_mean" [label="LN 路径\n计算 μ = mean(x)",width="2.762",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln_center" [label="逐 Token 中心化\nx_c = x − μ",width="2.432",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln_var" [label="计算 mean(x_c²)\n沿最后一维",width="2.512",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln_den" [label="分母\n√(mean(x_c²) + ε_L)",width="3.382",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln_div" [label="中心化值除以分母\nx_c / 分母",width="2.417",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln_affine" [label="乘 γ，再加 β\nγ / β：[D]\n跨 Token 共享",width="2.207",fillcolor="#fff0d4",color="#ca8425",fontcolor="#71400d"];
+"ln_out" [label="LayerNorm 输出\n[B,T,D]",width="2.367",fillcolor="#244968",color="#244968",fontcolor="#ffffff"];
+"note" [label="E3 在投影/Block/末端\n统一替换具体 Norm\n非仅“是否减均值”",width="3.117",fillcolor="#f5f6f8",color="#a3adb8",fontcolor="#435161",style="rounded,dashed,filled"];
+subgraph "cluster_rms_branch" { label="保留原值均值，仅做 RMS 缩放"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"rms_stat";
+"rms_den";
+"rms_div";
+"rms_affine";
+"rms_out";
+}
+subgraph "cluster_ln_branch" { label="先中心化，再标准化与仿射变换"; style="rounded"; color="#c5d1de"; fontcolor="#425b75"; margin=16;
+"ln_mean";
+"ln_center";
+"ln_var";
+"ln_den";
+"ln_div";
+"ln_affine";
+"ln_out";
+}
+"input" -> "rms_stat";
+"rms_stat" -> "rms_den";
+"rms_den" -> "rms_div" [label="分母"];
+"input" -> "rms_div" [label="原值 x"];
+"rms_div" -> "rms_affine";
+"rms_affine" -> "rms_out";
+"input" -> "ln_mean";
+"input" -> "ln_center" [label="原值 x"];
+"ln_mean" -> "ln_center" [label="均值 μ"];
+"ln_center" -> "ln_var";
+"ln_var" -> "ln_den";
+"ln_den" -> "ln_div" [label="分母"];
+"ln_center" -> "ln_div" [label="中心化值"];
+"ln_div" -> "ln_affine";
+"ln_affine" -> "ln_out";
+"note" -> "ln_affine" [label="共享方式也改变",style="dashed",color="#9ba8b5"];
+}
