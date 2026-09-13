@@ -1,0 +1,29 @@
+**v2：增加 Mixer 前的桶间交叉旁路**
+
+从 Mixer 前的 Token 中，分别对 common、item、creative 三桶取均值，得到 \(c、i、a\)。保留三个原向量，并加入两两逐元素乘积：
+
+$$u_b=[c;i;a;c\odot i;c\odot a;i\odot a]$$
+
+拼接结果经过投影、激活和归一化，再通过可学习的标量门控，与主干池化结果 \(p\) 融合：
+
+$$z_2=\operatorname{LN}\!\left(p+\sigma(\alpha)\operatorname{LN}\!\left(\operatorname{GELU}(u_bW_b+b_b)\right)\right)$$
+
+这条旁路使预测端能够直接利用**混合前的三桶表示及桶间乘性关系**。这里保留的是来源明确的桶级表示，并非未经压缩的全部字段。
+
+**v4：增加两路指定的 Query–Item 交叉**
+
+两路分别为：**查询意图与商品文本相关性**、**查询意图与商品身份及质量**。输入均取自 Mixer 前，经过 LayerNorm 和线性投影后，得到 128 维查询向量 \(q\) 与商品向量 \(i_j\)，其中 \(j\in\{1,2\}\)。
+
+每一路将两侧表示、乘积和差值拼接，形成 512 维交叉输入：
+
+$$u_j=[q;i_j;q\odot i_j;q-i_j]$$
+
+通过独立的两层网络执行 \(512\rightarrow128\rightarrow768\) 变换，并由样本门控控制输出幅度：
+
+$$g_j=\sigma\!\left([q;i_j;q\odot i_j]w_{g,j}+b_{g,j}\right),\qquad \delta_j=g_j\left(\operatorname{GELU}(u_jW_{1,j}+b_{1,j})W_{2,j}+b_{2,j}\right)$$
+
+两路结果与主干池化表示 \(p\)、原有桶间交叉输出 \(r_b\) 一起融合：
+
+$$z_4=\operatorname{LN}(p+r_b+\delta_1+\delta_2)$$
+
+这里“定向”指**明确指定 Query 与哪组商品信息交叉**，为这两类关系增加独立的学习路径。其中，\([\,;\,]\) 表示拼接，\(\odot\) 表示逐元素乘法，\(\sigma\) 表示 Sigmoid。

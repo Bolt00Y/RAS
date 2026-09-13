@@ -1,0 +1,62 @@
+{
+  "v6_e2": 199367013,
+  "v6_e2_small": 102356069,
+  "v6_e2_small_1": 80938853,
+  "v6_e2_small_2": 115664741,
+  "v6_e2_small_3": 137081957,
+  "v6_e3": 199275877,
+  "v6_e4": 80739301,
+  "v8": 192242606,
+  "v9": 199445658,
+  "v10": 199275877,
+  "mature_v1": {
+    "input_bn": 41956,
+    "senet": 7906162,
+    "local_tokens": 24795392,
+    "global_token": 10792712,
+    "mixer": 66262400,
+    "creative_bypass": 70272,
+    "task_head": 107777,
+    "total": 109976671
+  },
+  "mature_v2": {
+    "input_bn": 41956,
+    "senet": 7906162,
+    "local_tokens": 37193088,
+    "global_token": 10858632,
+    "mixer": 148938816,
+    "creative_bypass": 74432,
+    "task_head": 144641,
+    "total": 205157727
+  },
+  "mature_v3": {
+    "input_bn": 41956,
+    "senet": 7906162,
+    "local_tokens": 37193088,
+    "global_token": 10858632,
+    "mixer": 99292800,
+    "creative_bypass": 74432,
+    "task_head": 144641,
+    "total": 155511711
+  },
+  "mature_v4": {
+    "input_bn": 41956,
+    "senet": 11848754,
+    "local_tokens": 37193088,
+    "global_token": 16266632,
+    "mixer": 99264576,
+    "creative_bypass": 111552,
+    "task_head": 241537,
+    "total": 164968095
+  },
+  "mature_v5": {
+    "input_bn": 41956,
+    "senet": 11848754,
+    "local_tokens": 7999872,
+    "global_token": 16266632,
+    "mixer": 99264576,
+    "creative_bypass": 111552,
+    "task_head": 241537,
+    "total": 135774879
+  }
+}

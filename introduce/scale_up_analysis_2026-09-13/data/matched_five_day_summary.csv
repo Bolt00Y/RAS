@@ -1,0 +1,6 @@
+﻿model_id,label,start,end,n_dates,mean_auc,mean_gap,mean_abs_copc_error,dense_params_current_static,forward_flops_static_estimate,historical_config_binding,auc_cells
+base(bn-senet-dcnm),Base,2026-08-16,2026-08-20,5,0.8686216,0.0,0.0071576,90341785,180923051,unverified,B4;B5;B6;B7;B8
+bn_rankmixer_v6_e2_small,Small (L2),2026-08-16,2026-08-20,5,0.868143,-0.0004786,0.0105582,102356069,204818431,unverified,M4;M5;M6;M7;M8
+bn_rankmixer_v6_e2_small_3,Small-3 (L3),2026-08-16,2026-08-20,5,0.8683322,-0.0002894,0.0120376,137081957,274241663,unverified,V69;V70;V71;V72;V73
+bn_rankmixer_v6_e2,E2 (D512),2026-08-16,2026-08-20,5,0.8681968,-0.0004248,0.0042476,199367013,398962687,unverified,J4;J5;J6;J7;J8
+cvr-senet-mature-rankmixer-v1,Mature-v1,2026-08-16,2026-08-20,5,0.8686662,0.0000446,0.0108686,109976671,220714000,unverified,D48;D49;D50;D51;D52

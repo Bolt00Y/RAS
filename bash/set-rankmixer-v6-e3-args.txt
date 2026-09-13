@@ -1,6 +1,6 @@
 models.rankmixer.cvr_bn_rankmixer_v6_e3.MLPModel
 --data_dir=hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/search_rank_cvr_seq_fea_exp_shuffle_nebula/pt=%s+hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/chitu_bsearch_cvr_delta_shuffle_sample_v4/pt=%s+hdfs://pdd-data-ns/apps/nothive/warehouse/dist2/bsearch_cvr_shuffle_v4_label/pt=%s
---checkpoint_import_dir=hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-07-01/checkpoint
+--checkpoint_import_dir=hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/bsearch_rank_cvr_fea_v10_fst_v3/pt=2026-08-14/checkpoint
 --additional_checkpoint_dir=hdfs://pdd-data-ns/apps/nothive/warehouse/bsearch/flood_ctr_multitable_deepmatch_hourly/pt=%s/item_embedding/checkpoint
 --eval_every_steps=5000
 --sync_at_exit=true
@@ -11,9 +11,9 @@ models.rankmixer.cvr_bn_rankmixer_v6_e3.MLPModel
 --tf_config_proto_args='{"intra_op_parallelism_threads":32,"inter_op_parallelism_threads":8}'
 --model_args='{"use_rankmixer":true,"use_senet":true,"use_senet_bn":true,"senet_hidden_size":128,"rm_token_num":32,"rm_local_token_num":31,"rm_hidden_dim":512,"rm_layer_num":2,"rm_head_num":32,"rm_swiglu_hidden_dim":704,"rm_down_init_scale":0.01,"rm_rms_epsilon":1e-06,"rm_token_proj_act":"gelu_2","rm_norm_type":"layer_norm","rm_readout_type":"pure_flat","rm_bucket_token_counts":[10,20,1],"rm_group_version":"rankmixer_v6_semantic_balanced_v1","cvr_layers":[2048,2048,256],"enable_dense_warmup":false,"optimizer":"flood_adam","opt_goal":"first_cvr","save_predict_result":true,"skip_tensors":"rm_local_tokenize;rm_global_token;rm_block;rm_final_rms_norm;rm_v5_mlp;rm_v5_bn;rm_v5_out;bn_input;senet","warm_up_tensors":"rm_local_tokenize;rm_global_token;rm_block;rm_final_rms_norm;rm_v5_mlp;rm_v5_bn;rm_v5_out;bn_input;senet","drop_last_files":2,"learning_rate":0.00002,"batch_size":2048,"compression_type":"GZIP","act_type":"prelu","mlp_act_type":"gelu_2","epochs":1,"eval_batch_size":2048,"embedding_size":17,"batch_norm":true,"sample_format":"parquet","init_type":"normal","sparse_lr":0.05,"sparse_optimizer":"downpour_sgd_opt","train_reset_interval":10000,"upload_log":true,"lookup_fuse_num":20,"example_default_value":null,"prefetch_num":100,"interleave":6,"test_interleave":8,"dense_scale":0.01,"feature_version":"data.cvr.cvr_fea_v10_base_cold","feature_version_old":"data.cvr.cvr_fea_v10_base_cold","use_riemann_bn":true}'
 --flood_lr=0.05
---train_dates=2026-08-14:2026-08-14
---test_date=2026-08-15:2026-08-15
---additional_checkpoint_dates=2026-08-13:2026-08-13
+--train_dates=2026-08-15:2026-08-15
+--test_date=2026-08-16:2026-08-16
+--additional_checkpoint_dates=2026-08-14:2026-08-14
 --fast_matmul=true
 --worker_numa_strategy=select
 --predict_sample_ctr=True

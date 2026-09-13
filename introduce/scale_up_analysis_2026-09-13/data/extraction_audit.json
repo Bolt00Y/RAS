@@ -1,0 +1,156 @@
+{
+  "workbooks": [
+    {
+      "path": "docs/experiments/RankMixer-汇总-0909.xlsx",
+      "sha256": "55b3cd540ecd129fed7a07c3127dbcd1990d793af3a16ff03ddcb35f5c831588",
+      "sheet_shapes": [
+        {
+          "name": "Sheet1",
+          "max_row": 83,
+          "max_column": 36
+        }
+      ]
+    },
+    {
+      "path": "docs/experiments/副本RankMixer-汇总-0909.xlsx",
+      "sha256": "1b0d9e0867b7b6eb6e34b109ecad9df417faac07aec3c91d7a49ead3acf58c7a",
+      "sheet_shapes": [
+        {
+          "name": "Sheet1",
+          "max_row": 83,
+          "max_column": 36
+        }
+      ]
+    },
+    {
+      "path": "docs/experiments/RankMixer-汇总.xlsx",
+      "sha256": "3804f214d47046c654e1e1f9adce4abda2034b551d4f01b55ffa999be79d6bfd",
+      "sheet_shapes": [
+        {
+          "name": "Sheet1",
+          "max_row": 62,
+          "max_column": 36
+        }
+      ]
+    }
+  ],
+  "source_observation_count": 348,
+  "deduplicated_observation_count": 97,
+  "duplicate_observation_count": 251,
+  "baseline_observation_count": 26,
+  "candidate_observation_count": 71,
+  "candidate_unique_model_labels": 21,
+  "counts_by_source": {
+    "docs/experiments/RankMixer-汇总-0909.xlsx": 134,
+    "docs/experiments/副本RankMixer-汇总-0909.xlsx": 134,
+    "docs/experiments/RankMixer-汇总.xlsx": 80
+  },
+  "unique_observations_by_source": {
+    "docs/experiments/RankMixer-汇总-0909.xlsx": 97,
+    "docs/experiments/副本RankMixer-汇总-0909.xlsx": 97,
+    "docs/experiments/RankMixer-汇总.xlsx": 69
+  },
+  "copy_matches_primary_all_nonempty_cell_records": true,
+  "older_workbook_unique_observations_not_in_primary": 0,
+  "counts_by_chain": {
+    "2026-07-01": 39,
+    "2026-08-15": 58
+  },
+  "workbook_metric_conflict_count": 0,
+  "invalid_reported_diff_count": 0,
+  "blank_auc_slot_count_with_duplicates": 852,
+  "preregistered_not_run_count": 4,
+  "date_protocol_source": "docs/overview/background.md:27-50",
+  "date_protocol_note": "train_date/training_day/dense_start按文档协议从测试日期推导，非逐run日志验证；warm为同方案逐日热启动。",
+  "nonempty_cell_storage_note": "workbook_cells.json保留所有非空单元格和公式/缓存，未列出的单元格为空；blank_auc_slots保存日期×方案空记录。",
+  "statistical_note": "多个日期是相关续训/测试链，非独立seed；均值按共同测试日等权，不是合并样本总体AUC。",
+  "logs": [
+    {
+      "path": "docs/logs/cvr-senet-mature-rankmixer-v1-train0815-0817-error0901.log",
+      "sha256": "37603fe48ba8e29295fecff7b58f10be540de5c2737a652dd74fac6cc28dbb8e",
+      "line_count": 6588,
+      "metric_pattern_matching_line_numbers": [],
+      "explicit_errors": [
+        {
+          "line": 5737,
+          "text": "[WK0] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 5854,
+          "text": "[WK2] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 5973,
+          "text": "[WK3] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 6178,
+          "text": "[WK4] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 6208,
+          "text": "[WK1] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 6424,
+          "text": "[WK7] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 6540,
+          "text": "[WK5] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 6570,
+          "text": "[WK6] ModuleNotFoundError: No module named 'phalanx'"
+        },
+        {
+          "line": 6574,
+          "text": "some bg process failed"
+        }
+      ],
+      "note": "仅检索结果/显式错误线索；缺少最终测试指标不等价于零AUC或全部运行失败。"
+    },
+    {
+      "path": "docs/logs/mature-rankmixer-v1-debug-auz4l-worker-0_app_pos_es(1).log",
+      "sha256": "37f977ad51a7be1e33d9034d6a57df0fae2a40d463c12e9a5f6da94c6182f50f",
+      "line_count": 4486,
+      "metric_pattern_matching_line_numbers": [],
+      "explicit_errors": [],
+      "note": "仅检索结果/显式错误线索；缺少最终测试指标不等价于零AUC或全部运行失败。"
+    },
+    {
+      "path": "docs/logs/mature-rankmixer-v1-debug-error0901-14-01.log",
+      "sha256": "fa34d654162eb0412bf1682cd84e06926e0e82a69d743ac3e947c87bb60c0085",
+      "line_count": 113,
+      "metric_pattern_matching_line_numbers": [],
+      "explicit_errors": [
+        {
+          "line": 109,
+          "text": "some bg process failed"
+        }
+      ],
+      "note": "仅检索结果/显式错误线索；缺少最终测试指标不等价于零AUC或全部运行失败。"
+    },
+    {
+      "path": "docs/logs/mature-rankmixer-v1-debug-error0901-14-02.log",
+      "sha256": "885962f489aa81fb77e543643f6176220fe5bf2546854c62c2ffb1c8007fb564",
+      "line_count": 113,
+      "metric_pattern_matching_line_numbers": [],
+      "explicit_errors": [
+        {
+          "line": 109,
+          "text": "some bg process failed"
+        }
+      ],
+      "note": "仅检索结果/显式错误线索；缺少最终测试指标不等价于零AUC或全部运行失败。"
+    },
+    {
+      "path": "docs/logs/mature-rankmixer-v1-debug-error0901.log",
+      "sha256": "df0bc7c829016ae82771b0f46361159d8ed39db55b6f80d1298a9041620dbd65",
+      "line_count": 3002,
+      "metric_pattern_matching_line_numbers": [],
+      "explicit_errors": [],
+      "note": "仅检索结果/显式错误线索；缺少最终测试指标不等价于零AUC或全部运行失败。"
+    }
+  ]
+}

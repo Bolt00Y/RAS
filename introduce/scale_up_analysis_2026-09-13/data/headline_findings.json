@@ -1,0 +1,23 @@
+{
+  "units": "AUC absolute difference; one basis point=0.0001; no CI from summary rows",
+  "small3_minus_small_five_day": "0.0001892",
+  "small3_minus_e2_five_day": "0.0001354",
+  "small3_minus_base_five_day": "-0.0002894",
+  "mature_minus_small3_five_day": "0.000334",
+  "full_depth_gain_first_day": "0.000049",
+  "light_depth_gain_first_day": "0.000176",
+  "full_minus_light_depth_interaction_first_day": "-0.000127",
+  "small3_param_growth_vs_small_pct": "33.92655495591570637594532865",
+  "small3_param_saving_vs_e2_pct": "31.24140501618489915380334258",
+  "small_param_saving_vs_e2_pct": "48.65947607892384885156502796",
+  "small3_param_growth_vs_base_pct": "51.73704725891789718345724517",
+  "small3_flops_saving_vs_e2_pct": "31.26132544821165193325460032",
+  "small3_vs_e2_gap_closed_fraction": "0.3187382297551789077212806026",
+  "cannot_claim": [
+    "universal monotonic scaling",
+    "causal depth-over-width at equal compute",
+    "statistical significance",
+    "throughput speedup",
+    "data scaling exponent"
+  ]
+}

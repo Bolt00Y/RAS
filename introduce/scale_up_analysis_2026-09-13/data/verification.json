@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "local_markdown_links_checked": 75,
+  "source_hashes_unchanged": 458,
+  "png_figures_visually_reviewed": 3,
+  "numeric_recomputation": "97 unique result rows, all paired means, fixed five-day windows, five budget formulas independently verified",
+  "production_training_executed": false,
+  "errors": []
+}
